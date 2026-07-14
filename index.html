@@ -340,6 +340,7 @@ summary:hover{color:var(--ink)}
         <div class="btns" style="margin-top:16px">
           <button class="btn solid" onclick="connect()">Conectar cuenta</button>
           <button class="btn quiet" onclick="setup()">Configurar acceso</button>
+          <button class="btn quiet" onclick="diagnose()">Diagnosticar</button>
         </div>
       </div>
       <p class="cap" style="margin-top:14px">Sin conexión también puedes usar <b>Estudiar</b> para montar y valorar cualquier estrategia a mano.</p>
@@ -1576,16 +1577,72 @@ const gloss=()=>{$('gloss').innerHTML=GL.map(([k,v])=>`<dt>${k}</dt><dd>${v}</dd
 /* ══════════════ CONEXIÓN ══════════════ */
 const led=(t,c)=>{$('ledTx').textContent=t;$('led').className='led'+(c?' '+c:'');};
 function setup(){
-  const u=prompt('Dirección del Worker:',CN.url||'https://mesa-opt-proxy.xxx.workers.dev');if(u===null)return;
-  const k=prompt('Clave de acceso:',CN.key||'');if(k===null)return;
-  localStorage.setItem('tt_url',u.replace(/\/+$/,''));localStorage.setItem('tt_key',k.trim());
+  const u=prompt(`Dirección del Worker\n\nEjemplo: https://almighty-proxy.tu-cuenta.workers.dev\n(sin barra al final)`,
+    CN.url||'https://almighty-proxy.xxx.workers.dev');
+  if(u===null)return;
+  const url=u.trim().replace(/\/+$/,'');
+  if(!/^https:\/\/.+\.workers\.dev$/i.test(url)&&!/^https:\/\//i.test(url)){
+    alert('Esa URL no parece válida.\n\nDebe empezar por https:// y ser la del Worker de Cloudflare.');
+    return;
+  }
+  const k=prompt(`Clave de acceso\n\nEs el valor de PROXY_KEY que pusiste en Cloudflare.`,CN.key||'');
+  if(k===null)return;
+  const key=k.trim();
+  if(!key){alert('La clave no puede estar vacía.');return;}
+  localStorage.setItem('tt_url',url);localStorage.setItem('tt_key',key);
   led('Configurado');
+  alert(`Guardado.\n\nWorker: ${url}\nClave: ${key.length} caracteres\n\nIMPORTANTE: en Cloudflare, la variable ALLOWED_ORIGIN debe ser exactamente:\n${location.origin}`);
 }
 async function api(a,p={}){
   if(!CN.url||!CN.key)throw new Error('Configura el acceso primero');
   const qs=new URLSearchParams(p).toString();
-  const r=await fetch(`${CN.url}/${a}${qs?'?'+qs:''}`,{headers:{'X-Proxy-Key':CN.key}});
-  const j=await r.json();if(!r.ok||!j.ok)throw new Error(j.error||('HTTP '+r.status));return j.data;
+  const url=`${CN.url}/${a}${qs?'?'+qs:''}`;
+  let r;
+  try{
+    r=await fetch(url,{headers:{'X-Proxy-Key':CN.key}});
+  }catch(e){
+    // fetch lanza "Load failed"/"Failed to fetch" cuando el navegador bloquea
+    // la petición ANTES de mandarla. El navegador oculta la causa real por
+    // seguridad, así que damos un diagnóstico útil en vez del mensaje críptico.
+    throw new Error(
+      `No se pudo alcanzar el Worker.\n\n`+
+      `URL usada: ${url}\n\n`+
+      `Causas posibles, por orden de probabilidad:\n`+
+      `1. ALLOWED_ORIGIN en Cloudflare no coincide con ${location.origin}\n`+
+      `   (debe ser exactamente eso, sin barra final ni carpeta)\n`+
+      `2. La URL del Worker está mal escrita\n`+
+      `3. El Worker no está desplegado\n\n`+
+      `Detalle técnico: ${e.message}`);
+  }
+  let j;
+  try{ j=await r.json(); }
+  catch(e){ throw new Error(`El Worker respondió algo que no es JSON (HTTP ${r.status}). ¿Está bien desplegado?`); }
+  if(!r.ok||!j.ok){
+    const msg=j.error||('HTTP '+r.status);
+    if(r.status===401)throw new Error(`Clave rechazada (401).\n\nLa clave que has puesto en la app no coincide con PROXY_KEY en Cloudflare.\n\nDetalle: ${msg}`);
+    if(r.status===500&&msg.includes('variables'))throw new Error(`${msg}\n\n${j.ayuda||''}`);
+    throw new Error(msg);
+  }
+  return j.data;
+}
+/* Diagnóstico: prueba la conexión y explica qué falla */
+async function diagnose(){
+  const out=[];
+  out.push(`Origen de esta página: ${location.origin}`);
+  out.push(`(ALLOWED_ORIGIN en Cloudflare debe ser EXACTAMENTE eso)`);
+  out.push(``);
+  out.push(`URL del Worker guardada: ${CN.url||'(ninguna)'}`);
+  out.push(`Clave guardada: ${CN.key?'sí ('+CN.key.length+' caracteres)':'(ninguna)'}`);
+  out.push(``);
+  if(!CN.url||!CN.key){out.push('❌ Falta configurar el acceso.');alert(out.join('\n'));return;}
+  out.push('Probando el Worker…');
+  try{
+    const d=await api('accounts');
+    out.push('✅ CONEXIÓN CORRECTA. El Worker responde y la clave es válida.');
+  }catch(e){
+    out.push('❌ '+e.message);
+  }
+  alert(out.join('\n'));
 }
 async function pullMarket(){
   const sym=($('sym').value||'SPY').toUpperCase();st.sym=sym;
@@ -1685,7 +1742,7 @@ async function connect(){
     $('bkOff').style.display='none';$('bkOn').style.display='block';$('fromBk').style.display='';
     $('bkCount').textContent=BK.pos.length+' contratos';
     renderBk();
-  }catch(e){led('Error','bad');alert('No se pudo conectar: '+e.message);}
+  }catch(e){led('Error','bad');alert(e.message);}
 }
 const stopStream=()=>{if(BK.dx)BK.dx.disconnect();led('Detenido');};
 function mkt(s,d){
