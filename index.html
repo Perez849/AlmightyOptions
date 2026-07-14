@@ -341,6 +341,7 @@ summary:hover{color:var(--ink)}
           <button class="btn solid" onclick="connect()">Conectar cuenta</button>
           <button class="btn quiet" onclick="setup()">Configurar acceso</button>
           <button class="btn quiet" onclick="diagnose()">Diagnosticar</button>
+          <button class="btn quiet" onclick="debugAuth()">Ver error de tastytrade</button>
         </div>
       </div>
       <p class="cap" style="margin-top:14px">Sin conexión también puedes usar <b>Estudiar</b> para montar y valorar cualquier estrategia a mano.</p>
@@ -1624,6 +1625,36 @@ async function api(a,p={}){
     throw new Error(msg);
   }
   return j.data;
+}
+/* Diagnóstico profundo: pregunta al Worker qué le dice tastytrade */
+async function debugAuth(){
+  if(!CN.url||!CN.key){alert('Configura el acceso primero.');return;}
+  try{
+    const r=await fetch(`${CN.url}/debug`,{headers:{'X-Proxy-Key':CN.key}});
+    const j=await r.json();
+    const d=j.diagnostico;
+    if(!d){alert('El Worker no tiene la ruta /debug.\n\nActualiza el worker.js con la versión nueva y pulsa Deploy.');return;}
+    const L=[];
+    L.push('══ CONFIGURACIÓN ══');
+    L.push(`TT_BASE: ${d.configuracion.TT_BASE}`);
+    L.push(`client_secret: ${d.configuracion.client_secret_longitud} caracteres`);
+    L.push(`refresh_token: ${d.configuracion.refresh_token_longitud} caracteres`);
+    L.push(`ALLOWED_ORIGIN: ${d.configuracion.ALLOWED_ORIGIN}`);
+    L.push('');
+    L.push('══ QUÉ DICE TASTYTRADE ══');
+    d.pruebas.forEach(p=>{
+      L.push('');
+      L.push(`▸ ${p.variante}`);
+      L.push(`  HTTP ${p.status}${p.ok?'  ✅ FUNCIONA':''}`);
+      L.push(`  ${(p.respuesta||p.error||'').slice(0,200)}`);
+    });
+    const gana=d.pruebas.find(p=>p.ok);
+    L.push('');
+    L.push(gana?`✅ La variante que funciona: ${gana.variante}`
+               :`❌ Ninguna funciona. Las credenciales son el problema, no el formato.`);
+    alert(L.join('\n'));
+    console.log('DIAGNÓSTICO COMPLETO:',d);
+  }catch(e){alert('Error al diagnosticar: '+e.message);}
 }
 /* Diagnóstico: prueba la conexión y explica qué falla */
 async function diagnose(){
