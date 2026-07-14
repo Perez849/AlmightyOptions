@@ -209,6 +209,54 @@ input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;bac
   cursor:pointer;border:3px solid var(--paper);box-shadow:0 0 0 1px var(--model)}
 input[type=range]:focus-visible{outline:2px solid var(--model);outline-offset:4px}
 
+
+/* ═══ CAPA EXPLICATIVA ═══ */
+/* cifra con etiqueta doble: claro arriba, jerga pequeña debajo */
+.figs .f .k{font-size:11px;font-weight:500;color:var(--ink2);line-height:1.3;margin-bottom:5px}
+.figs .f .v{font-size:19px;font-weight:600;letter-spacing:-.01em}
+.figs .f .j{font-family:var(--num);font-size:9px;color:var(--ink3);margin-top:4px;letter-spacing:.01em}
+.figs .f{padding:13px 15px;min-width:120px}
+
+/* la historia: prosa que se lee */
+.historia{font-size:15px;line-height:1.65;color:var(--ink2);max-width:66ch}
+.historia p{margin-bottom:11px}
+.historia p:last-child{margin-bottom:0}
+.historia b{color:var(--ink);font-weight:600}
+.historia .num{font-family:var(--num);color:var(--ink);font-weight:600}
+.historia em{font-style:italic}
+/* el párrafo clave: el que dice qué hacer */
+.historia .clave{padding:12px 15px;border-radius:6px;border-left:3px solid var(--rule2);margin:14px 0}
+.historia .clave.up{background:rgba(63,185,132,.08);border-left-color:var(--bull)}
+.historia .clave.dn{background:rgba(229,72,77,.08);border-left-color:var(--bear)}
+.historia .clave.mk{background:rgba(217,164,65,.08);border-left-color:var(--mark)}
+.historia .tip{font-size:13px;color:var(--ink3);font-style:italic;margin-top:14px}
+
+/* desplegable de explicación */
+details.explica{margin-top:14px;border:1px solid var(--rule);border-radius:6px;
+  background:var(--paper2);padding:0;border-top:1px solid var(--rule)}
+details.explica summary{padding:10px 14px;font-size:13px;font-weight:500;color:var(--model);
+  cursor:pointer;list-style:none;user-select:none}
+details.explica summary::-webkit-details-marker{display:none}
+details.explica summary::before{content:"?  ";font-weight:700}
+details.explica[open] summary{border-bottom:1px solid var(--rule);color:var(--ink)}
+details.explica[open] summary::before{content:"×  "}
+details.explica summary:hover{color:var(--ink)}
+.explica-txt{padding:14px;font-size:14px;line-height:1.65;color:var(--ink2)}
+.explica-txt p{margin-bottom:10px}
+.explica-txt p:last-child{margin-bottom:0}
+.explica-txt b{color:var(--ink);font-weight:600}
+.explica-txt em{font-style:italic}
+
+/* intro de cada ranking */
+.intro-rank{font-size:14px;line-height:1.6;color:var(--ink2);margin-bottom:14px;
+  padding:11px 14px;background:var(--paper2);border-radius:6px;border-left:2px solid var(--model)}
+
+/* tabla: cabeceras a dos líneas */
+.quotes thead th small{display:block;font-weight:400;font-size:9px;color:var(--ink3);margin-top:2px}
+.quotes tbody td small{display:block;font-size:9.5px;margin-top:2px;font-weight:400}
+.quotes tbody td{padding:9px 8px;vertical-align:top}
+.quotes .tk{font-weight:600}
+
 canvas{width:100%;display:block}
 /* ═══ ajustes finos ═══ */
 /* la app entera debe ser oscura, aunque el contenedor externo no lo sea */
@@ -335,8 +383,9 @@ summary:hover{color:var(--ink)}
   <div class="view on" id="v-book">
     <div id="bkOff">
       <div class="empty">
-        <strong>Conecta tu cuenta para empezar</strong>
-        Verás tus posiciones con precios y griegas en directo, y qué significan en lenguaje llano.
+        <strong>Conecta tu cuenta</strong>
+        Verás tus posiciones con precios en directo, y —lo importante— <b>qué significan</b>:
+        si vas ganando, qué necesitas que pase, y dónde está el riesgo que no ves.
         <div class="btns" style="margin-top:16px">
           <button class="btn solid" onclick="connect()">Conectar cuenta</button>
           <button class="btn quiet" onclick="setup()">Configurar acceso</button>
@@ -348,9 +397,8 @@ summary:hover{color:var(--ink)}
     </div>
 
     <div id="bkOn" style="display:none">
-      <div id="bkVerdict"></div>
       <section class="blk">
-        <h2>Radiografía<span class="sub" id="bkNlv"></span></h2>
+        <h2>Cómo vas<span class="sub" id="bkNlv"></span></h2>
         <div class="figs" id="bkFigs"></div>
         <div id="bkNote"></div>
       </section>
@@ -369,14 +417,14 @@ summary:hover{color:var(--ink)}
   <div class="view" id="v-desk">
     <div class="cols c21">
       <section class="blk">
-        <h2>El subyacente</h2>
+        <h2>Sobre qué operas</h2>
         <div class="rw">
           <div class="fld"><label>Ticker</label><input id="sym" value="SPY" style="text-transform:uppercase"></div>
           <div class="fld"><label>Vencimiento</label><select id="expSel"><option value="">Manual</option></select></div>
         </div>
         <div class="btns" style="margin-bottom:14px">
-          <button class="btn sm" onclick="pullMarket()">Traer del mercado</button>
-          <button class="btn quiet sm" onclick="pullGarch()">Estimar volatilidad</button>
+          <button class="btn sm" onclick="pullMarket()">Traer datos reales</button>
+          <button class="btn quiet sm" onclick="pullGarch()">Ver cuánto se mueve de verdad</button>
         </div>
         <div class="rw">
           <div class="fld"><label>Precio</label><input id="S" type="number" value="100" step="0.5"></div>
@@ -394,7 +442,7 @@ summary:hover{color:var(--ink)}
       </section>
 
       <section class="blk">
-        <h2>La estructura</h2>
+        <h2>Qué montas</h2>
         <div class="chips" id="tpl"></div>
         <div class="btns" style="margin-bottom:10px">
           <button class="btn quiet sm" onclick="addLeg()">Añadir pata</button>
@@ -406,98 +454,114 @@ summary:hover{color:var(--ink)}
     </div>
 
     <section class="blk">
-      <h2>Qué pasa si<span class="sub" id="mdlTag">Black-Scholes</span></h2>
+      <h2>Qué pasa en cada escenario<span class="sub" id="mdlTag">Black-Scholes</span></h2>
       <div class="figs" id="payFigs"></div>
       <div id="payNote"></div>
       <div class="plot"><canvas id="payoff" height="290"></canvas></div>
-      <p class="cap"><b>Negro</b>: resultado a vencimiento. <b style="color:var(--model)">Azul</b>: hoy, con la IV del mercado.
-        <b style="color:var(--mark)">Ámbar</b>: hoy, con la volatilidad que predice el modelo. La separación entre azul y ámbar
-        <em>es</em> lo que el mercado te cobra de más (o de menos) por el seguro.</p>
+      <div class="historia" style="font-size:13.5px">
+        <p><b>La línea blanca</b> es lo que te llevas <b>el día del vencimiento</b>, según dónde acabe el precio.
+           Es la que importa de verdad.</p>
+        <p><b style="color:var(--model)">La azul</b> es lo que vale tu posición <b>hoy</b>, si cerraras ahora mismo.
+           <b style="color:var(--mark)">La ámbar</b> es lo que <em>debería</em> valer según el histórico real.</p>
+        <p class="tip">Si la ámbar está por debajo de la azul, el mercado te está pagando de más. Ese hueco es tu ventaja.</p>
+      </div>
     </section>
 
     <div class="cols c2">
       <section class="blk">
-        <h2>Mueve el mercado</h2>
-        <div class="sldr"><div class="top"><label style="margin:0">Precio del subyacente</label><span class="val" id="uS">0</span></div><input type="range" id="rS" min="-40" max="40" value="0" step="0.5"></div>
-        <div class="sldr"><div class="top"><label style="margin:0">Días transcurridos</label><span class="val" id="uD">0</span></div><input type="range" id="rD" min="0" max="120" value="0" step="1"></div>
-        <div class="sldr"><div class="top"><label style="margin:0">Cambio de IV (puntos)</label><span class="val" id="uV">0</span></div><input type="range" id="rV" min="-30" max="30" value="0" step="0.5"></div>
+        <h2>Juega con el mercado</h2>
+        <div class="sldr"><div class="top"><label style="margin:0">¿Y si el precio se mueve?</label><span class="val" id="uS">0</span></div><input type="range" id="rS" min="-40" max="40" value="0" step="0.5"></div>
+        <div class="sldr"><div class="top"><label style="margin:0">¿Y si pasan días?</label><span class="val" id="uD">0</span></div><input type="range" id="rD" min="0" max="120" value="0" step="1"></div>
+        <div class="sldr"><div class="top"><label style="margin:0">¿Y si sube el miedo?</label><span class="val" id="uV">0</span></div><input type="range" id="rV" min="-30" max="30" value="0" step="0.5"></div>
         <div class="figs" id="simFigs"></div>
       </section>
 
       <section class="blk">
-        <h2>Sensibilidades</h2>
+        <h2>Qué te hace ganar y perder</h2>
         <div class="figs" id="grFigs"></div>
         <div id="grNote"></div>
-        <details><summary>Segundo orden y ejercicio anticipado</summary>
+        <details><summary>Detalles finos (para curiosos)</summary>
           <table class="quotes" id="grFull" style="margin-top:8px"></table>
         </details>
       </section>
     </div>
 
     <section class="blk">
-      <h2>Escenarios de volatilidad<span class="sub">modelo frente a mercado</span></h2>
+      <h2>¿Te están pagando bien?<span class="sub">el mercado contra la historia</span></h2>
       <div id="volScen"></div>
     </section>
 
     <section class="blk">
-      <h2>Probabilidad<span class="sub"><select id="mcM" style="width:auto;display:inline-block;font-size:11px;padding:2px 4px"><option value="gbm">Lognormal</option><option value="merton">Con saltos</option><option value="heston">Vol estocástica</option></select> <button class="btn sm" onclick="runMC()">Simular</button></span></h2>
+      <h2>¿Cuántas veces ganarías?<span class="sub"><select id="mcM" style="width:auto;display:inline-block;font-size:11px;padding:2px 4px"><option value="gbm">Lognormal</option><option value="merton">Con saltos</option><option value="heston">Vol estocástica</option></select> <button class="btn sm" onclick="runMC()">Simular</button></span></h2>
       <div class="figs" id="mcFigs"></div>
       <div id="mcNote"></div>
       <div class="plot"><canvas id="mcHist" height="140"></canvas></div>
     </section>
 
-    <details><summary>Glosario</summary><dl class="gloss" id="gloss"></dl></details>
+    <details><summary>Diccionario: qué significa cada cosa</summary><dl class="gloss" id="gloss"></dl></details>
   </div>
 
   <!-- ═══════════ CADENA ═══════════ -->
   <div class="view" id="v-chain">
     <section class="blk">
-      <h2>Escáner de cadena</h2>
+      <h2>Buscar oportunidades</h2>
       <div class="rw" style="align-items:flex-end">
         <div class="fld"><label>Ticker</label><input id="cSym" value="SPY" style="text-transform:uppercase"></div>
         <div class="fld"><label>Vencimiento</label><select id="cExp"><option value="">—</option></select></div>
-        <div class="fld"><button class="btn solid" style="width:100%" onclick="scanChain()">Escanear cadena</button></div>
+        <div class="fld"><button class="btn solid" style="width:100%" onclick="scanChain()">Buscar oportunidades</button></div>
       </div>
       <p class="status" id="cMsg"></p>
-      <div class="caveat">Cada strike se compara con dos referencias: <b>la volatilidad que predice el modelo</b> (GARCH sobre el histórico real)
-        y <b>la curva SVI</b> ajustada a toda la cadena. La primera dice si el mercado paga de más por el seguro; la segunda, si un strike
-        concreto está dislocado respecto a sus vecinos. Comparar contra una IV inventada no diría nada: el modelo reproduciría el precio por construcción.</div>
+      <div class="caveat">Esto va a hacer dos cosas: mirar <b>todas las opciones</b> de ese vencimiento,
+        y mirar <b>cómo se ha movido la acción de verdad</b> en el último año.
+        Luego te dice cuáles están mal valoradas y por qué. Tarda unos segundos.</div>
     </section>
 
     <div id="cOut" style="display:none">
-      <div id="cVerdict"></div>
       <section class="blk">
-        <h2>Resumen<span class="sub" id="cSum"></span></h2>
-        <div class="figs" id="cFigs"></div>
+        <h2>Qué está pasando<span class="sub" id="cSum"></span></h2>
+        <div class="historia" id="cHistoria"></div>
+        <div class="figs" id="cFigs" style="margin-top:18px"></div>
+        <div id="cAyuda"></div>
       </section>
 
       <section class="blk">
-        <h2>Dónde está el valor<span class="sub" id="cRankSub"></span></h2>
+        <h2>Dónde está el dinero</h2>
         <div class="chips" id="cChips"></div>
+        <div id="cRankIntro"></div>
         <div class="scrollx"><table class="quotes" id="cRank"></table></div>
-        <div id="cRankNote"></div>
+        <div class="historia" id="cRankNote" style="margin-top:16px"></div>
       </section>
 
       <section class="blk">
-        <h2>Cadena completa<span class="sub" id="cCount"></span></h2>
+        <h2>Todas las opciones<span class="sub" id="cCount"></span></h2>
         <div class="scrollx"><table class="quotes" id="cTable"></table></div>
-        <p class="cap">Pulsa cualquier fila para llevarla a <b>Estudiar</b>.
-          <b style="color:var(--bull)">▸</b> cotiza por encima de su curva (candidato a vender) ·
-          <b style="color:var(--bear)">▸</b> por debajo (candidato a comprar).</p>
+        <div class="historia" style="font-size:13.5px">
+          <p><b style="color:var(--bull)">▸ Verde</b>: esta opción está <b>cara</b> comparada con sus vecinas. Buena para vender.
+             <b style="color:var(--bear)">▸ Rojo</b>: está <b>barata</b>. Buena para comprar.</p>
+          <p class="tip">Pulsa cualquier fila para llevártela a <b>Estudiar</b> y ver los escenarios.</p>
+        </div>
       </section>
 
       <div class="cols c2">
         <section class="blk">
-          <h2>La sonrisa</h2>
+          <h2>Cuáles se salen de lo normal</h2>
           <div class="plot"><canvas id="smile" height="220"></canvas></div>
-          <p class="cap">Cada punto es un strike real. La línea es la curva SVI que mejor los ajusta.
-            Los que se despegan de la línea son los dislocados.</p>
+          <div class="historia" style="font-size:13.5px">
+            <p>Cada punto es una opción real. La línea es "lo normal": la curva que forman todas juntas.</p>
+            <p><b style="color:var(--bull)">Los verdes</b> están por encima de la línea: <b>caros</b>, alguien paga de más.
+               <b style="color:var(--bear)">Los rojos</b>, por debajo: <b>baratos</b>.</p>
+            <p class="tip">Que los puts (izquierda) estén más altos que las calls es normal: la gente paga más
+               por protegerse de las caídas que de las subidas. Eso no es una anomalía, es el miedo de siempre.</p>
+          </div>
         </section>
         <section class="blk">
-          <h2>Lo que el mercado descuenta</h2>
+          <h2>Dónde cree el mercado que acabará</h2>
           <div class="plot"><canvas id="rnd" height="220"></canvas></div>
-          <p class="cap">Distribución implícita a vencimiento, derivada de la curva de precios
-            (Breeden-Litzenberger). La cola izquierda gorda es el miedo a las caídas.</p>
+          <div class="historia" style="font-size:13.5px">
+            <p>Esta es la apuesta colectiva: dónde cree el mercado que estará el precio el día del vencimiento.</p>
+            <p>Fíjate en que <b>la cola de la izquierda es más gorda</b>. El mercado teme más una caída
+               fuerte que una subida fuerte. Siempre es así.</p>
+          </div>
         </section>
       </div>
     </div>
@@ -1132,6 +1196,207 @@ class DXLink{
 
 
 /* ═══ APLICACIÓN ═══ */
+/* ═══════════════════════════════════════════════════════════════
+   CAPA DE TRADUCCIÓN
+   Cada concepto técnico tiene:
+     - titulo:  cómo se llama en cristiano
+     - corto:   una frase que explica qué es
+     - jerga:   el nombre técnico (se muestra pequeño, debajo)
+     - largo:   la explicación completa, para el desplegable
+   ═══════════════════════════════════════════════════════════════ */
+const DICC = {
+  iv: {
+    titulo: 'Lo que el mercado espera que se mueva',
+    jerga: 'Volatilidad implícita (IV)',
+    corto: 'El susto que descuentan los precios de las opciones.',
+    largo: `Cuando compras una opción, estás comprando un seguro. Y como todo seguro, su precio depende de lo probable que sea el siniestro.
+
+Si el mercado cree que <b>{sym}</b> va a dar bandazos, las opciones se encarecen. Si cree que va a estar tranquilo, se abaratan.
+
+La "volatilidad implícita" es esa expectativa, leída al revés desde el precio: si la opción cuesta esto, es que el mercado espera <em>este</em> nivel de movimiento.
+
+<b>Cómo leerla:</b> una IV del 26% significa que el mercado espera que el precio se mueva un 26% (arriba o abajo) a lo largo de un año. Para un mes, divide por la raíz de 12: unos 7,5%.`
+  },
+  volModelo: {
+    titulo: 'Lo que de verdad se ha movido',
+    jerga: 'Volatilidad esperada (GARCH/EWMA)',
+    corto: 'Lo que dice el histórico real de precios, no la opinión del mercado.',
+    largo: `Esta cifra no sale de las opciones. Sale de mirar <b>cómo se ha movido {sym} de verdad</b> durante los últimos {n} días, y proyectarlo hacia delante.
+
+<b>¿Cómo?</b> Con un modelo llamado GARCH. Suena a marciano, pero la idea es de sentido común: <em>la volatilidad viene en rachas</em>. Después de un día movido es más probable que venga otro día movido. Después de una temporada tranquila, lo normal es más calma.
+
+El modelo mide la fuerza de esa inercia y predice qué va a pasar en los próximos {dte} días.
+
+<b>Para qué sirve:</b> para tener una opinión propia, independiente de lo que dice el mercado. Y comparar.`
+  },
+  vrp: {
+    titulo: 'Quién tiene razón: el mercado o el histórico',
+    jerga: 'Prima de riesgo de volatilidad (VRP)',
+    corto: 'La diferencia entre el susto que cobra el mercado y el que dice la historia.',
+    largo: `Aquí está el meollo de todo.
+
+El mercado dice que {sym} se va a mover un <b>{iv}</b>. El histórico dice que se mueve un <b>{modelo}</b>.
+
+<b>Si el mercado pide más de lo que la historia justifica</b> (que es lo normal), te está pagando de más por el seguro. Eso favorece <b>vender</b> opciones: cobras una prima inflada.
+
+<b>Si pide menos</b>, las opciones están baratas. Favorece <b>comprar</b>.
+
+<b>Ojo, esto es importante:</b> que el mercado pague de más no es dinero gratis. Paga de más precisamente porque, de vez en cuando, pasa algo gordo y el que vendió el seguro se come el marrón. Cobras esa prima por asumir ese riesgo. La ventaja existe, pero viene con una factura ocasional.`
+  },
+  delta: {
+    titulo: 'Cuánto te afecta que suba o baje',
+    jerga: 'Delta (Δ)',
+    corto: 'Tu apuesta direccional, medida en acciones equivalentes.',
+    largo: `Si tu delta es <b>+50</b>, tu posición se comporta como si tuvieras <b>50 acciones</b>: si el precio sube 1€, ganas 50€.
+
+Si es <b>−50</b>, es como estar corto de 50 acciones: ganas cuando baja.
+
+Si es <b>cerca de cero</b>, te da igual la dirección. Ganas por otro motivo (el tiempo, o la volatilidad).`
+  },
+  theta: {
+    titulo: 'Lo que te da (o quita) el reloj',
+    jerga: 'Theta (Θ)',
+    corto: 'Lo que ganas o pierdes cada día que pasa, sin que se mueva nada.',
+    largo: `Las opciones caducan. Y según se acerca el vencimiento, valen menos, porque queda menos tiempo para que pase algo.
+
+<b>Si vendiste la opción</b>, eso te beneficia: cada día que pasa tranquilo, la opción que vendiste vale menos y tú ganas la diferencia. Theta positiva.
+
+<b>Si la compraste</b>, es al revés: se te derrite en las manos. Theta negativa. Necesitas que el movimiento llegue <em>pronto</em>.`
+  },
+  vega: {
+    titulo: 'Cuánto te afecta el pánico',
+    jerga: 'Vega',
+    corto: 'Lo que ganas o pierdes si el mercado se pone nervioso.',
+    largo: `Cuando hay miedo, las opciones se encarecen —todas a la vez, aunque el precio no se mueva.
+
+<b>Vega positiva</b>: te beneficia que suba el miedo. Es lo típico si compraste opciones.
+
+<b>Vega negativa</b>: te perjudica. Es lo típico si vendiste prima. Un susto en el mercado te hace daño aunque aciertes la dirección.`
+  },
+  gamma: {
+    titulo: 'Lo rápido que cambian las cosas',
+    jerga: 'Gamma (Γ)',
+    corto: 'Si tu apuesta direccional se acelera o se frena con el movimiento.',
+    largo: `Gamma mide cómo cambia tu delta cuando el precio se mueve.
+
+<b>Gamma negativa</b> (típico de vender prima): tu posición empeora <em>sola</em> cuando el mercado se mueve en tu contra. Cuanto más se aleja, más rápido pierdes. Es lo peligroso de vender opciones cerca del vencimiento.
+
+<b>Gamma positiva</b> (típico de comprarlas): tu posición mejora sola con el movimiento. Cuanto más se mueve, mejor.`
+  },
+  pop: {
+    titulo: 'Cuántas veces de cada 100 ganarías',
+    jerga: 'Probabilidad de beneficio (POP)',
+    corto: 'De 20.000 futuros simulados, en cuántos acabas en verde.',
+    largo: `Simulamos 20.000 futuros distintos para {sym} y contamos en cuántos acabas ganando.
+
+<b>Pero cuidado:</b> ganar el 80% de las veces no significa que sea buena idea. Si en el 20% restante pierdes diez veces más de lo que ganas, sales perdiendo. Por eso hay que mirar también el <em>valor esperado</em>.`
+  },
+  ev: {
+    titulo: 'Lo que ganarías de media si repitieras esto mil veces',
+    jerga: 'Valor esperado (EV)',
+    corto: 'La media de todos los futuros posibles. Positivo = tienes ventaja.',
+    largo: `Esta es la cifra honesta. No "¿ganaré?", sino "<em>si hiciera esta operación mil veces, saldría ganando?</em>".
+
+<b>Positivo</b>: tienes ventaja matemática. A largo plazo, ganas.
+<b>Negativo</b>: no la tienes. Puedes ganar hoy por suerte, pero repitiéndolo pierdes.
+
+<b>La trampa:</b> si simulas con la volatilidad que dice el <em>mercado</em>, este número siempre sale cero. Es una propiedad matemática: el mercado pone los precios justos según su propia opinión. Por eso hay que simular con <b>tu</b> opinión (el histórico) para ver si tienes ventaja de verdad.`
+  },
+  gap: {
+    titulo: 'Te pagan de más',
+    jerga: 'Precio de mercado − precio teórico',
+    corto: 'Cuánto dinero te dan por encima de lo que la opción "debería" valer.',
+    largo: `Cogemos la volatilidad que dice el histórico (no la del mercado) y calculamos cuánto <em>debería</em> costar esta opción.
+
+Luego lo comparamos con lo que te pagan de verdad.
+
+<b>Si te pagan más</b>: el mercado está siendo generoso. Buen momento para vender.
+<b>Si te pagan menos</b>: está siendo tacaño. Mejor comprar.
+
+Lo damos en euros por contrato, que es lo que te llega al bolsillo.`
+  },
+  curva: {
+    titulo: 'Si este strike se sale de lo normal',
+    jerga: 'Desviación vs curva SVI',
+    corto: 'Si esta opción está cara o barata comparada con sus vecinas.',
+    largo: `Todos los strikes de un vencimiento forman una curva suave: los muy lejanos tienen más volatilidad implícita, los cercanos menos. Es la "sonrisa".
+
+Ajustamos una curva a todos ellos y miramos cuáles <b>se salen</b>.
+
+<b>Si un strike está por encima de la curva</b>: está caro respecto a sus vecinos. Alguien está pagando de más por él. Candidato a <b>vender</b>.
+<b>Si está por debajo</b>: barato. Candidato a <b>comprar</b>.
+
+Esto es distinto del punto anterior: aquí no comparamos con el histórico, sino <em>de unos strikes con otros</em>. Es una anomalía local.`
+  },
+  probOTM: {
+    titulo: 'Probabilidad de que caduque sin valor',
+    jerga: 'P(OTM)',
+    corto: 'Si la vendes, la probabilidad de quedarte la prima entera.',
+    largo: `Si vendes una opción y expira "sin valor" (out of the money), te quedas con toda la prima y no pagas nada. Es el mejor escenario del vendedor.
+
+Un 85% significa: en 85 de cada 100 futuros, esa opción caduca sin que tengas que pagar nada.
+
+<b>Pero:</b> el 15% restante existe. Y ahí es donde puedes perder mucho más de lo que cobraste.`
+  },
+  liquidez: {
+    titulo: 'Lo fácil que es entrar y salir',
+    jerga: 'Liquidez (spread bid-ask)',
+    corto: 'Si el spread es ancho, pierdes dinero solo por operar.',
+    largo: `Cada opción tiene un precio de compra y otro de venta. La diferencia (el "spread") te la comes tú.
+
+<b>Liquidez alta (90-100%)</b>: spread estrecho, entras y sales casi al mismo precio.
+<b>Liquidez baja (menos del 50%)</b>: spread ancho. Puedes perder un 5-10% solo por abrir y cerrar la posición, aunque aciertes.
+
+En opciones poco negociadas esto se come el edge entero. Cuidado.`
+  },
+  breakeven: {
+    titulo: 'A partir de dónde empiezas a perder',
+    jerga: 'Punto de equilibrio',
+    corto: 'El precio al que tu resultado pasa de positivo a negativo.',
+    largo: `Es la frontera. Si {sym} acaba por encima (o por debajo, según la estrategia), pierdes.
+
+<b>La pregunta clave:</b> ¿está esa frontera lejos o cerca del movimiento que el mercado espera? Si el mercado espera que se mueva 5€ y tu frontera está a 3€, la va a cruzar sin despeinarse.`
+  },
+  eep: {
+    titulo: 'Lo que vale poder ejercer antes de tiempo',
+    jerga: 'Prima de ejercicio anticipado',
+    corto: 'Las opciones americanas se pueden ejercer cuando quieras. Eso vale dinero.',
+    largo: `Una opción europea solo se puede ejercer el día del vencimiento. Una americana, cualquier día.
+
+Esa flexibilidad vale algo, sobre todo en <b>puts muy dentro de dinero</b> cuando los tipos de interés están altos: te conviene ejercer ya y meter el dinero en el banco.
+
+Casi siempre es una cifra pequeña. Si sale cero, es que no compensa ejercer antes.`
+  },
+  kelly: {
+    titulo: 'Cuánto capital deberías arriesgar',
+    jerga: 'Criterio de Kelly',
+    corto: 'La fracción óptima de tu dinero según la ventaja que tengas.',
+    largo: `Si tienes ventaja, ¿cuánto apuestas? Muy poco y no aprovechas. Demasiado y una racha mala te arruina.
+
+Kelly da la respuesta matemática. <b>Pero es agresiva</b>: en la práctica casi todo el mundo usa un cuarto de lo que dice Kelly, porque el cálculo asume que conoces tus probabilidades con exactitud. Y no las conoces.
+
+<b>Si sale negativo</b>: no tienes ventaja. No apuestes.`
+  }
+};
+
+/* Genera el bloque de ayuda desplegable */
+function ayuda(clave, vars = {}) {
+  const d = DICC[clave];
+  if (!d) return '';
+  let txt = d.largo;
+  for (const k in vars) txt = txt.replaceAll(`{${k}}`, vars[k]);
+  return `<details class="explica">
+    <summary>¿Qué significa esto?</summary>
+    <div class="explica-txt">${txt}</div>
+  </details>`;
+}
+/* Etiqueta doble: cristiano arriba, jerga pequeña debajo */
+function etiq(clave) {
+  const d = DICC[clave];
+  if (!d) return clave;
+  return `<span class="et"><span class="et-claro">${d.titulo}</span><span class="et-jerga">${d.jerga}</span></span>`;
+}
+
 /* ══════════════ ESTADO ══════════════ */
 const st={S:100,DTE:45,IV:26,r:4.5,q:0,model:'bsm',legs:[],
   expVol:NaN,volPack:null,sym:'SPY',exps:[],rkView:'best'};
@@ -1242,37 +1507,84 @@ function ribbon(){
   const em=st.S*VV()*Math.sqrt(T());
   $('ribbon').innerHTML=
     `<div class="rq"><span class="l">${st.sym}</span><span class="n">${st.S.toFixed(2)}</span></div>`+
-    `<div class="rq"><span class="l">IV</span><span class="n">${st.IV.toFixed(1)}%</span></div>`+
-    `<div class="rq"><span class="l">Vol modelo</span><span class="n">${isFinite(st.expVol)?pc(st.expVol):'—'}</span></div>`+
-    `<div class="rq"><span class="l">VRP</span><span class="n ${vrp>.02?'up':vrp<-.02?'dn':''}">${isFinite(vrp)?((vrp>=0?'+':'')+(vrp*100).toFixed(1)+'pts'):'—'}</span></div>`+
-    `<div class="rq"><span class="l">Mov. esperado</span><span class="n">±${em.toFixed(2)}</span></div>`+
-    `<div class="rq"><span class="l">Vencimiento</span><span class="n">${st.DTE}d</span></div>`;
+    `<div class="rq"><span class="l">se espera que se mueva</span><span class="n">±${em.toFixed(2)}</span></div>`+
+    `<div class="rq"><span class="l">susto del mercado</span><span class="n">${st.IV.toFixed(1)}%</span></div>`+
+    `<div class="rq"><span class="l">susto real</span><span class="n">${isFinite(st.expVol)?pc(st.expVol):'—'}</span></div>`+
+    `<div class="rq"><span class="l">te pagan de más</span><span class="n ${vrp>.02?'up':vrp<-.02?'dn':''}">${isFinite(vrp)?((vrp>=0?'+':'')+(vrp*100).toFixed(1)+' pts'):'—'}</span></div>`+
+    `<div class="rq"><span class="l">vence en</span><span class="n">${st.DTE} días</span></div>`;
 }
 function payFigs(){
   if(!st.legs.length){$('payFigs').innerHTML='';$('payNote').innerHTML='';return;}
   const s=stats();const roc=s.max/Math.max(s.cap,1)*100;
   $('payFigs').innerHTML=
-    fg('Apertura',s.net<0?'Crédito':'Débito','mk',HELP.gap?'':'')+
-    fg('Máximo',money(s.max),'up')+
-    fg('Mínimo',money(s.min),'dn')+
-    fg('Retorno s/riesgo',isFinite(roc)?roc.toFixed(0)+'%':'∞','mk')+
-    fg('Puntos de equilibrio',s.be.map(b=>b.toFixed(1)).join(' · ')||'—','','',true);
+    fig2(s.net<0?'Te pagan hoy':'Pagas hoy', money(Math.abs(s.net)), s.net<0?'up':'dn', s.net<0?'Crédito':'Débito')+
+    fig2('Lo máximo que ganas', money(s.max), 'up', 'Beneficio máximo')+
+    fig2('Lo máximo que pierdes', money(Math.abs(s.min)), 'dn', 'Pérdida máxima')+
+    fig2('Ganas hasta', isFinite(roc)?roc.toFixed(0)+'% de lo que arriesgas':'ilimitado', 'mk', 'Retorno sobre riesgo')+
+    fig2('La frontera está en', s.be.map(b=>b.toFixed(1)).join('  y  ')||'—', '', 'Puntos de equilibrio');
   payNote(s);
 }
 function payNote(s){
-  const g=sGrk(st.S,T(),VV());const sig=st.S*VV()*Math.sqrt(T());
-  const dir=Math.abs(g.delta)<.1?'neutral':g.delta>0?'alcista':'bajista';
-  const d=dir==='neutral'?'No apuestas a dirección: ganas si el subyacente se queda dentro de un rango.'
-    :dir==='alcista'?'Apuestas a que el subyacente <b>sube</b>.':'Apuestas a que el subyacente <b>baja</b>.';
-  const t=g.theta>=0?'El tiempo juega <b>a tu favor</b>: cada día tranquilo que pasa, ganas.'
-    :'El tiempo juega <b>en tu contra</b>: necesitas que el movimiento llegue pronto.';
-  let b='';
-  if(s.be.length){const m=Math.min(...s.be.map(x=>Math.abs(x-st.S)/sig));
-    b=m>1.3?' Tus equilibrios están <b>más lejos</b> que el movimiento que el mercado espera: la probabilidad juega a favor.'
-     :m<.7?' Tus equilibrios caen <b>dentro</b> del movimiento esperado: el mercado los alcanza sin esfuerzo.'
-     :' Tus equilibrios rondan justo el movimiento esperado.';}
-  const e=$('payNote');e.className='note '+(dir==='neutral'?'up':'mk');
-  e.innerHTML=`<span class="eyebrow">Qué estás haciendo</span>${s.net<0?'Cobras prima por abrir':'Pagas prima por abrir'}. ${d}<br>${t}${b}`;
+  const g=sGrk(st.S,T(),VV());
+  const sig=st.S*VV()*Math.sqrt(T());
+  const e=$('payNote');e.className='historia';
+  const cobra=s.net<0;
+  let t='';
+
+  // Qué has montado
+  t+=`<p><b>Lo que has montado:</b> ${cobra
+    ? `te <b>pagan ${money(Math.abs(s.net))}</b> por abrir esta posición. Ese dinero entra en tu cuenta hoy.`
+    : `<b>pagas ${money(Math.abs(s.net))}</b> por abrir esta posición.`}</p>`;
+
+  // Qué necesitas que pase
+  if(Math.abs(g.delta)<0.1){
+    t+=`<p><b>Qué necesitas que pase:</b> que ${st.sym} <em>no haga nada raro</em>.
+      No apuestas a que suba ni a que baje: apuestas a que se quede quieto.</p>`;
+  } else if(g.delta>0){
+    t+=`<p><b>Qué necesitas que pase:</b> que ${st.sym} <b>suba</b>.
+      Por cada euro que suba, ganas unos ${money(g.delta*100)}.</p>`;
+  } else {
+    t+=`<p><b>Qué necesitas que pase:</b> que ${st.sym} <b>baje</b>.
+      Por cada euro que baje, ganas unos ${money(-g.delta*100)}.</p>`;
+  }
+
+  // Lo máximo y lo mínimo
+  t+=`<p><b>El mejor caso:</b> ganas <b class="num">${money(s.max)}</b>.
+    <b>El peor:</b> pierdes <b class="num">${money(Math.abs(s.min))}</b>.</p>`;
+
+  // Los breakevens: la frontera
+  if(s.be.length===1){
+    const b=s.be[0];
+    const dist=Math.abs(b-st.S);
+    const veces=dist/sig;
+    t+=`<p><b>La frontera está en ${b.toFixed(2)}.</b> Si ${st.sym} la cruza, empiezas a perder.
+      Está a <b>${dist.toFixed(2)}</b> de donde estamos ahora
+      —o sea, ${veces>1.3?'<b>bastante lejos</b>: el mercado tendría que hacer algo poco habitual para llegar ahí'
+      :veces<0.7?'<b>demasiado cerca</b>: el mercado llega ahí sin despeinarse'
+      :'más o menos lo que el mercado espera que se mueva'}.</p>`;
+  } else if(s.be.length===2){
+    const [b1,b2]=s.be;
+    const ancho=b2-b1;
+    const veces=Math.min(Math.abs(b1-st.S),Math.abs(b2-st.S))/sig;
+    t+=`<p><b>Tienes un pasillo:</b> ganas mientras ${st.sym} se quede entre
+      <b class="num">${b1.toFixed(2)}</b> y <b class="num">${b2.toFixed(2)}</b>.
+      Si se sale por cualquier lado, pierdes.</p>`;
+    t+=`<p>El pasillo mide <b>${ancho.toFixed(2)}</b> de ancho.
+      ${veces>1.3?'Es <b>ancho</b>: el mercado tendría que moverse mucho más de lo normal para salirse. La probabilidad juega a tu favor.'
+      :veces<0.7?'Es <b>estrecho</b>: el mercado se sale de ahí con un movimiento normal. Vas justo.'
+      :'Es más o menos del tamaño de lo que el mercado espera moverse. Ni fácil ni difícil.'}</p>`;
+  }
+
+  // El tiempo
+  t+=g.theta>=0
+    ? `<p class="clave up"><b>El tiempo juega a tu favor:</b> cada día que pasa sin sobresaltos,
+       te embolsas <b class="num">${money(g.theta*100)}</b>. Solo por esperar.</p>`
+    : `<p class="clave mk"><b>El tiempo juega en tu contra:</b> cada día que pasa te cuesta
+       <b class="num">${money(-g.theta*100)}</b>. Necesitas que el movimiento llegue pronto,
+       o se te derrite la posición.</p>`;
+
+  t+=ayuda('breakeven',{sym:st.sym});
+  e.innerHTML=t;
 }
 function cvs(id,h){const c=$(id);const d=window.devicePixelRatio||1;const w=c.clientWidth;
   c.width=w*d;c.height=h*d;const x=c.getContext('2d');x.setTransform(d,0,0,d,0,0);return[x,w,h];}
@@ -1326,15 +1638,41 @@ function sim(){
 function grFigs(){
   if(!st.legs.length){$('grFigs').innerHTML='';$('grNote').innerHTML='';$('grFull').innerHTML='';return;}
   const g=sGrk(st.S,T(),VV());
-  $('grFigs').innerHTML=fg('Delta',g.delta.toFixed(2),'',HELP.delta)+
-    fg('Gamma',g.gamma.toFixed(3),'',HELP.gamma)+
-    fg('Theta/día',money(g.theta*100),g.theta>=0?'up':'dn',HELP.theta)+
-    fg('Vega',g.vega.toFixed(2),'',HELP.vega);
-  const e=$('grNote');e.className='note';
-  e.innerHTML=`<span class="eyebrow">Cómo se lee</span>Tu posición se comporta como
-    <b class="num">${Math.abs(g.delta*100).toFixed(0)} acciones ${g.delta>=0?'largas':'cortas'}</b>.
-    ${g.theta>=0?'Cobras':'Pagas'} <b class="num">${money(g.theta*100)}</b> al día por el paso del tiempo.
-    ${g.vega>=0?'Ganas':'Pierdes'} si la volatilidad sube.`;
+  const acc=Math.abs(g.delta*100);
+  $('grFigs').innerHTML=
+    fig2('Si sube 1€, ganas', money(g.delta*100), g.delta>=0?'up':'dn', 'Delta '+g.delta.toFixed(2))+
+    fig2('Cada día que pasa', money(g.theta*100), g.theta>=0?'up':'dn', 'Theta')+
+    fig2('Si sube el miedo 1 punto', money(g.vega*100), g.vega>=0?'up':'dn', 'Vega '+g.vega.toFixed(2))+
+    fig2('Se acelera con el movimiento', g.gamma>=0?'A tu favor':'En tu contra',
+         g.gamma>=0?'up':'dn', 'Gamma '+g.gamma.toFixed(3));
+  const e=$('grNote');e.className='historia';
+  const dirTxt = Math.abs(g.delta)<0.1
+    ? `<p>Tu posición es <b>neutral a la dirección</b>: te da bastante igual si ${st.sym} sube o baja.
+       Ganas por otro motivo.</p>`
+    : `<p>Tu posición se comporta como si tuvieras <b class="num">${acc.toFixed(0)} acciones
+       ${g.delta>=0?'compradas':'vendidas'}</b> de ${st.sym}.
+       ${g.delta>=0?'Si sube, ganas. Si baja, pierdes.':'Si baja, ganas. Si sube, pierdes.'}</p>`;
+  const tiempoTxt = g.theta>=0
+    ? `<p><b>El tiempo juega a tu favor.</b> Cada día que pasa sin que se mueva nada,
+       te embolsas <b class="num">${money(g.theta*100)}</b>. Es el negocio del que vende seguros:
+       cobras por esperar.</p>`
+    : `<p><b>El tiempo juega en tu contra.</b> Cada día que pasa te cuesta
+       <b class="num">${money(-g.theta*100)}</b>. Compraste un billete de lotería con fecha de caducidad:
+       necesitas que el movimiento llegue <em>pronto</em>.</p>`;
+  const miedoTxt = Math.abs(g.vega)<0.02 ? ''
+    : g.vega>=0
+    ? `<p>Si el mercado se pone nervioso (aunque el precio no se mueva), <b>ganas</b>.</p>`
+    : `<p>Si el mercado se pone nervioso, <b>pierdes</b> — aunque el precio no se mueva ni un céntimo.
+       Es el riesgo típico de vender opciones: un susto general te hace daño.</p>`;
+  const gammaTxt = g.gamma<-0.001
+    ? `<p class="clave dn"><b>Cuidado con esto:</b> tu posición <em>empeora sola</em> cuando el mercado
+       se mueve en tu contra. Cuanto más se aleja, más rápido pierdes. Es lo peligroso de vender opciones,
+       y se agrava según se acerca el vencimiento.</p>`
+    : g.gamma>0.001
+    ? `<p>Y tu posición <em>mejora sola</em> con el movimiento: cuanto más se mueva ${st.sym},
+       mejor te va. Compraste convexidad.</p>` : '';
+  e.innerHTML = dirTxt + tiempoTxt + miedoTxt + gammaTxt
+    + ayuda('theta') + ayuda('vega');
   // segundo orden + prima de ejercicio anticipado
   let eepRows='';
   if(st.legs.length){
@@ -1343,70 +1681,109 @@ function grFigs(){
       eepTot+=(l.side==='B'?1:-1)*l.qty*e2*100;});
     eepRows=`<tr><td class="mute">Prima de ejercicio anticipado<span class="help">?<span class="bub">${HELP.eep}</span></span></td><td class="${eepTot>=0?'up':'dn'}">${money(eepTot)}</td></tr>`;
   }
-  const rows=[['Rho',g.rho,3],['Vanna',g.vanna,4],['Volga',g.volga,4],['Charm',g.charm,5],
-    ['Speed',g.speed,5],['Zomma',g.zomma,5],['Color',g.color,6]];
-  $('grFull').innerHTML='<tbody>'+rows.map(([k,v,d])=>
-    `<tr><td class="mute">${k}</td><td class="${v>=0?'up':'dn'}">${v.toFixed(d)}</td></tr>`).join('')+eepRows+'</tbody>';
+  const rows=[
+    ['Rho', g.rho, 3, 'Si suben los tipos de interés'],
+    ['Vanna', g.vanna, 4, 'Cómo cambia tu direccionalidad con el miedo'],
+    ['Volga', g.volga, 4, 'Cómo se acelera tu exposición al miedo'],
+    ['Charm', g.charm, 5, 'Cómo cambia tu direccionalidad con el paso del tiempo'],
+    ['Speed', g.speed, 5, 'La aceleración de la aceleración'],
+    ['Zomma', g.zomma, 5, 'Cómo cambia gamma con el miedo'],
+    ['Color', g.color, 6, 'Cómo cambia gamma con el tiempo']];
+  $('grFull').innerHTML='<tbody>'+rows.map(([k,v,d,exp])=>
+    `<tr><td class="mute">${exp}<br><small style="font-family:var(--num);opacity:.6">${k}</small></td>
+     <td class="${v>=0?'up':'dn'}">${v.toFixed(d)}</td></tr>`).join('')+eepRows+'</tbody>';
 }
 
 /* ══════════════ ESCENARIOS DE VOLATILIDAD ══════════════ */
 function volScen(){
   const e=$('volScen');
-  if(!st.legs.length){e.innerHTML='<p class="cap">Monta una estructura para ver los escenarios.</p>';return;}
+  if(!st.legs.length){e.innerHTML='<p class="cap">Monta una estrategia arriba para ver esto.</p>';return;}
   if(!isFinite(st.expVol)){
-    e.innerHTML=`<p class="cap">Pulsa <b>Estimar volatilidad</b> arriba para ajustar un GARCH sobre el histórico real
-      del subyacente y comparar lo que vale tu estructura con lo que el mercado te pide por ella.</p>`;
+    e.innerHTML=`<div class="historia">
+      <p>Aquí es donde se ve <b>si el mercado te está pagando de más o de menos</b>. Pero falta un dato.</p>
+      <p>Ahora mismo solo sabemos lo que <em>dice</em> el mercado. Para saber si tiene razón,
+         hay que mirar cómo se ha movido <b>${st.sym}</b> de verdad.</p>
+      <p class="clave mk">Pulsa <b>Estimar volatilidad</b> arriba. Descargamos un año de precios reales
+         y calculamos cuánto se mueve normalmente. Entonces podremos comparar.</p>
+      ${ayuda('volModelo',{sym:st.sym,n:'?',dte:st.DTE})}
+    </div>`;
     return;}
+
   const t=T(),S=st.S;
   const vMkt=VV(), vMdl=st.expVol;
   const valMkt=sVal(S,t,vMkt)*100, valMdl=sVal(S,t,vMdl)*100;
-  const gap=valMkt-valMdl;           // >0 → el mercado paga MÁS de lo que vale según el modelo
-  const credit=stats().net<0;
-  // rejilla de escenarios de IV
+  const gap=valMkt-valMdl;
+  const cobra=stats().net<0;
+  const vrp=(vMkt-vMdl)*100;
+  const vp=st.volPack;
+
+  // Rejilla de escenarios
   const grid=[-10,-5,0,5,10].map(d=>{
     const v=Math.max((st.IV+d)/100,.01);
-    return{d,val:sVal(S,t,v)*100,pnl:pnl(S,t,v)};});
-  const vp=st.volPack;
-  let src='';
-  if(vp&&vp.ok){
-    src=`<span class="eyebrow">De dónde sale la volatilidad del modelo</span>
-      GARCH(1,1) ajustado sobre <b class="num">${vp.n}</b> retornos diarios reales.
-      Persistencia <b class="num">${vp.garchParams?vp.garchParams.persistence.toFixed(3):'—'}</b>
-      (cuánto dura un shock de volatilidad).
-      Vol realizada <b class="num">${pc(vp.realized)}</b> ·
-      EWMA <b class="num">${pc(vp.ewma)}</b> ·
-      GARCH a ${st.DTE} días <b class="num">${pc(vp.garch)}</b>.<br>`;
+    return{d,pnl:pnl(S,t,v)};});
+
+  let txt=`<div class="historia">`;
+
+  txt+=`<p>El mercado dice que <b>${st.sym}</b> se va a mover un <b class="num">${pc(vMkt)}</b>.
+    El histórico —los últimos ${vp?vp.n:'?'} días reales— dice que se mueve un
+    <b class="num">${pc(vMdl)}</b>.</p>`;
+
+  const favorable = cobra ? gap>0 : gap<0;
+
+  if(Math.abs(vrp)<2){
+    txt+=`<p class="clave mk"><b>Coinciden.</b> No hay ni chollo ni trampa: el mercado está poniendo
+      precios razonables. Si operas esto, que no sea porque las opciones estén mal valoradas,
+      porque no lo están.</p>`;
+  } else if(favorable){
+    txt+=`<p class="clave up"><b>Esto juega a tu favor.</b>
+      ${cobra
+        ? `Estás <b>cobrando</b> prima, y el mercado te está pagando <b class="num">${money(Math.abs(gap))} de más</b>
+           de lo que valdría esta posición si ${st.sym} se moviera como se ha movido siempre.`
+        : `Estás <b>pagando</b> prima, y te sale <b class="num">${money(Math.abs(gap))} más barata</b>
+           de lo que valdría según el histórico.`}</p>
+      <p>${cobra ? 'Te están pagando de más por asumir el riesgo.' : 'Estás comprando el seguro con descuento.'}
+      Eso es una ventaja real —<em>si el histórico acierta</em>.</p>`;
+  } else {
+    txt+=`<p class="clave dn"><b>Esto juega en tu contra.</b>
+      ${cobra
+        ? `Estás <b>cobrando</b> prima, pero <b class="num">${money(Math.abs(gap))} menos</b> de lo que el riesgo merece
+           según el histórico. Te están pagando poco por asumir un riesgo que es mayor de lo que parece.`
+        : `Estás <b>pagando</b> prima, y <b class="num">${money(Math.abs(gap))} de más</b> respecto a lo que valdría
+           según el histórico. Estás comprando caro.`}</p>`;
   }
-  const lean=gap>0?'up':'dn';
-  const head=gap>0
-    ? `El mercado te paga <span class="n">${money(Math.abs(gap))}</span> <em>de más</em> por esta estructura de lo que vale si el subyacente se mueve como predice el modelo.`
-    : `El mercado te cobra <span class="n">${money(Math.abs(gap))}</span> <em>de más</em> de lo que valdría con la volatilidad del modelo.`;
-  const advice=credit
-    ? (gap>0?'Como estás <b>cobrando</b> prima, esto juega a tu favor: te pagan por encima del valor del modelo.'
-            :'Como estás <b>cobrando</b> prima, esto juega en tu contra: cobras menos de lo que el riesgo merece según el modelo.')
-    : (gap>0?'Como estás <b>pagando</b> prima, esto juega en tu contra: pagas por encima del valor del modelo.'
-            :'Como estás <b>pagando</b> prima, esto juega a tu favor: compras por debajo del valor del modelo.');
-  e.innerHTML=`
-    <div class="verdict ${lean}">${head}</div>
-    <div class="figs">
-      ${fg('Valor con IV mercado',money(valMkt),'mdl')}
-      ${fg('Valor con vol modelo',money(valMdl),'mk')}
-      ${fg('Diferencia',money(gap),gap>=0?'up':'dn','',false)}
-      ${fg('IV mercado',pc(vMkt))}
-      ${fg('Vol modelo',pc(vMdl),'mk')}
-      ${fg('VRP',((vMkt-vMdl)*100>=0?'+':'')+((vMkt-vMdl)*100).toFixed(1)+'pts',(vMkt-vMdl)>0?'up':'dn',HELP.vrp)}
+
+  txt+=`</div>`;
+
+  txt+=`<div class="figs" style="margin:18px 0">
+    ${fig2('Vale ahora (según el mercado)', money(valMkt), 'mdl', 'Con IV '+pc(vMkt))}
+    ${fig2('Debería valer (según el histórico)', money(valMdl), 'mk', 'Con vol '+pc(vMdl))}
+    ${fig2(gap>0?'Te pagan de más':'Te cobran de más', money(Math.abs(gap)), gap>0?'up':'dn', 'Diferencia')}
+  </div>`;
+
+  txt+=`<h3 style="margin-top:20px">¿Y si el mercado se pone nervioso?</h3>
+    <div class="historia" style="font-size:13.5px;margin-bottom:12px">
+      <p>Esto es lo que pasaría <b>solo</b> por un cambio de miedo, sin que ${st.sym} se mueva ni un céntimo:</p>
     </div>
-    <div class="note ${lean}">${src}${advice}</div>
-    <h3 style="margin-top:18px">Si la volatilidad se mueve</h3>
-    <table class="quotes"><thead><tr><th>Escenario IV</th><th>IV resultante</th><th>Valor estructura</th><th>Resultado</th></tr></thead><tbody>
+    <table class="quotes"><thead><tr>
+      <th>Si el miedo…</th><th>La volatilidad pasa a</th><th>Tú…</th>
+    </tr></thead><tbody>
     ${grid.map(r=>`<tr${r.d===0?' class="atm"':''}>
-      <td class="tk">${r.d===0?'Hoy':(r.d>0?'+':'')+r.d+' pts'}</td>
+      <td class="tk">${r.d===0?'no cambia (hoy)':r.d>0?`sube ${r.d} puntos`:`baja ${-r.d} puntos`}</td>
       <td>${(st.IV+r.d).toFixed(1)}%</td>
-      <td>${money(r.val)}</td>
-      <td class="${r.pnl>=0?'up':'dn'}">${money(r.pnl)}</td></tr>`).join('')}
-    </tbody></table>
-    <p class="cap">Manteniendo precio y tiempo constantes. Sirve para ver el riesgo de vega aislado:
-      cuánto te duele (o te beneficia) un cambio de volatilidad puro.</p>`;
+      <td class="${r.pnl>=0?'up':'dn'}">${r.d===0?'—':(r.pnl>=0?'ganas ':'pierdes ')+money(Math.abs(r.pnl))}</td>
+      </tr>`).join('')}
+    </tbody></table>`;
+
+  const g=sGrk(S,t,vMkt);
+  txt+=`<div class="historia" style="margin-top:12px">
+    ${g.vega<0
+      ? `<p class="tip">Estás <b>corto de miedo</b>: un susto general del mercado te hace daño,
+         aunque aciertes la dirección. Es la letra pequeña de vender opciones.</p>`
+      : `<p class="tip">Estás <b>largo de miedo</b>: un susto general del mercado te beneficia.</p>`}
+    ${ayuda('vrp',{sym:st.sym,iv:pc(vMkt),modelo:pc(vMdl)})}
+  </div>`;
+
+  e.innerHTML=txt;
 }
 
 /* ══════════════ MONTE CARLO ══════════════ */
@@ -1476,20 +1853,22 @@ function runMC(){
     // suposición no verificable. El edge que aislamos es el de VOLATILIDAD.
     real=simulate(n,st.expVol,RR()-QQ(),m,t,steps);
   }
-  mcR={rn,real,hasReal:!!real};
+  mcR={rn,real,hayReal:!!real};
   showMC();
 }
 function showMC(){
-  const {rn,real,hasReal}=mcR;
-  const R=hasReal?real:rn;   // la medida real manda si existe
-  // Cifras principales: bajo la medida REAL si la tenemos
+  const {rn,real,hayReal}=mcR;
+  const R=hayReal?real:rn;
+  const s=stats();
+  const perdMax=Math.abs(s.min);
+
   $('mcFigs').innerHTML=
-    fg(hasReal?'P(ganar) · tu modelo':'P(ganar) · mercado',pc(R.pop),R.pop>.5?'up':'mk',HELP.pop)+
-    fg('Valor esperado',money(R.ev),R.ev>=0?'up':'dn',HELP.ev)+
-    fg('Rango 90%',money(R.p5)+' · '+money(R.p95),'','',true)+
-    fg('Kelly',isFinite(R.kelly)?(R.kelly*100).toFixed(1)+'%':'n/d',
-       isFinite(R.kelly)?(R.kelly>0?'up':'dn'):'',HELP.kelly);
-  // histograma de la medida activa
+    fig2('Ganas en', (R.pop*100).toFixed(0)+' de cada 100', R.pop>.5?'up':'mk', 'Probabilidad de beneficio')+
+    fig2('De media te llevas', money(R.ev), R.ev>=0?'up':'dn', 'Valor esperado')+
+    fig2('En el peor 5% pierdes', money(R.p5), 'dn', 'Percentil 5')+
+    fig2('En el mejor 5% ganas', money(R.p95), 'up', 'Percentil 95');
+
+  // histograma
   const[x,W,H]=cvs('mcHist',140);x.clearRect(0,0,W,H);
   const a=R.srt,lo=a[0],hi=a[a.length-1];
   if(hi>lo){
@@ -1497,81 +1876,141 @@ function showMC(){
     a.forEach(v=>{let b=Math.floor((v-lo)/(hi-lo)*bins);b=Math.max(0,Math.min(bins-1,b));c[b]++;});
     const mm=Math.max(...c),bw=W/bins,zx=(0-lo)/(hi-lo)*W;
     c.forEach((n2,i)=>{const bx=lo+(i+.5)/bins*(hi-lo);
-      x.fillStyle=bx>=0?C.bullA:C.bearA;
+      x.fillStyle=bx>=0?'rgba(63,185,132,.55)':'rgba(229,72,77,.5)';
       const bh=n2/mm*(H-18);x.fillRect(i*bw,H-14-bh,Math.max(bw-1,1),bh);});
     x.strokeStyle=C.ink2;x.lineWidth=1;x.beginPath();x.moveTo(zx,0);x.lineTo(zx,H-14);x.stroke();
     x.fillStyle=C.ink3;x.font=C.mono;
     x.fillText(money(lo),2,H-3);x.fillText(money(hi),W-46,H-3);
   }
-  const e=$('mcNote');
-  if(!hasReal){
-    // Solo tenemos la medida del mercado: hay que ser explícito sobre su límite
-    e.className='note mk';
-    e.innerHTML=`<span class="eyebrow">Atención · qué mide esto exactamente</span>
-      Esta simulación usa la <b>volatilidad implícita del mercado</b> y deriva neutral al riesgo.
-      Es decir: te está dando <b>la probabilidad que descuenta el mercado</b>, no la tuya.
-      Bajo esa medida el valor esperado es cero por construcción —el ${money(R.ev)} que ves es ruido
-      de muestreo—, así que <b>no puede mostrar ninguna ventaja</b>. Es una propiedad matemática,
-      no un defecto de la estrategia.<br><br>
-      Para ver si <em>tú</em> tienes ventaja, pulsa <b>Estimar volatilidad</b> arriba: ajusta un GARCH
-      sobre el histórico real y vuelve a simular. Si tu estimación de volatilidad difiere de la del
-      mercado, ahí es donde aparece (o se desmiente) el edge.`;
+
+  const e=$('mcNote');e.className='historia';
+
+  if(!hayReal){
+    e.innerHTML=`
+      <p>Hemos simulado <b>20.000 futuros distintos</b> para ${st.sym} y hemos visto cómo acaba tu estrategia
+         en cada uno. Ganas en <b class="num">${(R.pop*100).toFixed(0)} de cada 100</b>.</p>
+      <p class="clave mk"><b>Pero este número no te sirve para decidir.</b> Y te explico por qué,
+         porque es la trampa más común en opciones.</p>
+      <p>Hemos simulado usando <b>la volatilidad que dice el mercado</b>. O sea: le hemos preguntado al mercado
+         qué va a pasar, y luego hemos comprobado si el mercado tiene razón <em>según el mercado</em>.
+         Es como preguntarle a un vendedor si su producto es bueno.</p>
+      <p>Por eso el "de media te llevas" sale prácticamente <b>cero</b> (${money(R.ev)}).
+         No es que tu estrategia sea mala: es que <b>es matemáticamente imposible</b> que salga otra cosa.
+         El mercado pone los precios justos según su propia opinión.</p>
+      <p class="clave up"><b>Qué hacer:</b> ve a <b>Estimar volatilidad</b> arriba. Eso mira cómo se ha movido
+         ${st.sym} <em>de verdad</em> en el último año. Si tu histórico discrepa del mercado,
+         <b>ahí</b> aparece tu ventaja. Y entonces esta simulación sí te dirá algo.</p>
+      ${ayuda('ev')}`;
     return;
   }
-  // Tenemos las dos: la comparación ES el resultado
-  const dPop=real.pop-rn.pop, dEv=real.ev-rn.ev;
-  const vrp=VV()-st.expVol;
-  const favour=dEv>0;
-  const head=Math.abs(dEv)<2
-    ? `Tu estimación de volatilidad apenas discrepa de la del mercado: <em>no hay ventaja clara</em> por esta vía.`
-    : favour
-    ? `Bajo tu modelo ganas <span class="n">${money(dEv)}</span> más de lo que el mercado descuenta. <em>Ahí está tu ventaja</em>, y viene de discrepar en volatilidad.`
-    : `Bajo tu modelo ganas <span class="n">${money(-dEv)}</span> <em>menos</em> de lo que el mercado descuenta. Esta estructura juega en tu contra según tu propia estimación.`;
-  const v=$('mcNote');
-  v.className='note '+(Math.abs(dEv)<2?'mk':favour?'up':'dn');
-  v.innerHTML=`
-    <span class="eyebrow">Dos medidas · y la diferencia es lo único que importa</span>
-    ${head}
-    <table class="quotes" style="margin-top:10px">
-      <thead><tr><th>Medida</th><th>Volatilidad</th><th>P(ganar)</th><th>Valor esperado</th><th>Rango 90%</th></tr></thead>
+
+  // ── Con las dos medidas: la comparación ES el resultado ──
+  const dPop=(real.pop-rn.pop)*100, dEv=real.ev-rn.ev;
+  const vrp=(VV()-st.expVol)*100;
+  const favorable=dEv>2;
+  const contrario=dEv<-2;
+
+  let txt=`
+    <p>Hemos simulado <b>20.000 futuros</b> para ${st.sym}. Pero dos veces, y con dos opiniones distintas:</p>
+    <table class="quotes" style="margin:14px 0">
+      <thead><tr>
+        <th>Según quién</th>
+        <th>Cuánto se mueve</th>
+        <th>Ganas en</th>
+        <th>De media te llevas</th>
+      </tr></thead>
       <tbody>
-        <tr><td class="tk">Lo que descuenta el mercado</td><td class="mdl">${pc(VV())}</td>
-            <td>${pc(rn.pop)}</td><td class="mute">${money(rn.ev)}</td>
-            <td class="mute">${money(rn.p5)} · ${money(rn.p95)}</td></tr>
-        <tr><td class="tk">Lo que predice tu modelo</td><td class="mk">${pc(st.expVol)}</td>
-            <td class="${real.pop>rn.pop?'up':'dn'}">${pc(real.pop)}</td>
-            <td class="${real.ev>=0?'up':'dn'}">${money(real.ev)}</td>
-            <td>${money(real.p5)} · ${money(real.p95)}</td></tr>
-        <tr class="atm"><td class="tk">Diferencia</td><td class="${vrp>0?'up':'dn'}">${(vrp*100>=0?'+':'')}${(vrp*100).toFixed(1)} pts</td>
-            <td class="${dPop>0?'up':'dn'}">${(dPop*100>=0?'+':'')}${(dPop*100).toFixed(1)} pts</td>
-            <td class="${dEv>0?'up':'dn'}">${money(dEv)}</td><td class="mute">—</td></tr>
+        <tr>
+          <td class="tk">El mercado<br><small class="mute">lo que dicen los precios</small></td>
+          <td class="mdl">${pc(VV())}</td>
+          <td>${(rn.pop*100).toFixed(0)}%</td>
+          <td class="mute">${money(rn.ev)}</td>
+        </tr>
+        <tr>
+          <td class="tk">El histórico<br><small class="mute">lo que ha pasado de verdad</small></td>
+          <td class="mk">${pc(st.expVol)}</td>
+          <td class="${real.pop>rn.pop?'up':'dn'}">${(real.pop*100).toFixed(0)}%</td>
+          <td class="${real.ev>=0?'up':'dn'}">${money(real.ev)}</td>
+        </tr>
       </tbody>
-    </table>
-    <p style="margin-top:9px;font-size:13px;line-height:1.55">
-      La fila del mercado siempre da un valor esperado cercano a cero: es una martingala, no puede
-      mostrar ventaja. La fila de tu modelo sí puede, porque parte de una volatilidad distinta.
-      <b>La ventaja no está en la estrategia: está en tener razón sobre la volatilidad.</b>
-      Si tu GARCH se equivoca, esta cifra miente.
-    </p>
-    ${isFinite(real.kelly)?`<p style="margin-top:7px;font-size:13px">Kelly bajo tu modelo sugiere no arriesgar más del
-      <b class="num">${(real.kelly*100).toFixed(0)}%</b> del capital; en la práctica se usa un cuarto de eso.</p>`
-      :`<p style="margin-top:7px;font-size:13px">Kelly no disponible: en la muestra la estrategia no pierde nunca, y el estimador degenera.</p>`}`;
+    </table>`;
+
+  txt+=`<p><b>Fíjate en la primera fila:</b> de media te llevas ${money(rn.ev)}, o sea, nada.
+    Eso <em>siempre</em> sale así, es matemática pura: si le preguntas al mercado, el mercado siempre
+    tiene razón consigo mismo. Esa fila no puede darte ventaja nunca.</p>`;
+
+  if(favorable){
+    txt+=`<p class="clave up"><b>La segunda fila es la que importa.</b> El histórico dice que ${st.sym}
+      se mueve un ${pc(st.expVol)}, mientras el mercado cobra como si se moviera un ${pc(VV())}.
+      Está cobrando <b>${Math.abs(vrp).toFixed(1)} puntos de más</b>.</p>
+      <p>Si el histórico tiene razón, esta estrategia te da <b class="num">${money(real.ev)}</b> de media,
+      no ${money(rn.ev)}. Ganas en <b>${(real.pop*100).toFixed(0)} de cada 100</b> en vez de ${(rn.pop*100).toFixed(0)}.
+      <b>Ahí está tu ventaja</b>, y no viene de la estrategia: viene de que crees que el mercado
+      está exagerando el susto.</p>`;
+  } else if(contrario){
+    txt+=`<p class="clave dn"><b>Y aquí viene el aviso.</b> El histórico dice que ${st.sym} se mueve un
+      ${pc(st.expVol)}, más de lo que el mercado descuenta (${pc(VV())}).</p>
+      <p>Si el histórico tiene razón, esta estrategia <b>pierde ${money(-real.ev)} de media</b>.
+      El mercado está cobrando barato el seguro, y tú lo estás vendiendo aún más barato.
+      <b>Esta operación juega en tu contra</b> según tus propios datos.</p>`;
+  } else {
+    txt+=`<p class="clave mk"><b>Las dos filas dicen casi lo mismo.</b> Tu histórico y el mercado coinciden,
+      así que <b>no tienes ventaja de volatilidad</b>. Si operas esto, será por otro motivo
+      (una opinión sobre la dirección, por ejemplo), pero no porque las opciones estén mal valoradas.</p>`;
+  }
+
+  txt+=`<p><b>El riesgo, en cristiano:</b> en el 5% de los peores casos pierdes <b class="num">${money(R.p5)}</b>.
+    ${perdMax>500?`Y en el peor absoluto, hasta ${money(-perdMax)}.`:''}
+    Pregúntate si puedes asumir eso sin que te quite el sueño.</p>`;
+
+  if(isFinite(R.kelly)&&R.kelly>0){
+    txt+=`<p>Sobre <b>cuánto dinero meter</b>: la matemática dice que como máximo el
+      <b class="num">${(R.kelly*100).toFixed(0)}%</b> de tu capital. Pero eso es la versión agresiva.
+      En la práctica se usa <b>un cuarto de eso</b>: un <b class="num">${(R.kelly*25).toFixed(0)}%</b>.
+      El cálculo asume que conoces las probabilidades con exactitud, y no las conoces.</p>`;
+  } else if(isFinite(R.kelly)){
+    txt+=`<p><b>Sobre cuánto meter:</b> la matemática dice que <b>nada</b>. No hay ventaja aquí.</p>`;
+  }
+
+  txt+=`<p class="tip">Recuerda: todo esto depende de que el histórico acierte. Si ${st.sym} hace algo
+    que no ha hecho nunca —y a veces pasa—, estos números no valen nada.</p>`;
+
+  txt+=ayuda('ev')+ayuda('kelly');
+  e.innerHTML=txt;
 }
 
 /* ══════════════ GLOSARIO ══════════════ */
 const GL=[
- ['Delta','Tu apuesta direccional. Un delta neto de +50 se comporta como tener 50 acciones largas.'],
- ['Gamma','La aceleración del delta. Alto significa direccionalidad que se dispara cerca del strike.'],
- ['Theta','El reloj. Lo que te da o te quita cada día que pasa, sin que el precio se mueva.'],
- ['Vega','Tu exposición al miedo del mercado: cuánto ganas o pierdes por cada punto de volatilidad.'],
- ['Volatilidad implícita','El precio del seguro. La volatilidad futura que el mercado descuenta en las opciones.'],
- ['Volatilidad del modelo','Lo que predice un GARCH(1,1) ajustado sobre el histórico real de precios del subyacente.'],
- ['VRP','La diferencia entre ambas. Positiva quiere decir que el mercado paga de más por asegurarse — el argumento estructural para vender prima. No es dinero gratis: la cobras precisamente porque a veces te comes una cola.'],
- ['Curva SVI','Una curva suave ajustada a la volatilidad de todos los strikes. Los que se despegan de ella están dislocados frente a sus vecinos.'],
- ['Ejercicio anticipado','Lo que vale de más una opción americana por poder ejercerse antes. Importa en puts muy dentro de dinero y con tipos altos.'],
- ['Distribución implícita','La distribución de precios que el mercado descuenta a vencimiento, extraída de la curva de precios de las opciones.'],
- ['Medida risk-neutral','La probabilidad que el mercado descuenta en los precios. Bajo esta medida, el valor esperado de cualquier estrategia es cero: es una martingala. Por eso una simulación hecha con la volatilidad implícita <b>nunca</b> puede mostrar ventaja — no porque la estrategia sea mala, sino porque es matemáticamente imposible.'],
- ['Medida real','La probabilidad bajo tu propia estimación de volatilidad. Es la única donde puede aparecer una ventaja, y aparece precisamente cuando discrepas del mercado. Si tu GARCH acierta y el mercado cobra de más, vendes prima con edge. Si tu GARCH se equivoca, la ventaja era un espejismo.']
+ ['Opción (call y put)',
+  'Un <b>call</b> es el derecho a comprar algo a un precio fijo. Un <b>put</b>, el derecho a venderlo. Quien te vende ese derecho cobra una prima. Piénsalo como un seguro: el que lo compra paga; el que lo vende, cobra y asume el riesgo.'],
+ ['Vender prima',
+  'Vender opciones. Cobras dinero hoy a cambio de comprometerte a algo. Es el negocio de la aseguradora: la mayoría de las veces te quedas la prima, pero de vez en cuando toca pagar. Y cuando toca, duele.'],
+ ['Strike',
+  'El precio al que se activa la opción. Si vendes un put con strike 90 y la acción cae por debajo de 90, empiezas a perder.'],
+ ['Volatilidad implícita',
+  'Cuánto espera <em>el mercado</em> que se mueva algo. No es una predicción de dirección, solo de agitación. Se lee al revés desde el precio de las opciones: si son caras, es que se espera movimiento.'],
+ ['Volatilidad histórica',
+  'Cuánto se ha movido <em>de verdad</em>, mirando los precios pasados. Es el contraste independiente que te permite tener una opinión propia.'],
+ ['GARCH',
+  'El modelo que usamos para predecir la volatilidad futura desde la histórica. Su idea es de sentido común: <b>la volatilidad viene en rachas</b>. Después de un día movido, es más probable otro día movido. Mide la fuerza de esa inercia.'],
+ ['Prima de riesgo de volatilidad (VRP)',
+  'La diferencia entre lo que cobra el mercado y lo que dice la historia. Casi siempre el mercado cobra de más —la gente paga por dormir tranquila—. Eso favorece vender. <b>Pero no es dinero gratis:</b> cobras esa prima precisamente porque de vez en cuando pasa algo gordo y te comes el marrón.'],
+ ['Delta',
+  'Cuánto te afecta que suba o baje. Delta +50 = te comportas como si tuvieras 50 acciones.'],
+ ['Theta',
+  'Lo que te da o te quita el paso del tiempo. Si vendiste opciones, el reloj es tu amigo. Si las compraste, es tu enemigo.'],
+ ['Vega',
+  'Cuánto te afecta el miedo general del mercado, aunque el precio no se mueva.'],
+ ['Gamma',
+  'Si tu posición <em>empeora sola</em> cuando el mercado se mueve en tu contra (gamma negativa, típico de vender), o <em>mejora sola</em> (gamma positiva, típico de comprar). La gamma negativa cerca del vencimiento es lo que arruina a los vendedores de opciones descuidados.'],
+ ['Medida risk-neutral',
+  'El nombre técnico de una trampa. Si simulas usando la volatilidad que dice el mercado, <b>siempre</b> saldrá que no tienes ventaja. No porque tu estrategia sea mala, sino porque es matemáticamente imposible que salga otra cosa: le estás preguntando al mercado si el mercado tiene razón.'],
+ ['Medida real',
+  'Simular usando <em>tu</em> estimación de volatilidad (la del histórico), no la del mercado. Es la única forma de ver si tienes ventaja de verdad. Y la ventaja aparece precisamente cuando discrepas del mercado y <b>aciertas</b>.'],
+ ['Spread',
+  'Comprar una opción y vender otra a la vez. Sirve para limitar el riesgo: cobras menos, pero pones un techo a lo que puedes perder. Casi siempre es mejor idea que vender a pelo.'],
+ ['La verdad incómoda',
+  'Ninguna de estas cifras predice el futuro. El GARCH mira al pasado y asume que se repetirá. Cuando no se repite —y de vez en cuando no se repite— todas estas cuentas valen cero. Por eso se limita el riesgo, se usan spreads, y no se apuesta más de lo que uno puede perder.']
 ];
 const gloss=()=>{$('gloss').innerHTML=GL.map(([k,v])=>`<dt>${k}</dt><dd>${v}</dd>`).join('');};
 
@@ -1725,14 +2164,22 @@ async function pullGarch(){
     const verdict=vrp>.04?'El mercado paga <b>de más</b> por el seguro. Favorece <b>vender</b> prima.'
       :vrp<-.02?'La IV está <b>por debajo</b> de lo que predice el modelo. Favorece <b>comprar</b> prima.'
       :'La IV y el modelo están alineados. Sin ventaja clara de volatilidad.';
-    e.className='note '+lean;
-    e.innerHTML=`<span class="eyebrow">GARCH(1,1) sobre ${pack.n} días reales</span>
-      Vol realizada <b class="num">${pc(pack.realized)}</b> ·
-      EWMA <b class="num">${pc(pack.ewma)}</b> ·
-      GARCH a ${st.DTE} días <b class="num">${pc(pack.garch)}</b>
-      ${pack.garchParams?`· persistencia <b class="num">${pack.garchParams.persistence.toFixed(3)}</b>`:''}<br>
-      Frente a una IV de mercado del <b class="num">${pc(VV())}</b>, la prima de riesgo es de
-      <b class="num">${(vrp*100>=0?'+':'')}${(vrp*100).toFixed(1)} puntos</b>. ${verdict}`;
+    e.className='historia';
+    let m=`<p>Hemos mirado <b>${pack.n} días reales</b> de ${sym}. Esto es lo que dicen:</p>`;
+    m+=`<p>${sym} se mueve, normalmente, un <b class="num">${pc(pack.expected)}</b> al año.
+      El mercado, en cambio, está cobrando como si se moviera un <b class="num">${pc(VV())}</b>.</p>`;
+    if(vrp>0.04){
+      m+=`<p class="clave up"><b>El mercado exagera.</b> Pide ${(vrp*100).toFixed(1)} puntos de más
+        de lo que la historia justifica. Vender opciones sobre ${sym} parece pagar bien.</p>`;
+    } else if(vrp<-0.02){
+      m+=`<p class="clave dn"><b>El mercado se queda corto.</b> Cobra menos de lo que la historia
+        justifica. Las opciones están baratas: mejor comprarlas que venderlas.</p>`;
+    } else {
+      m+=`<p class="clave mk"><b>El mercado acierta.</b> Lo que cobra coincide con lo que dice la historia.
+        No hay ventaja por aquí.</p>`;
+    }
+    m+=ayuda('volModelo',{sym,n:pack.n,dte:st.DTE});
+    e.innerHTML=m;
   }catch(err){e.className='note dn';
     e.innerHTML=`<span class="eyebrow">Error</span>${err.message}`;}
 }
@@ -1803,37 +2250,71 @@ function renderBk(){
 }
 function posNote(p,g){
   const nd=g.delta*p.qty;
-  const t=Math.abs(nd)<.05?'Neutral al precio ahora mismo.'
-    :nd>0?`Te beneficia que <b>suba</b>: unos <b class="num">${money(g.delta*p.qty*p.mult)}</b> por cada punto.`
-    :`Te beneficia que <b>baje</b>: unos <b class="num">${money(-g.delta*p.qty*p.mult)}</b> por cada punto.`;
   const th=g.theta*p.qty*p.mult;
-  return `<div class="note ${th>=0?'up':'mk'}" style="margin-top:8px">${t}
-    ${th>=0?`El tiempo te suma <b class="num">${money(th)}</b> al día.`:`El tiempo te resta <b class="num">${money(-th)}</b> al día.`}</div>`;
+  const dir=Math.abs(nd)<.05?'Ahora mismo te da igual si sube o baja.'
+    :nd>0?`Ganas si <b>sube</b>: unos ${money(g.delta*p.qty*p.mult)} por cada euro.`
+    :`Ganas si <b>baja</b>: unos ${money(-g.delta*p.qty*p.mult)} por cada euro.`;
+  const tiempo=th>=0
+    ? `Y el tiempo te paga <b>${money(th)}</b> al día.`
+    : `Pero el tiempo te cuesta <b>${money(-th)}</b> al día.`;
+  return `<div class="note ${th>=0?'up':'mk'}" style="margin-top:9px;font-size:13px">
+    ${dir} ${tiempo}</div>`;
 }
 function bkAgg(){
-  let nd=0,nt=0,nv=0,ng=0,P=0,has=false;
-  BK.pos.forEach(p=>{P+=lp(p);const g=p.live;if(g.delta!=null){has=true;
+  let nd=0,nt=0,nv=0,ng=0,P=0,hay=false;
+  BK.pos.forEach(p=>{P+=lp(p);const g=p.live;if(g.delta!=null){hay=true;
     nd+=g.delta*p.qty*p.mult;nt+=g.theta*p.qty*p.mult;nv+=g.vega*p.qty*p.mult;ng+=(g.gamma||0)*p.qty*p.mult;}});
-  $('bkFigs').innerHTML=fg('Resultado abierto',money(P),P>=0?'up':'dn')+
-    fg('Delta neto',(nd/100).toFixed(1),'',HELP.delta)+
-    fg('Gamma neto',(ng/100).toFixed(2),'',HELP.gamma)+
-    fg('Theta/día',money(nt),nt>=0?'up':'dn',HELP.theta)+
-    fg('Vega neto',(nv/100).toFixed(1),'',HELP.vega);
-  if(!has){$('bkVerdict').innerHTML='';
-    $('bkNote').innerHTML='<p class="cap">Esperando las griegas del feed…</p>';return;}
-  const ds=nd/100;let cls,tx;
-  if(Math.abs(ds)<5){cls='up';tx=`Tu cartera está <em>neutral</em> al mercado. Vives del paso del tiempo y de la volatilidad, no de la dirección.`;}
-  else if(ds>0){cls='mk';tx=`Tu cartera es <em>alcista</em>: equivale a tener <span class="n">${ds.toFixed(0)}</span> acciones. Si el mercado cae, pierdes.`;}
-  else{cls='mk';tx=`Tu cartera es <em>bajista</em>: equivale a estar corto de <span class="n">${Math.abs(ds).toFixed(0)}</span> acciones. Si el mercado sube, pierdes.`;}
-  const v=$('bkVerdict');v.className='verdict '+cls;v.innerHTML=tx;
-  const n=$('bkNote');n.className='note';
-  n.innerHTML=`<span class="eyebrow">Tu riesgo ahora mismo</span>
-    ${nt>=0?`El tiempo te suma <b class="num">${money(nt)}</b> al día: eres vendedor neto de prima.`
-           :`El tiempo te resta <b class="num">${money(-nt)}</b> al día: eres comprador neto de prima y necesitas movimiento.`}<br>
-    ${Math.abs(nv/100)<2?'Tu exposición a la volatilidad es baja.'
-      :nv>0?'Te beneficia que suba la volatilidad general.'
-      :'Te perjudica que suba la volatilidad: estás corto de vega, lo típico de la venta de prima.'}
-    ${Math.abs(ng/100)>0.5?`<br>Tu gamma neto es <b class="num">${(ng/100).toFixed(2)}</b>: ${ng<0?'tu delta empeora cuando el mercado se mueve en tu contra — cuidado cerca de vencimiento.':'tu delta mejora con el movimiento.'}`:''}`;
+  const ds=nd/100;
+  $('bkFigs').innerHTML=
+    fig2('Vas ganando', money(P), P>=0?'up':'dn', 'Resultado abierto')+
+    fig2('Si el mercado sube 1%', money(nd*0.01*100/100), nd>=0?'up':'dn', 'Delta '+ds.toFixed(1))+
+    fig2('Cada día que pasa', money(nt), nt>=0?'up':'dn', 'Theta')+
+    fig2('Si sube el miedo', money(nv), nv>=0?'up':'dn', 'Vega '+(nv/100).toFixed(1));
+  if(!hay){$('bkNote').innerHTML='<p class="cap">Esperando los datos del mercado…</p>';return;}
+
+  const n=$('bkNote');n.className='historia';
+  let t='';
+
+  // Dirección
+  if(Math.abs(ds)<5){
+    t+=`<p><b>Tu cartera está neutral.</b> Te da bastante igual si el mercado sube o baja:
+      no estás apostando a una dirección. Ganas por otro motivo.</p>`;
+  } else if(ds>0){
+    t+=`<p><b>Tu cartera es alcista.</b> Es como si tuvieras <b class="num">${ds.toFixed(0)} acciones</b>
+      compradas. Si el mercado se cae, pierdes.</p>`;
+  } else {
+    t+=`<p><b>Tu cartera es bajista.</b> Es como si estuvieras corto de
+      <b class="num">${Math.abs(ds).toFixed(0)} acciones</b>. Si el mercado sube, pierdes.</p>`;
+  }
+
+  // Tiempo
+  t+= nt>=0
+    ? `<p class="clave up"><b>El tiempo te está pagando.</b> Cada día que pasa, aunque no ocurra nada,
+       ganas <b class="num">${money(nt)}</b>. Eres <em>vendedor de seguros</em>: cobras por esperar.</p>`
+    : `<p class="clave mk"><b>El tiempo te está costando dinero.</b> Cada día que pasa pierdes
+       <b class="num">${money(-nt)}</b>. Eres <em>comprador de seguros</em>: necesitas que pase algo,
+       y que pase pronto.</p>`;
+
+  // Vega
+  if(Math.abs(nv)>=200){
+    t+= nv>0
+      ? `<p>Si el mercado se pone nervioso (un susto general, aunque no se mueva tu acción),
+         <b>ganas</b> unos ${money(nv)} por cada punto de miedo que suba.</p>`
+      : `<p><b>Cuidado con los sustos:</b> si sube el miedo general del mercado,
+         pierdes unos <b class="num">${money(-nv)}</b> por punto — aunque tus acciones no se muevan.
+         Es el riesgo típico de vender opciones.</p>`;
+  }
+
+  // Gamma: el aviso importante
+  if(ng<-50){
+    t+=`<p class="clave dn"><b>Aviso serio:</b> tu cartera <em>empeora sola</em> cuando el mercado
+      se mueve en tu contra. Cuanto más se aleja, más rápido pierdes.
+      Esto se agrava según se acerca el vencimiento. Si el mercado se pone a dar bandazos,
+      no te quedes mirando.</p>`;
+  }
+
+  t+=ayuda('theta')+ayuda('vega');
+  n.innerHTML=t;
 }
 function fromPosition(){
   const o=BK.pos.filter(p=>String(p.type).includes('Option'));
@@ -1909,71 +2390,151 @@ async function scanChain(){
     renderChain();ribbon();
   }catch(e){msg.textContent='No se pudo escanear: '+e.message;}
 }
+/* ═══════════════════════════════════════════════════
+   MODO CADENA · contado como una historia
+   ═══════════════════════════════════════════════════ */
 function renderChain(){
   const{an,rk,spot,dte,expVol,pack,sym}=CH;
-  const atm=an.atmIv,vrp=isFinite(expVol)?atm-expVol:NaN;
-  $('cSum').textContent=`${sym} · ${dte} días`;
-  $('cFigs').innerHTML=
-    fg('Precio',spot.toFixed(2))+
-    fg('IV en el dinero',pc(atm))+
-    fg('Vol del modelo',isFinite(expVol)?pc(expVol):'—','mk')+
-    fg('VRP',isFinite(vrp)?((vrp>=0?'+':'')+(vrp*100).toFixed(1)+'pts'):'—',vrp>.02?'up':vrp<-.02?'dn':'',HELP.vrp)+
-    fg('Ajuste SVI',an.svi?(an.svi.rmse*100).toFixed(2)+'pts':'—')+
-    fg('Contratos',an.rows.length);
-  const v=$('cVerdict');
-  if(isFinite(vrp)){
-    const c=vrp>.04?'up':vrp<-.02?'dn':'mk';
-    v.className='verdict '+c;
-    v.innerHTML=vrp>.04
-      ? `El mercado pide una volatilidad del <span class="n">${pc(atm)}</span> cuando el modelo predice <span class="n">${pc(expVol)}</span>. Te están pagando <span class="n">${(vrp*100).toFixed(1)} puntos</span> de más por el seguro: favorece <em>vender</em> prima.`
-      : vrp<-.02
-      ? `La IV del mercado (<span class="n">${pc(atm)}</span>) está por debajo de lo que predice el modelo (<span class="n">${pc(expVol)}</span>). Las opciones están baratas: favorece <em>comprar</em> prima.`
-      : `La IV del mercado y el modelo coinciden casi punto por punto. Sin ventaja de volatilidad; si operas, que sea por dirección o por una dislocación concreta.`;
-  }else v.innerHTML='';
-  const views=[['best','Mejores'],['richVsCurve','Caros vs curva'],['cheapVsCurve','Baratos vs curva'],
-    ['thetaEfficiency','Theta por delta'],['bestVRP','Mayor VRP'],['safestShort','Más seguros'],['bestEV','Mejor valor esperado']];
+  const atm=an.atmIv;
+  const hayModelo=isFinite(expVol);
+  const vrp=hayModelo?atm-expVol:NaN;
+
+  /* ── ACTO 1: la situación ── */
+  const mov1m = spot*atm*Math.sqrt(dte/365);
+  let historia = `<p>Estás mirando las opciones de <b>${sym}</b>, que ahora mismo cotiza a <b class="num">${spot.toFixed(2)}</b>.
+    Miramos las que vencen en <b>${dte} días</b>.</p>`;
+
+  historia += `<p>El mercado está poniendo precios como si esperara que ${sym} se moviera
+    <b class="num">±${mov1m.toFixed(2)}</b> (arriba o abajo) de aquí al vencimiento.
+    Eso es lo que significa esa "volatilidad implícita del ${pc(atm)}" que verás por ahí:
+    es el susto que llevan incorporado los precios.</p>`;
+
+  if(hayModelo){
+    historia += `<p>Ahora bien: hemos mirado <b>cómo se ha movido ${sym} de verdad</b>
+      durante los últimos ${pack?pack.n:'?'} días. Y el histórico dice que su volatilidad
+      normal es del <b class="num">${pc(expVol)}</b>.</p>`;
+
+    if(vrp>0.04){
+      historia += `<p class="clave up">Aquí está lo interesante: <b>el mercado está pidiendo más susto del que la historia justifica</b>.
+        Cobra como si ${sym} fuera a moverse un ${pc(atm)}, cuando normalmente se mueve un ${pc(expVol)}.
+        Te está pagando <b class="num">${(vrp*100).toFixed(1)} puntos de más</b> por asegurarle.</p>
+        <p><b>Traducción:</b> vender opciones sobre ${sym} parece pagar por encima de lo que vale el riesgo.
+        Pero ojo, eso no es dinero gratis — luego te lo explico.</p>`;
+    } else if(vrp<-0.02){
+      historia += `<p class="clave dn">Y aquí hay algo raro: <b>el mercado está pidiendo menos de lo que la historia justifica</b>.
+        Las opciones están baratas: cobran como si ${sym} fuera a estar tranquilo (${pc(atm)}),
+        cuando normalmente se mueve un ${pc(expVol)}.</p>
+        <p><b>Traducción:</b> comprar opciones sobre ${sym} sale a buen precio. El seguro está de oferta.</p>`;
+    } else {
+      historia += `<p class="clave mk">Y coinciden bastante: el mercado pide ${pc(atm)}, la historia dice ${pc(expVol)}.
+        <b>No hay chollo por ninguna parte.</b></p>
+        <p><b>Traducción:</b> si operas aquí, que sea porque tienes una opinión sobre la <em>dirección</em>,
+        no porque las opciones estén mal valoradas. No lo están.</p>`;
+    }
+  } else {
+    historia += `<p class="clave mk">Falta un dato importante: <b>no sabemos si ese precio es caro o barato</b>,
+      porque no hemos mirado el histórico real de ${sym}.
+      Pulsa <b>Estimar volatilidad</b> en la pestaña Estudiar para que lo calculemos.</p>`;
+  }
+
+  $('cHistoria').innerHTML = historia;
+
+  /* ── Las cifras, con etiqueta doble ── */
+  $('cFigs').innerHTML =
+    fig2('Precio de '+sym, spot.toFixed(2), '', 'Lo que vale ahora mismo')+
+    fig2('Susto que cobra el mercado', pc(atm), 'mdl', 'Volatilidad implícita')+
+    fig2('Susto real (histórico)', hayModelo?pc(expVol):'—', 'mk', 'Volatilidad GARCH')+
+    fig2('Te pagan de más', hayModelo?((vrp*100>=0?'+':'')+(vrp*100).toFixed(1)+' pts'):'—',
+         vrp>.02?'up':vrp<-.02?'dn':'', 'Prima de riesgo de volatilidad')+
+    fig2('Movimiento esperado', '±'+mov1m.toFixed(2), '', 'A '+dte+' días');
+
+  $('cAyuda').innerHTML = hayModelo
+    ? ayuda('vrp',{sym, iv:pc(atm), modelo:pc(expVol)})
+    : ayuda('iv',{sym});
+
+  /* ── ACTO 2: qué hacer ── */
+  const views=[
+    ['best','Las mejores para vender','Ordenadas por lo bien que combinan todo: cobras mucho tiempo, es poco probable que te toque pagar, y se puede entrar y salir sin comerte el spread.'],
+    ['richVsCurve','Las que están caras','Estas cotizan por encima de lo que les tocaría comparadas con sus vecinas. Alguien está pagando de más por ellas. Buenas candidatas a vender.'],
+    ['cheapVsCurve','Las que están baratas','Estas cotizan por debajo de sus vecinas. Están de oferta. Buenas para comprar, o para usarlas como protección de un spread.'],
+    ['safestShort','Las más seguras','Las que es más improbable que acaben costándote dinero. Cobras menos, pero duermes mejor.'],
+    ['bestEV','Las que más ventaja tienen','Según el histórico real, las que te pagan más por encima de lo que vale su riesgo.'],
+  ];
+  st.rkView = views.some(v=>v[0]===st.rkView) ? st.rkView : 'best';
   $('cChips').innerHTML=views.map(([k,l])=>
     `<button class="chip${st.rkView===k?' on':''}" onclick="setRk('${k}')">${l}</button>`).join('');
+  const vista = views.find(v=>v[0]===st.rkView);
+  $('cRankIntro').innerHTML = `<p class="intro-rank">${vista[2]}</p>`;
+
   renderRank();renderTable();drawSmile();drawRND();
 }
-const setRk=k=>{st.rkView=k;renderChain();};
+
 function renderRank(){
   const list=CH.rk[st.rkView]||[];
-  $('cRankSub').textContent=list.length+' de '+CH.rk.candidates;
+  const hayModelo=isFinite(CH.expVol);
+  if(!list.length){$('cRank').innerHTML='<p class="cap">No hay candidatos con datos suficientes.</p>';return;}
+
   $('cRank').innerHTML=`<thead><tr>
-    <th>Contrato</th><th>Mercado</th><th>Modelo<span class="help">?<span class="bub">${HELP.gap}</span></span></th>
-    <th>Te pagan<span class="help">?<span class="bub">${HELP.gap}</span></span></th>
-    <th>En IV<span class="help">?<span class="bub">${HELP.gapiv}</span></span></th>
-    <th>vs curva<span class="help">?<span class="bub">${HELP.edge}</span></span></th>
-    <th>Delta</th><th>Theta</th><th>θ/Δ</th>
-    <th>P(sin valor)<span class="help">?<span class="bub">${HELP.otm}</span></span></th>
-    <th>σ</th><th>Liquidez<span class="help">?<span class="bub">${HELP.liq}</span></span></th></tr></thead><tbody>`+
+    <th>Contrato</th>
+    <th>Te pagan<br><small>prima</small></th>
+    <th>Debería valer<br><small>según el histórico</small></th>
+    <th>Diferencia<br><small>por contrato</small></th>
+    <th>Caduca sin valor<br><small>probabilidad</small></th>
+    <th>Cobras al día<br><small>por esperar</small></th>
+    <th>Se sale de la curva<br><small>vs vecinas</small></th>
+    <th>Fácil de operar<br><small>liquidez</small></th>
+    </tr></thead><tbody>`+
     list.map(o=>{
       const rich=o.ivEdge>0.005,cheap=o.ivEdge<-0.005;
+      const tipo = o.type==='P'?'Put':'Call';
       return `<tr class="${rich?'rich':cheap?'cheap':''}" onclick="pick(${o.K},'${o.type}')">
-      <td class="tk">${o.type} ${o.K}</td>
-      <td>${o.mid.toFixed(2)}</td>
+      <td class="tk">${tipo} ${o.K}<br><small class="mute">${o.sigmas.toFixed(1)}σ de distancia</small></td>
+      <td class="num">${o.mid.toFixed(2)}<br><small class="mute">$${(o.mid*100).toFixed(0)}/contrato</small></td>
       <td class="mk">${isFinite(o.pxExpVol)?o.pxExpVol.toFixed(2):'—'}</td>
-      <td class="${o.gapContract>0?'up':'dn'}">${isFinite(o.gapContract)?money(o.gapContract):'—'}</td>
-      <td class="${o.gapIV>0?'up':'dn'}">${isFinite(o.gapIV)?((o.gapIV>=0?'+':'')+(o.gapIV*100).toFixed(1)):'—'}</td>
-      <td class="${rich?'up':cheap?'dn':'mute'}">${isFinite(o.ivEdge)?((o.ivEdge>=0?'+':'')+(o.ivEdge*100).toFixed(2)):'—'}</td>
-      <td>${o.delta.toFixed(3)}</td>
-      <td class="dn">${(o.theta*100).toFixed(2)}</td>
-      <td class="mk">${isFinite(o.thetaPerDelta)?o.thetaPerDelta.toFixed(2):'—'}</td>
+      <td class="${o.gapContract>0?'up':'dn'}">${isFinite(o.gapContract)?(o.gapContract>0?'+':'')+'$'+Math.abs(o.gapContract).toFixed(0):'—'}
+        <br><small class="mute">${isFinite(o.gapIV)?((o.gapIV>=0?'+':'')+(o.gapIV*100).toFixed(1)+' pts vol'):''}</small></td>
       <td class="${o.probOTM>.8?'up':''}">${(o.probOTM*100).toFixed(0)}%</td>
-      <td class="mute">${o.sigmas.toFixed(2)}</td>
-      <td class="mute">${(o.liquidity*100).toFixed(0)}%</td></tr>`;}).join('')+'</tbody>';
-  const EXP={
-    best:'Combina cuatro cosas: cuánta theta cobras por unidad de delta, la probabilidad de que expire sin valor, la prima de volatilidad aislada del sesgo, y la calidad de ejecución. <b>Los pesos son una heurística, no están calibrados contra ningún backtest</b>: úsalo para ordenar candidatos, no como veredicto.',
-    richVsCurve:'Cotizan con una volatilidad <b>por encima</b> de la curva que ajusta a sus vecinos. En términos relativos, el mercado los está pagando caros: candidatos a vender.',
-    cheapVsCurve:'Cotizan <b>por debajo</b> de su curva. Candidatos a comprar, o a usar como pata larga de un spread.',
-    thetaEfficiency:'Cuánto tiempo cobras por cada unidad de riesgo direccional que asumes. Alto significa que te pagan bien por esperar sin apostar a dirección.',
-    bestVRP:'Mayor prima de volatilidad, ya <b>normalizada</b> por el sesgo de la curva. Sin esa normalización, el ranking lo dominarían siempre los puts más lejanos, cuya IV alta es sesgo, no anomalía.',
-    safestShort:'Mayor probabilidad de expirar sin valor, con una prima mínima que compense. Los conservadores.',
-    bestEV:'Prima cobrada menos el payoff esperado, calculado con la <b>volatilidad de tu modelo</b>, no con la del mercado. Bajo la volatilidad del mercado este número sería cero por construcción (es el precio justo): solo se separa de cero si tu estimación de volatilidad discrepa de la implícita. Es el edge de volatilidad, contrato a contrato.'};
-  const e=$('cRankNote');e.className='note';
-  e.innerHTML=`<span class="eyebrow">Qué mide este ranking</span>${EXP[st.rkView]||''}`;
+      <td class="mk">$${Math.abs(o.theta*100).toFixed(2)}</td>
+      <td class="${rich?'up':cheap?'dn':'mute'}">${isFinite(o.ivEdge)?
+        (Math.abs(o.ivEdge)<0.005?'normal':(o.ivEdge>0?'CARA':'BARATA')):'—'}
+        <br><small class="mute">${isFinite(o.ivEdge)?((o.ivEdge>=0?'+':'')+(o.ivEdge*100).toFixed(2)+' pts'):''}</small></td>
+      <td>${o.liquidity>0.8?'✓ fácil':o.liquidity>0.5?'· regular':'⚠ difícil'}
+        <br><small class="mute">${(o.liquidity*100).toFixed(0)}%</small></td>
+      </tr>`;}).join('')+'</tbody>';
+
+  /* Lectura del primero de la lista: la recomendación en cristiano */
+  const top=list[0];
+  const tipo=top.type==='P'?'put':'call';
+  const dir=top.type==='P'?'baje':'suba';
+  let lectura=`<p><b>Si tuviera que quedarme con una:</b> el ${tipo} de strike ${top.K}.</p>`;
+  lectura+=`<p>Te pagan <b class="num">$${(top.mid*100).toFixed(0)}</b> por contrato.
+    A cambio te comprometes a comprar${top.type==='C'?'/vender':''} ${CH.sym} a ${top.K}
+    si acaba ${top.type==='P'?'por debajo':'por encima'} de ese precio.</p>`;
+  lectura+=`<p>Está a <b>${top.sigmas.toFixed(1)} desviaciones</b> del precio actual —o sea, bastante lejos.
+    Hay un <b class="num">${(top.probOTM*100).toFixed(0)}%</b> de probabilidad de que caduque sin que tengas que pagar nada,
+    y te quedes la prima entera.</p>`;
+  if(hayModelo&&isFinite(top.gapContract)&&top.gapContract>0){
+    lectura+=`<p class="clave up">Y lo importante: según el histórico real de ${CH.sym}, ese contrato
+      <b>debería costar $${(top.pxExpVol*100).toFixed(0)}</b>, no $${(top.mid*100).toFixed(0)}.
+      Te están pagando <b class="num">$${top.gapContract.toFixed(0)} de más</b>.</p>`;
+  }
+  lectura+=`<p><b>El riesgo:</b> en el ${((1-top.probOTM)*100).toFixed(0)}% de casos restante, ${CH.sym} ${dir}
+    de ${top.K} y empiezas a perder. Y ahí no hay techo:
+    ${top.type==='P'?'cuanto más caiga, más pierdes':'cuanto más suba, más pierdes'}.
+    Por eso conviene cubrirlo comprando otro ${tipo} más lejano (un "spread") en vez de venderlo a pelo.</p>`;
+  lectura+=`<p class="tip">Pulsa cualquier fila para llevártela a <b>Estudiar</b> y ver el gráfico de qué pasa en cada escenario.</p>`;
+  $('cRankNote').innerHTML=lectura;
 }
+
+/* Cifra con etiqueta doble: claro arriba, técnico pequeño debajo */
+function fig2(titulo, valor, cls='', jerga=''){
+  return `<div class="f">
+    <div class="k">${titulo}</div>
+    <div class="v ${cls}">${valor}</div>
+    ${jerga?`<div class="j">${jerga}</div>`:''}
+  </div>`;
+}
+
 function renderTable(){
   const rows=[...CH.an.rows].sort((a,b)=>CH.desc?b[CH.sortKey]-a[CH.sortKey]:a[CH.sortKey]-b[CH.sortKey]);
   $('cCount').textContent=rows.length+' contratos';
