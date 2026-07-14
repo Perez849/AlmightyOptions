@@ -1,0 +1,1984 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Almighty Options</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* carbón azulado · terminal oscura sobria */
+  --paper:#12161C;      /* fondo */
+  --paper2:#1A1F27;     /* superficie elevada */
+  --paper3:#232935;     /* superficie 2 / hover */
+  --ink:#E6E9EE;        /* texto principal, blanco hueso */
+  --ink2:#A8B0BC;       /* secundario */
+  --ink3:#727C8A;     /* terciario, etiquetas */
+  --rule:#242A34;       /* separadores sutiles */
+  --rule2:#333B48;      /* separadores marcados */
+  --bull:#3FB984;       /* verde desaturado */
+  --bear:#E5484D;       /* rojo desaturado */
+  --model:#5B8DEF;      /* azul: lo que dice el modelo */
+  --mark:#D9A441;       /* ámbar: atención */
+  --disp:"Inter",system-ui,sans-serif;
+  --body:"Inter",system-ui,sans-serif;
+  --num:"IBM Plex Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html{-webkit-text-size-adjust:100%;background:var(--paper);min-height:100%}
+body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.55;
+  min-height:100vh;padding-bottom:80px;-webkit-font-smoothing:antialiased}
+.w{max-width:1220px;margin:0 auto;padding:0 20px}
+
+/* ── cabecera de periódico ── */
+header{border-bottom:1px solid var(--rule2);background:var(--paper);position:sticky;top:0;z-index:60}
+.mast{display:flex;align-items:baseline;gap:20px;padding:12px 0 10px;flex-wrap:wrap}
+.name{font-family:var(--disp);font-size:20px;font-weight:700;letter-spacing:-.02em;line-height:1;color:var(--ink)}
+.name em{font-style:normal;font-weight:400;color:var(--ink2)}
+.dek{font-family:var(--body);font-size:12px;font-weight:450;letter-spacing:0;color:var(--ink3);
+  border-left:1px solid var(--rule2);padding-left:13px;align-self:center}
+.state{margin-left:auto;display:flex;align-items:center;gap:7px;font-family:var(--body);font-size:12px;
+  letter-spacing:0;color:var(--ink2);text-transform:none;font-weight:450}
+.led{width:7px;height:7px;border-radius:50%;background:var(--rule2);flex-shrink:0}
+.led.live{background:var(--bull);box-shadow:0 0 6px var(--bull);animation:pulse 2s ease-in-out infinite}
+.led.bad{background:var(--bear)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* cinta de cotización */
+.ribbon{border-bottom:1px solid var(--rule);background:var(--paper2);overflow-x:auto;-webkit-overflow-scrolling:touch}
+.ribbon .in{display:flex;gap:0;padding:0;min-width:min-content}
+.rq{padding:7px 18px;border-right:1px solid var(--rule);white-space:nowrap;display:flex;align-items:baseline;gap:7px}
+.rq .l{font-family:var(--body);font-size:11px;font-weight:500;letter-spacing:0;color:var(--ink3);text-transform:none}
+.rq .n{font-family:var(--num);font-size:13px;font-weight:600;font-variant-numeric:tabular-nums}
+.rq .n.up{color:var(--bull)}.rq .n.dn{color:var(--bear)}.rq .n.mk{color:var(--mark)}
+
+/* ── navegación tipo secciones ── */
+nav{border-bottom:1px solid var(--rule);display:flex;gap:0}
+nav button{font-family:var(--body);font-size:14px;font-weight:500;padding:12px 0;margin-right:26px;
+  background:none;border:none;border-bottom:2px solid transparent;color:var(--ink3);cursor:pointer;transition:.15s}
+nav button.on{color:var(--ink);border-bottom-color:var(--model)}
+nav button:hover:not(.on){color:var(--ink2)}
+nav button:focus-visible{outline:2px solid var(--model);outline-offset:2px}
+
+.view{display:none;padding:22px 0}
+.view.on{display:block}
+.cols{display:grid;gap:22px}
+.c2{grid-template-columns:1fr 1fr}
+.c21{grid-template-columns:1.35fr 1fr}
+@media(max-width:880px){.c2,.c21{grid-template-columns:1fr}}
+
+/* ── secciones: reglas finas, sin cajas ── */
+section.blk{margin-bottom:26px}
+h2{font-family:var(--disp);font-size:15px;font-weight:600;letter-spacing:-.005em;color:var(--ink);
+  padding-bottom:9px;margin-bottom:16px;border-bottom:1px solid var(--rule2);display:flex;align-items:baseline;gap:10px}
+h2 .sub{font-family:var(--num);font-size:11px;letter-spacing:0;text-transform:none;
+  color:var(--ink3);font-weight:400;margin-left:auto}
+h3{font-family:var(--body);font-size:12px;letter-spacing:.02em;color:var(--ink3);
+  margin-bottom:9px;font-weight:600;text-transform:none}
+
+/* ── el número grande: cabecera de artículo ── */
+.lede{margin-bottom:16px}
+.lede .fig{font-family:var(--num);font-size:38px;font-weight:600;line-height:1;letter-spacing:-.02em;
+  font-variant-numeric:tabular-nums}
+.lede .fig.up{color:var(--bull)}.lede .fig.dn{color:var(--bear)}
+.lede .cap{font-family:var(--body);font-size:12px;letter-spacing:0;text-transform:none;color:var(--ink3);margin-top:5px}
+
+/* ── rejilla de datos: como tabla de cotizaciones impresa ── */
+.figs{display:flex;flex-wrap:wrap;background:var(--paper2);border:1px solid var(--rule);border-radius:6px;overflow:hidden}
+.figs .f{flex:1;min-width:96px;padding:11px 14px;border-right:1px solid var(--rule)}
+.figs .f:last-child{border-right:none}
+.figs .f .k{font-family:var(--body);font-size:11px;font-weight:500;letter-spacing:0;color:var(--ink3);
+  display:flex;align-items:center;margin-bottom:4px}
+.figs .f .v{font-family:var(--num);font-size:17px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--ink)}
+.figs .f .v.up{color:var(--bull)}.figs .f .v.dn{color:var(--bear)}.figs .f .v.mk{color:var(--mark)}
+.figs .f.wide{flex:1.6}
+
+/* ── prosa explicativa: el periódico explica ── */
+.note{font-size:13.5px;line-height:1.6;margin-top:12px;padding:11px 14px;border-left:2px solid var(--rule2);background:var(--paper2);border-radius:0 5px 5px 0;color:var(--ink2)}
+.note.up{border-left-color:var(--bull)}
+.note.dn{border-left-color:var(--bear)}
+.note.mk{border-left-color:var(--mark)}
+.note .eyebrow{font-family:var(--body);font-size:11px;font-weight:600;letter-spacing:.02em;
+  color:var(--ink3);display:block;margin-bottom:5px;text-transform:none}
+.note b{font-weight:600;color:var(--ink)}
+.note .num{font-family:var(--num);font-weight:600;font-variant-numeric:tabular-nums}
+
+/* titular de veredicto */
+.verdict{font-family:var(--disp);font-size:16px;font-weight:500;line-height:1.45;letter-spacing:-.005em;
+  padding:14px 16px;margin-bottom:16px;border-left:3px solid var(--ink2);background:var(--paper2);border-radius:0 6px 6px 0}
+.verdict.up{border-left-color:var(--bull)}
+.verdict.dn{border-left-color:var(--bear)}
+.verdict.mk{border-left-color:var(--mark)}
+.verdict em{font-style:normal;font-weight:700}
+.verdict .n{font-family:var(--num);font-variant-numeric:tabular-nums;font-size:.85em}
+
+/* ── formularios ── */
+label{display:block;font-family:var(--body);font-size:11px;font-weight:500;letter-spacing:.01em;
+  color:var(--ink3);margin-bottom:5px}
+input,select{width:100%;background:var(--paper2);border:1px solid var(--rule2);
+  color:var(--ink);font-family:var(--num);font-size:14px;font-variant-numeric:tabular-nums;
+  padding:7px 9px;outline:none;border-radius:5px;transition:.12s}
+input:focus,select:focus{border-color:var(--model);background:var(--paper3)}
+select{cursor:pointer}
+.fld{margin-bottom:13px}
+.rw{display:flex;gap:14px}.rw>*{flex:1}
+
+.btn{font-family:var(--body);font-size:13px;font-weight:500;letter-spacing:0;padding:7px 13px;
+  background:var(--paper2);border:1px solid var(--rule2);color:var(--ink);cursor:pointer;transition:.12s;border-radius:6px}
+.btn:hover{background:var(--paper3);border-color:var(--ink2)}
+.btn:focus-visible{outline:2px solid var(--model);outline-offset:2px}
+.btn.solid{background:var(--model);color:#fff;border-color:var(--model);font-weight:500}
+.btn.solid:hover{background:#7BA3F2;border-color:#7BA3F2}
+.btn.quiet{background:transparent;border-color:var(--rule2);color:var(--ink2)}
+.btn.quiet:hover{background:var(--paper2);color:var(--ink)}
+.btn.sm{padding:5px 11px;font-size:12px}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+
+/* ── tabla de cotizaciones: LA SIGNATURE ── */
+.quotes{width:100%;border-collapse:collapse;font-family:var(--num);font-size:12px;font-variant-numeric:tabular-nums}
+.quotes thead th{font-family:var(--body);font-size:11px;letter-spacing:0;text-transform:none;color:var(--ink3);font-weight:500;
+  text-align:right;padding:8px 8px;border-bottom:1px solid var(--rule2);white-space:nowrap;cursor:pointer;user-select:none}
+.quotes thead th:hover{color:var(--ink)}
+.quotes thead th.sorted{color:var(--ink);font-weight:600}
+.quotes thead th:first-child,.quotes tbody td:first-child{text-align:left}
+.quotes tbody td{padding:5px 7px;border-bottom:1px solid var(--rule);text-align:right;white-space:nowrap}
+.quotes tbody tr:hover td{background:var(--paper2)}
+.quotes tbody tr{cursor:pointer}
+.quotes .tk{font-weight:600;color:var(--ink)}
+.quotes .up{color:var(--bull)}
+.quotes .dn{color:var(--bear)}
+.quotes .mdl{color:var(--model)}
+.quotes .mk{color:var(--mark)}
+.quotes .mute{color:var(--ink3)}
+/* la anotación al margen: marca de trader sobre el papel */
+.quotes tbody tr.flag td:first-child{position:relative}
+.quotes tbody tr.flag td:first-child::before{content:"›";position:absolute;left:-9px;color:var(--mark);
+  font-weight:700;font-size:14px;line-height:1}
+.quotes tbody tr.rich td:first-child::before{content:"▸";color:var(--bull)}
+.quotes tbody tr.cheap td:first-child::before{content:"▸";color:var(--bear)}
+.quotes tbody tr.atm td{border-top:1px solid var(--rule2);border-bottom:1px solid var(--rule2);background:var(--paper3)}
+.scrollx{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -20px;padding:0 20px}
+
+.tag{font-family:var(--body);font-size:11px;font-weight:500;letter-spacing:0;padding:2px 7px;text-transform:none;border-radius:4px}
+.tag.up{background:rgba(63,185,132,.14);color:var(--bull)}
+.tag.dn{background:rgba(229,72,77,.14);color:var(--bear)}
+.tag.mk{background:rgba(217,164,65,.14);color:var(--mark)}
+.tag.mute{background:var(--paper3);color:var(--ink2)}
+
+/* ── ayuda inline ── */
+.help{display:inline-flex;align-items:center;justify-content:center;width:13px;height:13px;margin-left:5px;
+  border:1px solid var(--rule2);border-radius:50%;font-family:var(--body);font-size:9px;color:var(--ink3);
+  cursor:help;position:relative;flex-shrink:0}
+.help:hover{border-color:var(--ink2);color:var(--ink)}
+.help:hover .bub{display:block}
+.bub{display:none;position:absolute;bottom:18px;left:50%;transform:translateX(-50%);width:212px;
+  background:#2C3442;color:var(--ink);padding:9px 11px;font-family:var(--body);font-size:12px;
+  line-height:1.45;letter-spacing:0;text-transform:none;font-weight:400;z-index:200;text-align:left;
+  border:1px solid var(--rule2);border-radius:5px;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+.bub::after{content:"";position:absolute;top:100%;left:50%;transform:translateX(-50%);
+  border:5px solid transparent;border-top-color:#2C3442}
+
+/* ── patas ── */
+.leg{display:grid;grid-template-columns:auto 1fr 1fr .55fr auto;gap:10px;align-items:end;
+  padding:9px 0;border-bottom:1px solid var(--rule)}
+.leg label{font-size:10px}
+.bs{display:flex;border:1px solid var(--rule2);border-radius:5px;overflow:hidden}
+.bs button{background:none;border:none;font-family:var(--body);font-size:12px;font-weight:500;padding:6px 11px;color:var(--ink3);cursor:pointer}
+.bs button.on{background:var(--bull);color:#0A1410;font-weight:600}
+.bs.sell button.on{background:var(--bear);color:#fff}
+.leg .del{background:none;border:none;color:var(--ink3);font-size:17px;cursor:pointer;line-height:1;padding:0 3px}
+.leg .del:hover{color:var(--bear)}
+
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.chip{font-family:var(--body);font-size:12.5px;font-weight:450;letter-spacing:0;padding:5px 11px;background:var(--paper2);
+  border:1px solid var(--rule2);color:var(--ink2);cursor:pointer;transition:.12s;border-radius:20px}
+.chip:hover{border-color:var(--ink2);color:var(--ink)}
+.chip.on{background:var(--model);color:#fff;border-color:var(--model);font-weight:500}
+
+/* ── sliders ── */
+.sldr{margin-bottom:15px}
+.sldr .top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+.sldr .val{font-family:var(--num);font-size:14px;font-weight:600;font-variant-numeric:tabular-nums}
+input[type=range]{-webkit-appearance:none;appearance:none;height:2px;background:var(--rule2);border:none;padding:0;cursor:pointer;border-radius:2px}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;
+  background:var(--model);cursor:pointer;border:3px solid var(--paper);box-shadow:0 0 0 1px var(--model)}
+input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--model);
+  cursor:pointer;border:3px solid var(--paper);box-shadow:0 0 0 1px var(--model)}
+input[type=range]:focus-visible{outline:2px solid var(--model);outline-offset:4px}
+
+canvas{width:100%;display:block}
+/* ═══ ajustes finos ═══ */
+/* la app entera debe ser oscura, aunque el contenedor externo no lo sea */
+html,body{background:#12161C!important}
+
+/* cabecera compacta */
+.mast{padding:14px 0 12px}
+.name{font-size:18px;letter-spacing:-.01em}
+.rq{padding:8px 16px}
+.rq .n{font-size:13px}
+nav button{font-size:14px;margin-right:24px;padding:13px 0}
+
+/* aire: las secciones necesitan respirar */
+.view{padding:26px 0}
+section.blk{margin-bottom:32px}
+.cols{gap:26px}
+
+/* inputs: más discretos, menos "caja negra" */
+input,select{background:#161B23;border-color:#2A313C;font-size:14px;padding:8px 10px}
+input:focus,select:focus{border-color:var(--model);background:#1B212B;box-shadow:0 0 0 3px rgba(91,141,239,.12)}
+.fld{margin-bottom:15px}
+
+/* botones: proporcionados */
+.btn{border-radius:6px}
+.btn.solid{box-shadow:0 1px 2px rgba(0,0,0,.3)}
+.btns{gap:9px}
+
+/* chips en píldora, con estado claro */
+.chip{border-radius:16px}
+.chip:hover{background:var(--paper3);border-color:var(--ink3);color:var(--ink)}
+.chip.on{box-shadow:0 1px 3px rgba(91,141,239,.3)}
+
+/* cifras: que el número domine */
+.figs{border-radius:8px}
+.figs .f .v{font-size:17px;font-weight:600;letter-spacing:-.01em}
+.figs .f{padding:12px 15px}
+
+/* tabla: legible */
+.quotes{font-size:12.5px}
+.quotes tbody td{padding:6px 8px}
+.quotes .tk{font-weight:600}
+
+/* separadores más sutiles */
+.rq{border-right:1px solid var(--rule)}
+.leg{border-bottom:1px solid var(--rule);padding:11px 0}
+.pos{border-bottom:1px solid var(--rule);padding:15px 0}
+.quotes tbody td{border-bottom:1px solid var(--rule)}
+details{border-top:1px solid var(--rule)}
+.quotes tbody tr.flag td:first-child::before,
+.quotes tbody tr.rich td:first-child::before,
+.quotes tbody tr.cheap td:first-child::before{left:-7px;font-size:11px}
+h3{color:var(--ink3)}
+.verdict .n{color:var(--ink);font-weight:600}
+.note .num{color:var(--ink)}
+.sldr .val{color:var(--ink);font-family:var(--num)}
+::selection{background:var(--model);color:#fff}
+::-webkit-scrollbar{height:8px;width:8px}
+::-webkit-scrollbar-track{background:var(--paper)}
+::-webkit-scrollbar-thumb{background:var(--rule2);border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:var(--ink3)}
+.quotes tbody tr.flag td:first-child::before,
+.quotes tbody tr.rich td:first-child::before,
+.quotes tbody tr.cheap td:first-child::before{left:-7px;font-size:11px}
+details{border-top:1px solid var(--rule)}
+h3{color:var(--ink3)}
+.verdict .n{color:var(--ink);font-weight:600}
+.note .num{color:var(--ink)}
+.sldr .val{color:var(--ink)}
+::selection{background:var(--model);color:#fff}
+/* scrollbar discreta */
+::-webkit-scrollbar{height:8px;width:8px}
+::-webkit-scrollbar-track{background:var(--paper)}
+::-webkit-scrollbar-thumb{background:var(--rule2);border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:var(--ink3)}
+.plot{background:var(--paper2);border:1px solid var(--rule);border-radius:6px;padding:10px 8px;margin-top:8px}
+.cap{font-size:12px;color:var(--ink3);line-height:1.5;margin-top:8px}
+.cap b{font-weight:600;color:var(--ink2)}
+.empty{padding:32px 24px;color:var(--ink2);font-size:14px;line-height:1.6;background:var(--paper2);
+  border:1px solid var(--rule);border-radius:8px}
+.empty strong{font-family:var(--disp);font-size:17px;display:block;margin-bottom:8px;color:var(--ink);font-weight:600}
+.caveat{font-size:12.5px;color:var(--ink2);line-height:1.55;padding:10px 13px;background:var(--paper2);
+  border-left:2px solid var(--mark);margin-top:12px;border-radius:0 5px 5px 0}
+details{margin-top:12px;border-top:1px solid var(--rule);padding-top:8px}
+summary{font-family:var(--body);font-size:12.5px;font-weight:500;letter-spacing:0;text-transform:none;color:var(--ink3);
+  cursor:pointer;list-style:none;padding:4px 0}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"+ ";font-weight:600}
+details[open] summary::before{content:"− "}
+summary:hover{color:var(--ink)}
+.gloss dt{font-family:var(--body);font-size:13px;letter-spacing:0;text-transform:none;
+  color:var(--model);margin-top:14px;font-weight:600}
+.gloss dd{font-size:14px;line-height:1.55;color:var(--ink2);margin-top:2px}
+.pos{padding:13px 0;border-bottom:1px solid var(--rule)}
+.pos .hd{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.pos .id{font-family:var(--num);font-size:13px;font-weight:500;display:flex;align-items:center;gap:8px;color:var(--ink)}
+.pos .pl{font-family:var(--num);font-size:19px;font-weight:600;font-variant-numeric:tabular-nums}
+.pos .meta{font-family:var(--body);font-size:12px;color:var(--ink3);margin-top:4px;letter-spacing:0}
+.pos .grk{display:flex;gap:16px;margin-top:9px;flex-wrap:wrap;font-family:var(--num);font-size:12px;color:var(--ink3)}
+.pos .grk b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+.dotlive{width:6px;height:6px;border-radius:50%;background:var(--bull);animation:pulse 2s ease-in-out infinite;flex-shrink:0}
+.status{font-size:13px;color:var(--ink2);margin-top:9px;font-style:italic}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="w mast">
+    <span class="name">Almighty <em>Options</em></span>
+    <span class="dek">Análisis de derivados</span>
+    <span class="state"><span class="led" id="led"></span><span id="ledTx">Sin conectar</span></span>
+  </div>
+</header>
+
+<div class="ribbon"><div class="w"><div class="in" id="ribbon"></div></div></div>
+
+<div class="w">
+  <nav>
+    <button class="on" data-v="book" onclick="go('book')">Mi cuenta</button>
+    <button data-v="desk" onclick="go('desk')">Estudiar</button>
+    <button data-v="chain" onclick="go('chain')">Cadena</button>
+  </nav>
+
+  <!-- ═══════════ MI CUENTA ═══════════ -->
+  <div class="view on" id="v-book">
+    <div id="bkOff">
+      <div class="empty">
+        <strong>Conecta tu cuenta para empezar</strong>
+        Verás tus posiciones con precios y griegas en directo, y qué significan en lenguaje llano.
+        <div class="btns" style="margin-top:16px">
+          <button class="btn solid" onclick="connect()">Conectar cuenta</button>
+          <button class="btn quiet" onclick="setup()">Configurar acceso</button>
+        </div>
+      </div>
+      <p class="cap" style="margin-top:14px">Sin conexión también puedes usar <b>Estudiar</b> para montar y valorar cualquier estrategia a mano.</p>
+    </div>
+
+    <div id="bkOn" style="display:none">
+      <div id="bkVerdict"></div>
+      <section class="blk">
+        <h2>Radiografía<span class="sub" id="bkNlv"></span></h2>
+        <div class="figs" id="bkFigs"></div>
+        <div id="bkNote"></div>
+      </section>
+      <section class="blk">
+        <h2>Posiciones abiertas<span class="sub" id="bkCount"></span></h2>
+        <div id="bkList"></div>
+        <div class="btns" style="margin-top:14px">
+          <button class="btn quiet sm" onclick="stopStream()">Detener actualización</button>
+          <button class="btn quiet sm" onclick="setup()">Cambiar acceso</button>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- ═══════════ ESTUDIAR ═══════════ -->
+  <div class="view" id="v-desk">
+    <div class="cols c21">
+      <section class="blk">
+        <h2>El subyacente</h2>
+        <div class="rw">
+          <div class="fld"><label>Ticker</label><input id="sym" value="SPY" style="text-transform:uppercase"></div>
+          <div class="fld"><label>Vencimiento</label><select id="expSel"><option value="">Manual</option></select></div>
+        </div>
+        <div class="btns" style="margin-bottom:14px">
+          <button class="btn sm" onclick="pullMarket()">Traer del mercado</button>
+          <button class="btn quiet sm" onclick="pullGarch()">Estimar volatilidad</button>
+        </div>
+        <div class="rw">
+          <div class="fld"><label>Precio</label><input id="S" type="number" value="100" step="0.5"></div>
+          <div class="fld"><label>Días</label><input id="DTE" type="number" value="45" step="1"></div>
+          <div class="fld"><label>IV %</label><input id="IV" type="number" value="26" step="0.5"></div>
+        </div>
+        <div class="rw">
+          <div class="fld"><label>Tipo %</label><input id="r" type="number" value="4.5" step="0.1"></div>
+          <div class="fld"><label>Dividendo %</label><input id="q" type="number" value="0" step="0.1"></div>
+          <div class="fld"><label>Modelo</label><select id="model">
+            <option value="bsm">Black-Scholes (europea)</option>
+            <option value="crr">Binomial (americana)</option></select></div>
+        </div>
+        <div id="volNote"></div>
+      </section>
+
+      <section class="blk">
+        <h2>La estructura</h2>
+        <div class="chips" id="tpl"></div>
+        <div class="btns" style="margin-bottom:10px">
+          <button class="btn quiet sm" onclick="addLeg()">Añadir pata</button>
+          <button class="btn quiet sm" onclick="clearLegs()">Vaciar</button>
+          <button class="btn quiet sm" id="fromBk" onclick="fromPosition()" style="display:none">Cargar mi posición</button>
+        </div>
+        <div id="legs"></div>
+      </section>
+    </div>
+
+    <section class="blk">
+      <h2>Qué pasa si<span class="sub" id="mdlTag">Black-Scholes</span></h2>
+      <div class="figs" id="payFigs"></div>
+      <div id="payNote"></div>
+      <div class="plot"><canvas id="payoff" height="290"></canvas></div>
+      <p class="cap"><b>Negro</b>: resultado a vencimiento. <b style="color:var(--model)">Azul</b>: hoy, con la IV del mercado.
+        <b style="color:var(--mark)">Ámbar</b>: hoy, con la volatilidad que predice el modelo. La separación entre azul y ámbar
+        <em>es</em> lo que el mercado te cobra de más (o de menos) por el seguro.</p>
+    </section>
+
+    <div class="cols c2">
+      <section class="blk">
+        <h2>Mueve el mercado</h2>
+        <div class="sldr"><div class="top"><label style="margin:0">Precio del subyacente</label><span class="val" id="uS">0</span></div><input type="range" id="rS" min="-40" max="40" value="0" step="0.5"></div>
+        <div class="sldr"><div class="top"><label style="margin:0">Días transcurridos</label><span class="val" id="uD">0</span></div><input type="range" id="rD" min="0" max="120" value="0" step="1"></div>
+        <div class="sldr"><div class="top"><label style="margin:0">Cambio de IV (puntos)</label><span class="val" id="uV">0</span></div><input type="range" id="rV" min="-30" max="30" value="0" step="0.5"></div>
+        <div class="figs" id="simFigs"></div>
+      </section>
+
+      <section class="blk">
+        <h2>Sensibilidades</h2>
+        <div class="figs" id="grFigs"></div>
+        <div id="grNote"></div>
+        <details><summary>Segundo orden y ejercicio anticipado</summary>
+          <table class="quotes" id="grFull" style="margin-top:8px"></table>
+        </details>
+      </section>
+    </div>
+
+    <section class="blk">
+      <h2>Escenarios de volatilidad<span class="sub">modelo frente a mercado</span></h2>
+      <div id="volScen"></div>
+    </section>
+
+    <section class="blk">
+      <h2>Probabilidad<span class="sub"><select id="mcM" style="width:auto;display:inline-block;font-size:11px;padding:2px 4px"><option value="gbm">Lognormal</option><option value="merton">Con saltos</option><option value="heston">Vol estocástica</option></select> <button class="btn sm" onclick="runMC()">Simular</button></span></h2>
+      <div class="figs" id="mcFigs"></div>
+      <div id="mcNote"></div>
+      <div class="plot"><canvas id="mcHist" height="140"></canvas></div>
+    </section>
+
+    <details><summary>Glosario</summary><dl class="gloss" id="gloss"></dl></details>
+  </div>
+
+  <!-- ═══════════ CADENA ═══════════ -->
+  <div class="view" id="v-chain">
+    <section class="blk">
+      <h2>Escáner de cadena</h2>
+      <div class="rw" style="align-items:flex-end">
+        <div class="fld"><label>Ticker</label><input id="cSym" value="SPY" style="text-transform:uppercase"></div>
+        <div class="fld"><label>Vencimiento</label><select id="cExp"><option value="">—</option></select></div>
+        <div class="fld"><button class="btn solid" style="width:100%" onclick="scanChain()">Escanear cadena</button></div>
+      </div>
+      <p class="status" id="cMsg"></p>
+      <div class="caveat">Cada strike se compara con dos referencias: <b>la volatilidad que predice el modelo</b> (GARCH sobre el histórico real)
+        y <b>la curva SVI</b> ajustada a toda la cadena. La primera dice si el mercado paga de más por el seguro; la segunda, si un strike
+        concreto está dislocado respecto a sus vecinos. Comparar contra una IV inventada no diría nada: el modelo reproduciría el precio por construcción.</div>
+    </section>
+
+    <div id="cOut" style="display:none">
+      <div id="cVerdict"></div>
+      <section class="blk">
+        <h2>Resumen<span class="sub" id="cSum"></span></h2>
+        <div class="figs" id="cFigs"></div>
+      </section>
+
+      <section class="blk">
+        <h2>Dónde está el valor<span class="sub" id="cRankSub"></span></h2>
+        <div class="chips" id="cChips"></div>
+        <div class="scrollx"><table class="quotes" id="cRank"></table></div>
+        <div id="cRankNote"></div>
+      </section>
+
+      <section class="blk">
+        <h2>Cadena completa<span class="sub" id="cCount"></span></h2>
+        <div class="scrollx"><table class="quotes" id="cTable"></table></div>
+        <p class="cap">Pulsa cualquier fila para llevarla a <b>Estudiar</b>.
+          <b style="color:var(--bull)">▸</b> cotiza por encima de su curva (candidato a vender) ·
+          <b style="color:var(--bear)">▸</b> por debajo (candidato a comprar).</p>
+      </section>
+
+      <div class="cols c2">
+        <section class="blk">
+          <h2>La sonrisa</h2>
+          <div class="plot"><canvas id="smile" height="220"></canvas></div>
+          <p class="cap">Cada punto es un strike real. La línea es la curva SVI que mejor los ajusta.
+            Los que se despegan de la línea son los dislocados.</p>
+        </section>
+        <section class="blk">
+          <h2>Lo que el mercado descuenta</h2>
+          <div class="plot"><canvas id="rnd" height="220"></canvas></div>
+          <p class="cap">Distribución implícita a vencimiento, derivada de la curva de precios
+            (Breeden-Litzenberger). La cola izquierda gorda es el miedo a las caídas.</p>
+        </section>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+
+/* ═══ MOTOR · griegas auditadas vs diferencias finitas (<0.02%) ═══ */
+/* MOTOR v3 · CDF alta precisión + griegas completas */
+function erfc(x){
+  const z=Math.abs(x),t=2/(2+z),ty=4*t-2;
+  const cof=[-1.3026537197817094,6.4196979235649026e-1,1.9476473204185836e-2,-9.561514786808631e-3,
+    -9.46595344482036e-4,3.66839497852761e-4,4.2523324806907e-5,-2.0278578112534e-5,-1.624290004647e-6,
+    1.303655835580e-6,1.5626441722e-8,-8.5238095915e-8,6.529054439e-9,5.059343495e-9,-9.91364156e-10,
+    -2.27365122e-10,9.6467911e-11,2.394038e-12,-6.886027e-12,8.94487e-13,3.13092e-13,-1.12708e-13,
+    3.81e-16,7.106e-15];
+  let d=0,dd=0;
+  for(let j=cof.length-1;j>0;j--){const tmp=d;d=ty*d-dd+cof[j];dd=tmp;}
+  const ans=t*Math.exp(-z*z+0.5*(cof[0]+ty*d)-dd);
+  return x>=0?ans:2-ans;
+}
+const N=x=>0.5*erfc(-x/Math.SQRT2);
+const npdf=x=>0.3989422804014327*Math.exp(-x*x/2);
+function d1d2(S,K,t,r,q,v){const vt=v*Math.sqrt(t);const d1=(Math.log(S/K)+(r-q+v*v/2)*t)/vt;return[d1,d1-vt,vt];}
+function bsm(type,S,K,t,r,q,v){
+  if(t<=1e-9||v<=1e-9)return type==='C'?Math.max(S-K,0):Math.max(K-S,0);
+  const[d1,d2]=d1d2(S,K,t,r,q,v);const df=Math.exp(-r*t),dq=Math.exp(-q*t);
+  return type==='C'?S*dq*N(d1)-K*df*N(d2):K*df*N(-d2)-S*dq*N(-d1);
+}
+function greeks(type,S,K,t,r,q,v){
+  // guardas: sin vol, sin tiempo o sin subyacente las griegas no están definidas.
+  // Sin esto, gamma sale NaN (división por vt=0) y contamina toda la cartera.
+  const ZERO={delta:0,gamma:0,vega:0,theta:0,rho:0,vanna:0,volga:0,charm:0,speed:0,zomma:0,color:0};
+  if(!(S>0)||!(K>0)||!(v>1e-6))return ZERO;
+  if(t<=0)t=1e-6;
+  const[d1,d2,vt]=d1d2(S,K,t,r,q,v);
+  if(!isFinite(d1)||!isFinite(d2)||!(vt>0))return ZERO;
+  const df=Math.exp(-r*t),dq=Math.exp(-q*t),nd1=npdf(d1),sq=Math.sqrt(t);
+  const sgn=type==='C'?1:-1;
+  const Nd1=type==='C'?N(d1):N(d1)-1;              // delta sin dq
+  const delta=dq*Nd1;
+  const gamma=dq*nd1/(S*vt);
+  const vega=S*dq*nd1*sq/100;                       // por 1 punto de IV
+  const theta=(-(S*dq*nd1*v)/(2*sq)
+    -sgn*r*K*df*(type==='C'?N(d2):N(-d2))
+    +sgn*q*S*dq*(type==='C'?N(d1):N(-d1)))/365;     // por día
+  const rho=sgn*K*t*df*(type==='C'?N(d2):N(-d2))/100;
+  // segundo orden
+  const vanna=(-dq*nd1*d2/v)/100;                   // dDelta/dVol(1pt)
+  const volga=(S*dq*nd1*sq*d1*d2/v)/100;            // dVega/dVol(1pt)
+  const charm=(sgn*q*dq*(type==='C'?N(d1):N(-d1))
+    -dq*nd1*(2*(r-q)*t-d2*vt)/(2*t*vt))/365;        // dDelta/dt (por día)
+  const speed=-gamma/S*(d1/vt+1);
+  const zomma=gamma*(d1*d2-1)/v/100;
+  // color = dGamma por día que pasa (t decreciente), consistente con theta y charm
+  const color=(dq*nd1/(2*S*t*vt)*(2*q*t+1+(2*(r-q)*t-d2*vt)/vt*d1))/365;
+  return{delta,gamma,vega,theta,rho,vanna,volga,charm,speed,zomma,color};
+}
+/* IV implícita por Newton-Raphson con bisección de respaldo */
+function impliedVol(type,mkt,S,K,t,r,q){
+  // guardas: sin precio, sin tiempo o sin subyacente no hay IV que extraer
+  if(!(mkt>1e-6)||!(t>0)||!(S>0)||!(K>0))return NaN;
+  const intr=type==='C'?Math.max(S*Math.exp(-q*t)-K*Math.exp(-r*t),0):Math.max(K*Math.exp(-r*t)-S*Math.exp(-q*t),0);
+  if(mkt<intr-1e-6)return NaN;                    // por debajo del intrínseco: sin solución
+  if(mkt<=intr+1e-8)return NaN;                   // exactamente el intrínseco: vega=0, IV indeterminada
+  let v=0.25;                                      // semilla
+  let sol=NaN;
+  for(let i=0;i<60;i++){
+    const p=bsm(type,S,K,t,r,q,v);
+    const[d1]=d1d2(S,K,t,r,q,v);
+    const vg=S*Math.exp(-q*t)*npdf(d1)*Math.sqrt(t); // vega en unidades de v (no /100)
+    const diff=p-mkt;
+    if(Math.abs(diff)<1e-8){sol=v;break;}          // Newton convergió
+    if(vg<1e-10)break;                             // vega colapsada → Newton no sirve
+    const step=diff/vg;
+    v-=Math.max(-0.5,Math.min(0.5,step));          // limitar salto
+    if(v<=1e-4||v>5){v=Math.max(1e-4,Math.min(5,v));break;}
+  }
+  if(!isFinite(sol)){
+    // bisección de respaldo (robusta)
+    let lo=1e-4,hi=5;
+    if(bsm(type,S,K,t,r,q,lo)>mkt)return NaN;
+    if(bsm(type,S,K,t,r,q,hi)<mkt)return NaN;
+    for(let i=0;i<200;i++){
+      const mid=(lo+hi)/2;
+      if(bsm(type,S,K,t,r,q,mid)<mkt)lo=mid;else hi=mid;
+      if(hi-lo<1e-9)break;
+    }
+    sol=(lo+hi)/2;
+  }
+  // Validación ÚNICA y centralizada: una IV fuera de este rango significa que
+  // el precio no es consistente con el modelo (dato corrupto, mercado roto,
+  // opción sin liquidez). Devolver un número saturado sería mentir.
+  if(!isFinite(sol)||sol<0.005||sol>4.5)return NaN;
+  return sol;
+}
+
+/* ---------- Binomial CRR con ejercicio americano ----------
+   Relevante en puts ITM y acciones con dividendo alto: el
+   ejercicio anticipado añade valor que Black-Scholes no captura. */
+function crr(type,S,K,t,r,q,v,steps=200){
+  if(t<=1e-9)return type==='C'?Math.max(S-K,0):Math.max(K-S,0);
+  const dt=t/steps,u=Math.exp(v*Math.sqrt(dt)),d=1/u;
+  const p=(Math.exp((r-q)*dt)-d)/(u-d),df=Math.exp(-r*dt);
+  if(p<0||p>1)return bsm(type,S,K,t,r,q,v);   // parámetros degenerados
+  const val=new Float64Array(steps+1);
+  for(let i=0;i<=steps;i++){
+    const ST=S*Math.pow(u,steps-i)*Math.pow(d,i);
+    val[i]=type==='C'?Math.max(ST-K,0):Math.max(K-ST,0);
+  }
+  for(let s=steps-1;s>=0;s--)for(let i=0;i<=s;i++){
+    const cont=df*(p*val[i]+(1-p)*val[i+1]);
+    const ST=S*Math.pow(u,s-i)*Math.pow(d,i);
+    const ex=type==='C'?Math.max(ST-K,0):Math.max(K-ST,0);
+    val[i]=Math.max(cont,ex);
+  }
+  return val[0];
+}
+/* Prima de ejercicio anticipado: cuánto vale de más la americana */
+function earlyExercisePremium(type,S,K,t,r,q,v){
+  return crr(type,S,K,t,r,q,v)-bsm(type,S,K,t,r,q,v);
+}
+/* Griegas del binomial por diferencias finitas (para americanas).
+   OJO: el árbol es escalonado; con h pequeño la 2ª derivada capta los
+   saltos de la malla en vez de la curvatura. Se usa h grande (≈2% de S)
+   y un nº de pasos alto para que gamma sea estable. */
+function crrGreeks(type,S,K,t,r,q,v,steps=400){
+  const hS=S*0.02, hV=0.005, hT=Math.min(t*0.02,1/365);
+  const P=(s,tt,vv)=>crr(type,s,K,tt,r,q,vv,steps);
+  const p0=P(S,t,v);
+  const delta=(P(S+hS,t,v)-P(S-hS,t,v))/(2*hS);
+  const gamma=(P(S+hS,t,v)-2*p0+P(S-hS,t,v))/(hS*hS);
+  const vega=(P(S,t,v+hV)-P(S,t,v-hV))/(2*hV)/100;
+  const theta=-(P(S,t+hT,v)-P(S,t-hT,v))/(2*hT)/365;
+  const rho=(crr(type,S,K,t,r+0.0005,q,v,steps)-crr(type,S,K,t,r-0.0005,q,v,steps))/0.001/100;
+  return {delta,gamma,vega,theta,rho,vanna:0,volga:0,charm:0,speed:0,zomma:0,color:0};
+}
+
+
+/* ═══ VOLATILIDAD · SVI · GARCH(1,1) · EWMA ═══ */
+/* =========================================================
+   MÓDULOS DE VOLATILIDAD
+   · SVI: ajuste de la smile a partir de IVs de mercado
+   · EWMA / GARCH(1,1): volatilidad esperada desde histórico
+   · VRP: prima de riesgo de volatilidad (IV − vol esperada)
+   ========================================================= */
+
+/* ---------- SVI (Gatheral) ----------
+   w(k) = a + b·( ρ(k−m) + √((k−m)² + σ²) )
+   donde w = varianza total = σ_imp²·t , k = log(K/F)
+   Ajuste por mínimos cuadrados con Nelder-Mead.            */
+function sviTotalVar(p, k) {
+  const [a, b, rho, m, sig] = p;
+  const km = k - m;
+  return a + b * (rho * km + Math.sqrt(km * km + sig * sig));
+}
+function sviIV(p, k, t) {
+  const w = sviTotalVar(p, k);
+  return w > 0 ? Math.sqrt(w / t) : NaN;
+}
+/* Nelder-Mead simple para 5 parámetros */
+function nelderMead(f, x0, iters = 900) {
+  const n = x0.length;
+  let simplex = [x0.slice()];
+  for (let i = 0; i < n; i++) {
+    const p = x0.slice();
+    p[i] += (Math.abs(p[i]) || 0.1) * 0.15 + 0.02;
+    simplex.push(p);
+  }
+  let fv = simplex.map(f);
+  for (let it = 0; it < iters; it++) {
+    const idx = fv.map((v, i) => [v, i]).sort((a, b) => a[0] - b[0]).map(x => x[1]);
+    simplex = idx.map(i => simplex[i]); fv = idx.map(i => fv[i]);
+    if (Math.abs(fv[n] - fv[0]) < 1e-12) break;
+    const cen = new Array(n).fill(0);
+    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) cen[j] += simplex[i][j] / n;
+    const refl = cen.map((c, j) => c + 1.0 * (c - simplex[n][j]));
+    const fr = f(refl);
+    if (fr < fv[0]) {
+      const exp = cen.map((c, j) => c + 2.0 * (c - simplex[n][j]));
+      const fe = f(exp);
+      if (fe < fr) { simplex[n] = exp; fv[n] = fe; } else { simplex[n] = refl; fv[n] = fr; }
+    } else if (fr < fv[n - 1]) { simplex[n] = refl; fv[n] = fr; }
+    else {
+      const con = cen.map((c, j) => c + 0.5 * (simplex[n][j] - c));
+      const fc = f(con);
+      if (fc < fv[n]) { simplex[n] = con; fv[n] = fc; }
+      else {
+        for (let i = 1; i <= n; i++) {
+          simplex[i] = simplex[i].map((v, j) => simplex[0][j] + 0.5 * (v - simplex[0][j]));
+          fv[i] = f(simplex[i]);
+        }
+      }
+    }
+  }
+  const best = fv.indexOf(Math.min(...fv));
+  return { p: simplex[best], err: fv[best] };
+}
+/* pts = [{k, iv}] con k = log(K/F).  t = años */
+function fitSVI(pts, t) {
+  if (pts.length < 5) return null;
+  const ws = pts.map(p => p.iv * p.iv * t);          // varianza total observada
+  const wAtm = ws[Math.floor(ws.length / 2)] || 0.04;
+  const x0 = [wAtm * 0.5, 0.1, -0.3, 0, 0.1];
+  const loss = (p) => {
+    const [a, b, rho, m, sig] = p;
+    // restricciones de no-arbitraje básicas (Gatheral): b≥0, |ρ|<1, σ>0, a+b·σ·√(1−ρ²)≥0
+    if (b < 0 || Math.abs(rho) >= 0.999 || sig <= 1e-4) return 1e9;
+    if (a + b * sig * Math.sqrt(1 - rho * rho) < 0) return 1e9;
+    let s = 0;
+    for (let i = 0; i < pts.length; i++) {
+      const wm = sviTotalVar(p, pts[i].k);
+      if (wm <= 0) return 1e9;
+      const d = wm - ws[i];
+      s += d * d;
+    }
+    return s;
+  };
+  const { p, err } = nelderMead(loss, x0);
+  if (err > 1e8) return null;
+  // RMSE en puntos de IV
+  let se = 0;
+  pts.forEach((pt, i) => { const iv = sviIV(p, pt.k, t); se += (iv - pt.iv) ** 2; });
+  return { params: p, rmse: Math.sqrt(se / pts.length) };
+}
+
+/* ---------- EWMA (RiskMetrics λ=0.94) ---------- */
+function ewmaVol(returns, lambda = 0.94) {
+  if (!returns.length) return NaN;
+  let v = returns.slice(0, Math.min(20, returns.length)).reduce((a, r) => a + r * r, 0) / Math.min(20, returns.length);
+  for (const r of returns) v = lambda * v + (1 - lambda) * r * r;
+  return Math.sqrt(v * 252);                      // anualizada
+}
+
+/* ---------- GARCH(1,1) por máxima verosimilitud ----------
+   σ²_t = ω + α·r²_{t−1} + β·σ²_{t−1}
+   Devuelve params + pronóstico de vol media hasta horizonte h (días).   */
+function fitGARCH(returns) {
+  if (returns.length < 60) return null;
+  const n = returns.length;
+  const uncond = returns.reduce((a, r) => a + r * r, 0) / n;
+  const negLL = (p) => {
+    const [om, al, be] = p;
+    if (om <= 0 || al < 0 || be < 0 || al + be >= 0.999) return 1e9;
+    let s2 = uncond, ll = 0;
+    for (let i = 0; i < n; i++) {
+      if (i > 0) s2 = om + al * returns[i - 1] * returns[i - 1] + be * s2;
+      if (s2 <= 1e-12) return 1e9;
+      ll += Math.log(s2) + returns[i] * returns[i] / s2;
+    }
+    return ll;
+  };
+  const { p, err } = nelderMead(negLL, [uncond * 0.05, 0.08, 0.90], 1200);
+  if (err > 1e8) return null;
+  const [om, al, be] = p;
+  // varianza condicional actual
+  let s2 = uncond;
+  for (let i = 0; i < n; i++) s2 = i === 0 ? uncond : om + al * returns[i - 1] ** 2 + be * s2;
+  const persist = al + be;
+  const longRun = om / (1 - persist);              // varianza incondicional
+  return { omega: om, alpha: al, beta: be, persistence: persist, currentVar: s2, longRunVar: longRun };
+}
+/* Pronóstico GARCH: vol media anualizada esperada en los próximos h días */
+function garchForecast(g, hDays) {
+  if (!g) return NaN;
+  const { persistence: ph, longRunVar: lr, currentVar: cv } = g;
+  // E[σ²_{t+k}] = lr + ph^k (σ²_t − lr).  Media sobre k=1..h:
+  let sum = 0;
+  for (let k = 1; k <= hDays; k++) sum += lr + Math.pow(ph, k) * (cv - lr);
+  const avgVar = sum / hDays;
+  return Math.sqrt(Math.max(avgVar, 1e-12) * 252);
+}
+
+/* ---------- Prima de riesgo de volatilidad ----------
+   VRP = IV − vol esperada.  Positiva → el mercado paga de más por el seguro
+   (favorece vender prima). Es el edge estructural documentado.          */
+function volRiskPremium(iv, expectedVol) {
+  return iv - expectedVol;
+}
+
+/* ---------- Densidad risk-neutral (Breeden-Litzenberger) ----------
+   La 2ª derivada del precio de la call respecto al strike da la densidad
+   implícita que el mercado descuenta. Aquí se calcula sobre la curva SVI
+   suavizada (derivar precios ruidosos directamente es inestable).       */
+function riskNeutralDensity(sviP, F, t, r, kGrid) {
+  const dens = [];
+  const dk = (kGrid[kGrid.length - 1] - kGrid[0]) / (kGrid.length - 1);
+  const callAt = (k) => {
+    const K = F * Math.exp(k);
+    const iv = sviIV(sviP, k, t);
+    if (!isFinite(iv) || iv <= 0) return NaN;
+    return bsm('C', F * Math.exp(-r * t) * Math.exp(r * t), K, t, r, 0, iv);
+  };
+  for (let i = 1; i < kGrid.length - 1; i++) {
+    const K = F * Math.exp(kGrid[i]);
+    const hK = K * dk;
+    const cUp = callAt(kGrid[i + 1]), c0 = callAt(kGrid[i]), cDn = callAt(kGrid[i - 1]);
+    const KUp = F * Math.exp(kGrid[i + 1]), KDn = F * Math.exp(kGrid[i - 1]);
+    // segunda derivada con espaciado no uniforme
+    const d2 = 2 * (cDn * (KUp - K) - c0 * (KUp - KDn) + cUp * (K - KDn)) /
+      ((KUp - K) * (K - KDn) * (KUp - KDn));
+    dens.push([K, Math.max(d2 * Math.exp(r * t), 0)]);
+  }
+  return dens;
+}
+
+/* ═══ Pipeline completo: velas → retornos → GARCH+EWMA → pronóstico ═══ */
+function returnsFromCandles(candles){
+  const s=[...candles].sort((a,b)=>a.time-b.time);
+  const r=[];
+  for(let i=1;i<s.length;i++){
+    const p0=s[i-1].close,p1=s[i].close;
+    if(p0>0&&p1>0&&isFinite(p0)&&isFinite(p1)){
+      const x=Math.log(p1/p0);
+      if(isFinite(x))r.push(x);
+    }
+  }
+  return r;
+}
+/* Winsoriza al percentil 0.5/99.5. Un solo dato corrupto (un split mal
+   ajustado, una vela errónea) dispara el GARCH a cientos de puntos de vol.
+   Recortar las colas extremas evita que un outlier destruya el pronóstico. */
+function winsorize(r,p=0.005){
+  if(r.length<20)return r;
+  const s=[...r].sort((a,b)=>a-b);
+  const lo=s[Math.floor(s.length*p)],hi=s[Math.ceil(s.length*(1-p))-1];
+  return r.map(x=>Math.min(Math.max(x,lo),hi));
+}
+/* Devuelve el paquete completo de volatilidad esperada hasta el horizonte */
+function volForecast(candles,horizonDays){
+  const raw=returnsFromCandles(candles);
+  if(raw.length<60)return {ok:false,reason:`solo ${raw.length} retornos (mínimo 60)`};
+  const rets=winsorize(raw);              // recorta outliers antes de ajustar
+  const realized=Math.sqrt(rets.reduce((a,x)=>a+x*x,0)/rets.length*252);
+  // serie sin variación: no hay volatilidad que estimar
+  if(!(realized>0.001))return {ok:false,reason:'la serie no tiene variación (¿precios constantes?)'};
+  const ewma=ewmaVol(rets);
+  const g=fitGARCH(rets);
+  let garch=g?garchForecast(g,horizonDays):NaN;
+  // cordura: un pronóstico fuera de [1%, 300%] indica ajuste degenerado
+  if(!(garch>0.01&&garch<3))garch=NaN;
+  const expected=isFinite(garch)?garch:(isFinite(ewma)&&ewma>0.01&&ewma<3?ewma:realized);
+  if(!(expected>0.001&&expected<5))return {ok:false,reason:'el ajuste no converge a un valor razonable'};
+  const outliers=raw.length-raw.filter((x,i)=>x===rets[i]).length;
+  return {ok:true,n:rets.length,ewma,realized,garch,garchParams:g,expected,horizonDays,outliers};
+}
+
+
+/* ═══ CADENA · análisis y comparación con el mercado ═══ */
+/* =========================================================
+   ESCÁNER DE CADENA
+   Toma la cadena real (strikes + bid/ask), extrae la IV de cada
+   strike, ajusta SVI, y rankea los OTM por criterios de venta
+   de prima y de valor relativo.
+   ========================================================= */
+
+
+/* rows: [{K, type:'C'|'P', bid, ask}]  (una fila por contrato)
+   Devuelve filas enriquecidas con IV, griegas, y métricas de ranking. */
+function analyzeChain(rows, S, t, r, q, expectedVol) {
+  const F = S * Math.exp((r - q) * t);                 // forward
+  const out = [];
+
+  // 1) IV de mercado por contrato (usando el mid)
+  for (const row of rows) {
+    const mid = (row.bid + row.ask) / 2;
+    if (!(mid > 0) || !(row.ask > 0)) continue;
+    const iv = impliedVol(row.type, mid, S, row.K, t, r, q);
+    if (!isFinite(iv) || iv <= 0.001 || iv > 4) continue;
+    const g = greeks(row.type, S, row.K, t, r, q, iv);
+    const spread = row.ask - row.bid;
+    out.push({
+      ...row, mid, iv, ...g,
+      k: Math.log(row.K / F),
+      spread,
+      spreadPct: spread / mid,                          // coste de entrar/salir
+      otm: (row.type === 'C' && row.K > S) || (row.type === 'P' && row.K < S),
+      moneyness: row.K / S,
+    });
+  }
+  if (!out.length) return { rows: [], svi: null };
+
+  // 2) SVI sobre los contratos OTM (los más líquidos y sin valor intrínseco)
+  const otmPts = out.filter(o => o.otm).map(o => ({ k: o.k, iv: o.iv }));
+  const svi = otmPts.length >= 5 ? fitSVI(otmPts, t) : null;
+
+  // 3) métricas derivadas
+  for (const o of out) {
+    // IV del modelo suavizado: la curva que ajusta a TODA la cadena
+    o.ivModel = svi ? sviIV(svi.params, o.k, t) : NaN;
+    // precio teórico usando la IV del modelo (no una IV inventada)
+    o.priceModel = isFinite(o.ivModel) ? bsm(o.type, S, o.K, t, r, q, o.ivModel) : NaN;
+    // DESVIACIÓN vs la curva: esto SÍ es señal (dislocación relativa)
+    o.ivEdge = isFinite(o.ivModel) ? o.iv - o.ivModel : NaN;       // + = cotiza con IV más alta que sus vecinos → caro
+    o.priceEdge = isFinite(o.priceModel) ? o.mid - o.priceModel : NaN;
+    o.priceEdgePct = isFinite(o.priceModel) && o.priceModel > 0 ? o.priceEdge / o.priceModel : NaN;
+
+    // VRP por contrato: IV vs volatilidad esperada del subyacente.
+    // OJO: el VRP crudo está dominado por el skew (los puts muy OTM siempre
+    // tienen IV altísima). Guardamos ambos: el crudo y el normalizado.
+    o.vrp = isFinite(expectedVol) ? o.iv - expectedVol : NaN;
+    // VRP normalizado: cuánta IV cobra ESTE strike por encima de lo que
+    // le "correspondería" si el skew fuera el único motivo. Usamos la ATM
+    // como referencia y escalamos la vol esperada por la razón IV_k/IV_atm
+    // implícita en la curva, de modo que aislamos el exceso real.
+    o.vrpNorm = NaN;   // se rellena abajo, necesita la IV ATM
+
+    // Prob. de acabar OTM (que expire sin valor) — para vendedores de prima
+    // Usa la IV propia del strike, que es lo correcto (no la ATM)
+    const d2 = (Math.log(S / o.K) + (r - q - o.iv * o.iv / 2) * t) / (o.iv * Math.sqrt(t));
+    o.probITM = o.type === 'C' ? N(d2) : N(-d2);
+    o.probOTM = 1 - o.probITM;
+
+    // Métricas de eficiencia para VENTA de prima
+    o.thetaPerDelta = Math.abs(o.delta) > 1e-6 ? Math.abs(o.theta) / Math.abs(o.delta) : NaN;
+    o.thetaPerVega = Math.abs(o.vega) > 1e-6 ? Math.abs(o.theta) / Math.abs(o.vega) : NaN;
+    o.premiumPerDay = o.mid / Math.max(t * 365, 1);
+    // crédito recibido por unidad de riesgo aproximado (delta como proxy de riesgo direccional)
+    o.creditPerRisk = Math.abs(o.delta) > 1e-6 ? o.mid / (Math.abs(o.delta) * 100) : NaN;
+    // distancia en sigmas
+    o.sigmas = (o.K - S) / (S * o.iv * Math.sqrt(t));
+    // EV de vender este contrato desnudo, con la esperanza condicional REAL de la cola.
+    // Bajo lognormal, E[max(K−S_T,0)] es exactamente el precio del put sin descontar,
+    // y E[max(S_T−K,0)] el de la call. Es decir: la pérdida esperada de vender un
+    // contrato desnudo ES el valor esperado del payoff, que se calcula exacto.
+    // (La versión anterior aproximaba la cola con |delta|·σ·√t·0.5, que no es la
+    //  esperanza condicional y subestimaba las colas gordas.)
+    const df = Math.exp(r * t);
+    const payoffEsperado = bsm(o.type, S, o.K, t, r, q, o.iv) * df;  // E[payoff] sin descontar
+    o.evShort = (o.mid * df - payoffEsperado) * 100;  // prima capitalizada − payoff esperado
+    // OJO: bajo la medida risk-neutral esto es ~0 por construcción (es el precio justo).
+    // Solo se separa de cero si la IV del strike difiere de la vol esperada real:
+    if (isFinite(expectedVol)) {
+      const payoffReal = bsm(o.type, S, o.K, t, r, q, expectedVol) * df;
+      o.evShortReal = (o.mid * df - payoffReal) * 100;   // ESTE es el EV con edge de verdad
+    } else o.evShortReal = NaN;
+    // calidad de ejecución: penaliza spreads anchos respecto a la prima
+    o.liquidity = isFinite(o.spreadPct) ? Math.max(0, 1 - o.spreadPct / 0.20) : 0;  // 1=perfecto, 0=intragable
+  }
+
+  // IV ATM de referencia (para normalizar el VRP)
+  const atmIv = svi ? sviIV(svi.params, 0, t)
+    : out.reduce((best, o) => Math.abs(o.k) < Math.abs(best.k) ? o : best, out[0]).iv;
+  for (const o of out) {
+    if (isFinite(expectedVol) && isFinite(atmIv) && atmIv > 0) {
+      // vol esperada "ajustada" a este strike por la forma de la curva
+      const skewFactor = isFinite(o.ivModel) ? o.ivModel / atmIv : 1;
+      o.vrpNorm = o.iv - expectedVol * skewFactor;
+    }
+    // Score compuesto para venta de prima. IMPORTANTE: los pesos son una
+    // heurística razonada, NO están calibrados contra ningún backtest.
+    // Sirve para ordenar candidatos, no como medida objetiva de calidad.
+    const zTheta = isFinite(o.thetaPerDelta) ? Math.min(o.thetaPerDelta / 0.5, 2) : 0;
+    const zProb = isFinite(o.probOTM) ? (o.probOTM - 0.5) * 2 : 0;
+    const zVrp = isFinite(o.vrpNorm) ? Math.max(-1, Math.min(o.vrpNorm / 0.05, 2)) : 0;
+    o.shortScore = (zTheta * 0.3 + zProb * 0.3 + zVrp * 0.25 + o.liquidity * 0.15);
+  }
+
+  return { rows: out, svi, F, atmIv };
+}
+
+/* Rankings: devuelve top-N por cada criterio, solo OTM y con liquidez decente */
+function rankChain(analyzed, opts = {}) {
+  const maxSpreadPct = opts.maxSpreadPct ?? 0.25;
+  const minPrice = opts.minPrice ?? 0.05;
+  const cand = analyzed.rows.filter(o =>
+    o.otm && o.spreadPct <= maxSpreadPct && o.mid >= minPrice && isFinite(o.iv)
+  );
+  const top = (arr, key, n = 5, desc = true) =>
+    arr.filter(o => isFinite(o[key]))
+      .sort((a, b) => desc ? b[key] - a[key] : a[key] - b[key])
+      .slice(0, n);
+
+  return {
+    candidates: cand.length,
+    // RANKING PRINCIPAL: score compuesto para venta de prima
+    best: top(cand, 'shortScore', 8),
+    // más theta por unidad de riesgo direccional: el pan de la venta de prima
+    thetaEfficiency: top(cand, 'thetaPerDelta', 5),
+    // cotizan CAROS respecto a la curva de sus vecinos → candidatos a VENDER
+    richVsCurve: top(cand, 'ivEdge', 5),
+    // cotizan BARATOS respecto a la curva → candidatos a COMPRAR
+    cheapVsCurve: top(cand, 'ivEdge', 5, false),
+    // mayor prima de riesgo de vol NORMALIZADA (aislada del skew)
+    bestVRP: top(cand, 'vrpNorm', 5),
+    // mayor probabilidad de expirar sin valor con prima decente
+    safestShort: top(cand.filter(o => o.mid >= 0.15), 'probOTM', 5),
+    // mejor EV de venta desnuda
+    bestEV: top(cand, 'evShortReal', 5),
+    // mejor prima por día
+    premiumPerDay: top(cand, 'premiumPerDay', 5),
+  };
+}
+
+/* Impacto de un cambio de volatilidad sobre una estrategia:
+   revalúa las patas con la vol esperada del modelo vs la IV de mercado.  */
+function volScenario(legs, S, t, r, q, ivMarket, volExpected) {
+  const valAt = (v) => legs.reduce((a, l) =>
+    a + (l.side === 'B' ? 1 : -1) * l.qty * bsm(l.type, S, l.K, t, r, q, v), 0);
+  const atMarket = valAt(ivMarket) * 100;
+  const atExpected = valAt(volExpected) * 100;
+  return {
+    atMarket, atExpected,
+    diff: atExpected - atMarket,
+    // Si la vol esperada < IV, la estrategia "vale menos" de lo que cotiza:
+    // bueno para el vendedor (cobra de más), malo para el comprador.
+    verdict: volExpected < ivMarket ? 'mercado_caro' : 'mercado_barato',
+  };
+}
+
+/* ═══════════════════════════════════════════════════════
+   COMPARADOR TEÓRICO vs MERCADO (lo que pediste explícito)
+   Tres modelos de referencia, cada uno con su lógica:
+   1. BSM con vol ESPERADA (GARCH/EWMA) → "lo que valdría si el
+      subyacente se moviera como predice el histórico"
+   2. BSM con la curva SVI → "lo que valdría según sus vecinos"
+   3. Binomial americano → captura el ejercicio anticipado
+   ═══════════════════════════════════════════════════════ */
+function priceVsMarket(rows, S, t, r, q, expectedVol, svi) {
+  return rows.map(o => {
+    const out = { ...o };
+    // (1) valor teórico con la vol esperada del modelo GARCH/EWMA
+    if (isFinite(expectedVol)) {
+      out.pxExpVol = bsm(o.type, S, o.K, t, r, q, expectedVol);
+      out.gapExpVol = o.mid - out.pxExpVol;                    // $ por acción (× 100 = por contrato)
+      out.gapContract = out.gapExpVol * 100;                   // $ por contrato: lo que cobras de más al vender
+      // OJO: el gap PORCENTUAL explota en strikes lejanos (teórico≈0 → %→∞).
+      // La medida honesta y comparable entre strikes es en PUNTOS DE IV:
+      // cuánta volatilidad de más te está pagando el mercado.
+      out.gapIV = o.iv - expectedVol;                          // puntos de IV (esto sí es comparable)
+      // ratio acotado, solo informativo y con techo para que no engañe
+      out.gapRatio = out.pxExpVol > 0.05 ? Math.min(out.gapExpVol / out.pxExpVol, 5) : NaN;
+    }
+    // (2) valor teórico según la curva SVI (dislocación relativa entre strikes)
+    if (svi && isFinite(o.ivModel)) {
+      out.pxSVI = bsm(o.type, S, o.K, t, r, q, o.ivModel);
+      out.gapSVI = o.mid - out.pxSVI;
+      out.gapSVIContract = out.gapSVI * 100;
+    }
+    // (3) americana: prima de ejercicio anticipado sobre su propia IV
+    out.pxAmerican = crr(o.type, S, o.K, t, r, q, o.iv, 200);
+    out.eep = out.pxAmerican - bsm(o.type, S, o.K, t, r, q, o.iv);
+    // Veredicto: basado en PUNTOS DE IV (no en % del teórico, que engaña)
+    const gi = out.gapIV;
+    out.verdict = !isFinite(gi) ? 'n/d'
+      : gi > 0.10 ? 'muy_caro' : gi > 0.04 ? 'caro'
+      : gi < -0.06 ? 'muy_barato' : gi < -0.02 ? 'barato' : 'justo';
+    return out;
+  });
+}
+
+
+/* ═══ DXLINK · quotes + greeks + velas históricas ═══ */
+class DXLink{
+  constructor(){this.ws=null;this.token=null;this.url=null;
+    this.chQ=3;this.chC=5;            // canal de quotes/greeks y canal de velas
+    this.ka=null;this.subs=new Set();this.ready=false;this.candleReady=false;
+    this.onQuote=()=>{};this.onGreeks=()=>{};this.onCandle=()=>{};this.onStatus=()=>{};}
+  async connect(workerUrl,key){
+    this.onStatus('conectando');
+    const r=await fetch(`${workerUrl}/stream-token`,{headers:{'X-Proxy-Key':key}});
+    const j=await r.json();if(!j.ok)throw new Error(j.error||'sin token');
+    const d=j.data?.data||j.data;
+    this.token=d['token']||d['dxlink-token'];
+    this.url=d['dxlink-url']||d['websocket-url']||'wss://tasty-openapi-ws.dxfeed.com/realtime';
+    if(!this.token)throw new Error('respuesta sin token');
+    return this._open();
+  }
+  _open(){return new Promise((res,rej)=>{
+    this.ws=new WebSocket(this.url);
+    this.ws.onopen=()=>this._s({type:'SETUP',channel:0,version:'0.1-mesa',keepaliveTimeout:60,acceptKeepaliveTimeout:60});
+    this.ws.onmessage=e=>this._m(JSON.parse(e.data),res);
+    this.ws.onerror=()=>{this.onStatus('error');rej(new Error('WS'));};
+    this.ws.onclose=()=>{this.ready=false;this.onStatus('desconectado');clearInterval(this.ka);};
+  });}
+  _s(m){if(this.ws&&this.ws.readyState===1)this.ws.send(JSON.stringify(m));}
+  _m(m,res){
+    switch(m.type){
+      case 'AUTH_STATE':
+        if(m.state==='UNAUTHORIZED')this._s({type:'AUTH',channel:0,token:this.token});
+        else if(m.state==='AUTHORIZED'){
+          this.onStatus('autenticado');
+          this._s({type:'CHANNEL_REQUEST',channel:this.chQ,service:'FEED',parameters:{contract:'AUTO'}});
+          this._s({type:'CHANNEL_REQUEST',channel:this.chC,service:'FEED',parameters:{contract:'AUTO'}});
+        }
+        break;
+      case 'CHANNEL_OPENED':
+        if(m.channel===this.chQ)
+          this._s({type:'FEED_SETUP',channel:this.chQ,acceptAggregationPeriod:.1,acceptDataFormat:'COMPACT',
+            acceptEventFields:{Quote:['eventType','eventSymbol','bidPrice','askPrice'],
+              Greeks:['eventType','eventSymbol','price','volatility','delta','gamma','theta','rho','vega']}});
+        else if(m.channel===this.chC)
+          this._s({type:'FEED_SETUP',channel:this.chC,acceptAggregationPeriod:1,acceptDataFormat:'COMPACT',
+            acceptEventFields:{Candle:['eventType','eventSymbol','time','open','high','low','close']}});
+        break;
+      case 'FEED_CONFIG':
+        if(m.channel===this.chQ){this.ready=true;this.onStatus('en vivo');this._ka();
+          if(res)res(true);if(this.subs.size)this._push([...this.subs]);}
+        else if(m.channel===this.chC)this.candleReady=true;
+        break;
+      case 'FEED_DATA':this._d(m.data);break;
+      case 'KEEPALIVE':this._s({type:'KEEPALIVE',channel:0});break;
+      case 'ERROR':this.onStatus('error',m.message);break;
+    }
+  }
+  _ka(){clearInterval(this.ka);this.ka=setInterval(()=>this._s({type:'KEEPALIVE',channel:0}),25000);}
+  _d(data){
+    if(!Array.isArray(data))return;
+    for(let i=0;i<data.length;i+=2){
+      const ty=data[i],f=data[i+1];if(!Array.isArray(f))continue;
+      if(ty==='Quote')for(let k=0;k<f.length;k+=4)this.onQuote(f[k+1],{bid:+f[k+2],ask:+f[k+3]});
+      else if(ty==='Greeks')for(let k=0;k<f.length;k+=9)this.onGreeks(f[k+1],
+        {price:+f[k+2],iv:+f[k+3],delta:+f[k+4],gamma:+f[k+5],theta:+f[k+6],rho:+f[k+7],vega:+f[k+8]});
+      else if(ty==='Candle')for(let k=0;k<f.length;k+=7){
+        const o=f[k+3];if(o==='NaN'||o==null)continue;
+        this.onCandle(f[k+1],{time:+f[k+2],open:+o,high:+f[k+4],low:+f[k+5],close:+f[k+6]});}
+    }
+  }
+  subscribe(syms){syms.forEach(s=>this.subs.add(s));if(this.ready)this._push(syms);}
+  _push(syms){const add=[];
+    syms.forEach(s=>{add.push({type:'Quote',symbol:s});if(s.startsWith('.'))add.push({type:'Greeks',symbol:s});});
+    this._s({type:'FEED_SUBSCRIPTION',channel:this.chQ,add});}
+  /* velas diarias históricas: días hacia atrás */
+  subscribeCandles(sym,days=400,tf='d'){
+    const from=Date.now()-days*86400000;
+    this._s({type:'FEED_SUBSCRIPTION',channel:this.chC,
+      add:[{type:'Candle',symbol:`${sym}{=${tf}}`,fromTime:from}]});
+  }
+  disconnect(){clearInterval(this.ka);if(this.ws)this.ws.close();this.ready=false;this.subs.clear();}
+}
+
+
+/* ═══ APLICACIÓN ═══ */
+/* ══════════════ ESTADO ══════════════ */
+const st={S:100,DTE:45,IV:26,r:4.5,q:0,model:'bsm',legs:[],
+  expVol:NaN,volPack:null,sym:'SPY',exps:[],rkView:'best'};
+const T=()=>Math.max(st.DTE/365,1e-6);
+const RR=()=>st.r/100,QQ=()=>st.q/100,VV=()=>st.IV/100;
+const CN={get url(){return localStorage.getItem('tt_url')||''},get key(){return localStorage.getItem('tt_key')||''},acct:null};
+
+const $=i=>document.getElementById(i);
+const money=x=>(x>=0?'+':'−')+'$'+Math.abs(x).toFixed(Math.abs(x)<10?2:0);
+const pc=x=>(x*100).toFixed(1)+'%';
+const HELP={
+ delta:'Cuánto gana o pierde tu posición por cada dólar que se mueva el subyacente. Un delta neto de 50 se comporta como tener 50 acciones.',
+ gamma:'Cuánto cambia tu delta cuando el precio se mueve. Alto significa que tu direccionalidad se dispara cerca del strike.',
+ theta:'Lo que ganas o pierdes cada día que pasa, sin que el precio se mueva.',
+ vega:'Lo que ganas o pierdes por cada punto que suba la volatilidad implícita.',
+ vrp:'IV menos la volatilidad que predice el modelo. Positiva quiere decir que el mercado paga de más por el seguro.',
+ pop:'En qué proporción de escenarios simulados acabas ganando.',
+ ev:'La media de todos los resultados. Positiva significa ventaja matemática si repites la operación muchas veces.',
+ kelly:'Qué fracción del capital sería óptimo arriesgar según tu ventaja. Negativa quiere decir que la apuesta no compensa.',
+ gap:'Lo que el mercado te paga de más (o de menos) frente a lo que valdría la opción si el subyacente se moviera como predice el modelo.',
+ gapiv:'La misma diferencia, pero medida en puntos de volatilidad. Es comparable entre strikes; el porcentaje del precio no lo es.',
+ edge:'Desviación de este strike respecto a la curva SVI de sus vecinos. Positiva: cotiza caro en términos relativos.',
+ eep:'Lo que vale de más una opción americana por poder ejercerla antes de vencimiento.',
+ otm:'Probabilidad de que expire sin valor. Es lo que quieres alto si la vendes.',
+ liq:'Calidad de ejecución. Baja significa spread ancho: te lo comes al entrar y al salir.'
+};
+const fg=(k,v,cls='',help='',wide=false)=>
+  `<div class="f${wide?' wide':''}"><div class="k">${k}${help?`<span class="help">?<span class="bub">${help}</span></span>`:''}</div><div class="v ${cls}">${v}</div></div>`;
+
+/* Paleta única para los canvas: mantiene el CSS y el JS sincronizados.
+   Si cambia el tema, se cambia aquí y en :root, no en veinte sitios. */
+const C={
+  bg:'#12161C', surf:'#1A1F27',
+  ink:'#E6E9EE', ink2:'#A8B0BC', ink3:'#727C8A',
+  rule:'#242A34', rule2:'#333B48',
+  bull:'#3FB984', bear:'#E5484D', model:'#5B8DEF', mark:'#D9A441',
+  bullA:'rgba(63,185,132,.55)', bearA:'rgba(229,72,77,.5)',
+  modelA:'rgba(91,141,239,.16)', bandA:'rgba(91,141,239,.06)',
+  mono:'9px "IBM Plex Mono",monospace'
+};
+
+/* ══════════════ VALORACIÓN ══════════════ */
+const px=(ty,S,K,t,r,q,v)=>st.model==='crr'?crr(ty,S,K,t,r,q,v,200):bsm(ty,S,K,t,r,q,v);
+const legPx=(l,S,t,v)=>(l.side==='B'?1:-1)*l.qty*px(l.type,S,l.K,t,RR(),QQ(),v);
+const sVal=(S,t,v)=>st.legs.reduce((a,l)=>a+legPx(l,S,t,v),0);
+const entry=()=>sVal(st.S,T(),VV());
+const pnl=(S,t,v)=>(sVal(S,t,v)-entry())*100;
+function sGrk(S,t,v){
+  const g={delta:0,gamma:0,vega:0,theta:0,rho:0,vanna:0,volga:0,charm:0,speed:0,zomma:0,color:0};
+  st.legs.forEach(l=>{
+    // griegas siempre por BSM: son exactas. El binomial es discreto y su
+    // gamma oscila con el nº de pasos. El binomial se usa para el PRECIO.
+    const gg=greeks(l.type,S,l.K,t,RR(),QQ(),v);const s=(l.side==='B'?1:-1)*l.qty;
+    for(const k in g)g[k]+=s*gg[k];});
+  return g;
+}
+const range=()=>{const w=Math.max(st.S*VV()*Math.sqrt(T())*3.2,st.S*.16);return[Math.max(st.S-w,.5),st.S+w];};
+function stats(){
+  const[lo,hi]=range();let mx=-1e9,mn=1e9;const p=[];
+  for(let i=0;i<=200;i++){const S=lo+(hi-lo)*i/200;const v=pnl(S,1e-6,VV());p.push([S,v]);if(v>mx)mx=v;if(v<mn)mn=v;}
+  const be=[];for(let i=1;i<p.length;i++){const[a,pa]=p[i-1],[b,pb]=p[i];
+    if((pa<0&&pb>=0)||(pa>0&&pb<=0))be.push(a+(b-a)*(0-pa)/(pb-pa));}
+  return{max:mx,min:mn,be,net:entry()*100,cap:Math.abs(mn)};
+}
+let lid=0;
+const addLeg=(sd='S',ty='P',K=null,q=1)=>{st.legs.push({id:++lid,side:sd,type:ty,K:K??Math.round(st.S),qty:q});legs();calc();};
+const clearLegs=()=>{st.legs=[];legs();calc();};
+const delLeg=i=>{st.legs=st.legs.filter(l=>l.id!==i);legs();calc();};
+const setLeg=(i,k,v)=>{const l=st.legs.find(x=>x.id===i);if(l){l[k]=v;legs();calc();}};
+function legs(){
+  const e=$('legs');
+  if(!st.legs.length){e.innerHTML='<p class="cap">Elige una plantilla o añade patas a mano.</p>';return;}
+  e.innerHTML=st.legs.map(l=>`<div class="leg">
+    <div class="bs ${l.side==='S'?'sell':''}"><button class="${l.side==='B'?'on':''}" onclick="setLeg(${l.id},'side','B')">Compra</button><button class="${l.side==='S'?'on':''}" onclick="setLeg(${l.id},'side','S')">Venta</button></div>
+    <div><label>Tipo</label><select onchange="setLeg(${l.id},'type',this.value)"><option value="C"${l.type==='C'?' selected':''}>Call</option><option value="P"${l.type==='P'?' selected':''}>Put</option></select></div>
+    <div><label>Strike</label><input type="number" value="${l.K}" step="0.5" onchange="setLeg(${l.id},'K',+this.value)"></div>
+    <div><label>Nº</label><input type="number" value="${l.qty}" step="1" onchange="setLeg(${l.id},'qty',+this.value)"></div>
+    <button class="del" onclick="delLeg(${l.id})" aria-label="Eliminar pata">×</button></div>`).join('');
+}
+const TPL={'Iron condor':[['S','P',-5],['B','P',-12],['S','C',5],['B','C',12]],
+ 'Put credit':[['S','P',-5],['B','P',-12]],'Call credit':[['S','C',5],['B','C',12]],
+ 'Iron fly':[['S','C',0],['S','P',0],['B','C',10],['B','P',-10]],
+ 'Strangle':[['B','C',5],['B','P',-5]],'Straddle':[['B','C',0],['B','P',0]],
+ 'Bull call':[['B','C',-2],['S','C',5]],'Bear put':[['B','P',2],['S','P',-5]],
+ 'Butterfly':[['B','C',-8],['S','C',0],['S','C',0],['B','C',8]],
+ 'Jade lizard':[['S','P',-8],['S','C',6],['B','C',12]],
+ 'Long call':[['B','C',0]],'Long put':[['B','P',0]]};
+const tpl=n=>{const a=Math.round(st.S);st.legs=[];lid=0;
+  TPL[n].forEach(([s,t,o,q])=>st.legs.push({id:++lid,side:s,type:t,K:a+o,qty:q||1}));legs();calc();};
+
+/* ══════════════ RENDER · ESTUDIAR ══════════════ */
+function read(){
+  // Saneado: valores fuera de rango daban resultados absurdos (spot 0 → payoff
+  // negativo sin sentido; IV 0 → gamma NaN que contaminaba toda la cartera).
+  const num=(v,def,min,max)=>{const x=parseFloat(v);
+    return isFinite(x)?Math.min(Math.max(x,min),max):def;};
+  st.S=num($('S').value,100,0.01,1e7);
+  st.DTE=num($('DTE').value,45,0,3650);
+  st.IV=num($('IV').value,26,0.1,500);
+  st.r=num($('r').value,4.5,-10,50);
+  st.q=num($('q').value,0,0,50);
+  st.model=$('model').value==='crr'?'crr':'bsm';
+}
+function calc(){read();ribbon();payFigs();drawPay();sim();grFigs();volScen();
+  $('mdlTag').textContent=st.model==='crr'?'Binomial americana':'Black-Scholes';}
+function ribbon(){
+  const vrp=isFinite(st.expVol)?VV()-st.expVol:NaN;
+  const em=st.S*VV()*Math.sqrt(T());
+  $('ribbon').innerHTML=
+    `<div class="rq"><span class="l">${st.sym}</span><span class="n">${st.S.toFixed(2)}</span></div>`+
+    `<div class="rq"><span class="l">IV</span><span class="n">${st.IV.toFixed(1)}%</span></div>`+
+    `<div class="rq"><span class="l">Vol modelo</span><span class="n">${isFinite(st.expVol)?pc(st.expVol):'—'}</span></div>`+
+    `<div class="rq"><span class="l">VRP</span><span class="n ${vrp>.02?'up':vrp<-.02?'dn':''}">${isFinite(vrp)?((vrp>=0?'+':'')+(vrp*100).toFixed(1)+'pts'):'—'}</span></div>`+
+    `<div class="rq"><span class="l">Mov. esperado</span><span class="n">±${em.toFixed(2)}</span></div>`+
+    `<div class="rq"><span class="l">Vencimiento</span><span class="n">${st.DTE}d</span></div>`;
+}
+function payFigs(){
+  if(!st.legs.length){$('payFigs').innerHTML='';$('payNote').innerHTML='';return;}
+  const s=stats();const roc=s.max/Math.max(s.cap,1)*100;
+  $('payFigs').innerHTML=
+    fg('Apertura',s.net<0?'Crédito':'Débito','mk',HELP.gap?'':'')+
+    fg('Máximo',money(s.max),'up')+
+    fg('Mínimo',money(s.min),'dn')+
+    fg('Retorno s/riesgo',isFinite(roc)?roc.toFixed(0)+'%':'∞','mk')+
+    fg('Puntos de equilibrio',s.be.map(b=>b.toFixed(1)).join(' · ')||'—','','',true);
+  payNote(s);
+}
+function payNote(s){
+  const g=sGrk(st.S,T(),VV());const sig=st.S*VV()*Math.sqrt(T());
+  const dir=Math.abs(g.delta)<.1?'neutral':g.delta>0?'alcista':'bajista';
+  const d=dir==='neutral'?'No apuestas a dirección: ganas si el subyacente se queda dentro de un rango.'
+    :dir==='alcista'?'Apuestas a que el subyacente <b>sube</b>.':'Apuestas a que el subyacente <b>baja</b>.';
+  const t=g.theta>=0?'El tiempo juega <b>a tu favor</b>: cada día tranquilo que pasa, ganas.'
+    :'El tiempo juega <b>en tu contra</b>: necesitas que el movimiento llegue pronto.';
+  let b='';
+  if(s.be.length){const m=Math.min(...s.be.map(x=>Math.abs(x-st.S)/sig));
+    b=m>1.3?' Tus equilibrios están <b>más lejos</b> que el movimiento que el mercado espera: la probabilidad juega a favor.'
+     :m<.7?' Tus equilibrios caen <b>dentro</b> del movimiento esperado: el mercado los alcanza sin esfuerzo.'
+     :' Tus equilibrios rondan justo el movimiento esperado.';}
+  const e=$('payNote');e.className='note '+(dir==='neutral'?'up':'mk');
+  e.innerHTML=`<span class="eyebrow">Qué estás haciendo</span>${s.net<0?'Cobras prima por abrir':'Pagas prima por abrir'}. ${d}<br>${t}${b}`;
+}
+function cvs(id,h){const c=$(id);const d=window.devicePixelRatio||1;const w=c.clientWidth;
+  c.width=w*d;c.height=h*d;const x=c.getContext('2d');x.setTransform(d,0,0,d,0,0);return[x,w,h];}
+function drawPay(){
+  const[x,W,H]=cvs('payoff',290);x.clearRect(0,0,W,H);if(!st.legs.length)return;
+  const[lo,hi]=range();const pad=44;
+  const E=[],D=[],M=[];let mn=1e9,mxv=-1e9;
+  const hasM=isFinite(st.expVol);
+  for(let i=0;i<=180;i++){const S=lo+(hi-lo)*i/180;
+    const e=pnl(S,1e-6,VV()),d=pnl(S,T(),VV());E.push([S,e]);D.push([S,d]);
+    mn=Math.min(mn,e,d);mxv=Math.max(mxv,e,d);
+    if(hasM){const m=pnl(S,T(),st.expVol);M.push([S,m]);mn=Math.min(mn,m);mxv=Math.max(mxv,m);}}
+  const yr=(mxv-mn)||1;mn-=yr*.12;mxv+=yr*.12;
+  const PX=S=>pad+(S-lo)/(hi-lo)*(W-pad-8),PY=v=>H-22-(v-mn)/(mxv-mn)*(H-36);
+  const sig=st.S*VV()*Math.sqrt(T());
+  // banda 1σ
+  x.fillStyle=C.bandA;x.fillRect(PX(st.S-sig),8,PX(st.S+sig)-PX(st.S-sig),H-30);
+  // ejes
+  x.strokeStyle=C.rule2;x.lineWidth=1;
+  x.beginPath();x.moveTo(pad,PY(0));x.lineTo(W-8,PY(0));x.stroke();
+  x.strokeStyle=C.rule;x.beginPath();x.moveTo(PX(st.S),8);x.lineTo(PX(st.S),H-22);x.stroke();
+  // curva con vol del modelo (ámbar, discontinua)
+  if(hasM){x.strokeStyle=C.mark;x.lineWidth=1.4;x.setLineDash([5,3]);x.beginPath();
+    M.forEach(([S,v],i)=>i?x.lineTo(PX(S),PY(v)):x.moveTo(PX(S),PY(v)));x.stroke();x.setLineDash([]);}
+  // hoy con IV de mercado (azul)
+  x.strokeStyle=C.model;x.lineWidth=1.5;x.beginPath();
+  D.forEach(([S,v],i)=>i?x.lineTo(PX(S),PY(v)):x.moveTo(PX(S),PY(v)));x.stroke();
+  // vencimiento (tinta)
+  x.strokeStyle=C.ink;x.lineWidth=2.2;x.beginPath();
+  E.forEach(([S,v],i)=>i?x.lineTo(PX(S),PY(v)):x.moveTo(PX(S),PY(v)));x.stroke();
+  // equilibrios
+  stats().be.forEach(b=>{x.fillStyle=C.mark;x.beginPath();x.arc(PX(b),PY(0),3.5,0,7);x.fill();
+    x.fillStyle=C.ink3;x.font=C.mono;x.fillText(b.toFixed(1),PX(b)-11,PY(0)-7);});
+  x.fillStyle=C.ink3;x.font=C.mono;
+  x.fillText(lo.toFixed(0),pad,H-6);x.fillText(hi.toFixed(0),W-30,H-6);
+  x.fillText(st.S.toFixed(0),PX(st.S)-8,H-6);
+  x.fillText(money(mxv),3,14);x.fillText(money(mn),3,H-26);
+}
+['rS','rD','rV'].forEach(i=>$(i).addEventListener('input',sim));
+function sim(){
+  if(!st.legs.length){$('simFigs').innerHTML='';return;}
+  const dS=+$('rS').value,dD=+$('rD').value,dV=+$('rV').value;
+  $('uS').textContent=(dS>=0?'+':'')+dS.toFixed(1);
+  $('uD').textContent=dD;$('uV').textContent=(dV>=0?'+':'')+dV;
+  const S2=st.S+dS,t2=Math.max((st.DTE-dD)/365,1e-6),v2=Math.max((st.IV+dV)/100,.01);
+  const p=pnl(S2,t2,v2),g=sGrk(S2,t2,v2);
+  $('simFigs').innerHTML=fg('Resultado',money(p),p>=0?'up':'dn')+
+    fg('Precio',S2.toFixed(2))+fg('Delta',g.delta.toFixed(2))+
+    fg('Theta/día',money(g.theta*100),g.theta>=0?'up':'dn');
+}
+function grFigs(){
+  if(!st.legs.length){$('grFigs').innerHTML='';$('grNote').innerHTML='';$('grFull').innerHTML='';return;}
+  const g=sGrk(st.S,T(),VV());
+  $('grFigs').innerHTML=fg('Delta',g.delta.toFixed(2),'',HELP.delta)+
+    fg('Gamma',g.gamma.toFixed(3),'',HELP.gamma)+
+    fg('Theta/día',money(g.theta*100),g.theta>=0?'up':'dn',HELP.theta)+
+    fg('Vega',g.vega.toFixed(2),'',HELP.vega);
+  const e=$('grNote');e.className='note';
+  e.innerHTML=`<span class="eyebrow">Cómo se lee</span>Tu posición se comporta como
+    <b class="num">${Math.abs(g.delta*100).toFixed(0)} acciones ${g.delta>=0?'largas':'cortas'}</b>.
+    ${g.theta>=0?'Cobras':'Pagas'} <b class="num">${money(g.theta*100)}</b> al día por el paso del tiempo.
+    ${g.vega>=0?'Ganas':'Pierdes'} si la volatilidad sube.`;
+  // segundo orden + prima de ejercicio anticipado
+  let eepRows='';
+  if(st.legs.length){
+    let eepTot=0;
+    st.legs.forEach(l=>{const e2=earlyExercisePremium(l.type,st.S,l.K,T(),RR(),QQ(),VV());
+      eepTot+=(l.side==='B'?1:-1)*l.qty*e2*100;});
+    eepRows=`<tr><td class="mute">Prima de ejercicio anticipado<span class="help">?<span class="bub">${HELP.eep}</span></span></td><td class="${eepTot>=0?'up':'dn'}">${money(eepTot)}</td></tr>`;
+  }
+  const rows=[['Rho',g.rho,3],['Vanna',g.vanna,4],['Volga',g.volga,4],['Charm',g.charm,5],
+    ['Speed',g.speed,5],['Zomma',g.zomma,5],['Color',g.color,6]];
+  $('grFull').innerHTML='<tbody>'+rows.map(([k,v,d])=>
+    `<tr><td class="mute">${k}</td><td class="${v>=0?'up':'dn'}">${v.toFixed(d)}</td></tr>`).join('')+eepRows+'</tbody>';
+}
+
+/* ══════════════ ESCENARIOS DE VOLATILIDAD ══════════════ */
+function volScen(){
+  const e=$('volScen');
+  if(!st.legs.length){e.innerHTML='<p class="cap">Monta una estructura para ver los escenarios.</p>';return;}
+  if(!isFinite(st.expVol)){
+    e.innerHTML=`<p class="cap">Pulsa <b>Estimar volatilidad</b> arriba para ajustar un GARCH sobre el histórico real
+      del subyacente y comparar lo que vale tu estructura con lo que el mercado te pide por ella.</p>`;
+    return;}
+  const t=T(),S=st.S;
+  const vMkt=VV(), vMdl=st.expVol;
+  const valMkt=sVal(S,t,vMkt)*100, valMdl=sVal(S,t,vMdl)*100;
+  const gap=valMkt-valMdl;           // >0 → el mercado paga MÁS de lo que vale según el modelo
+  const credit=stats().net<0;
+  // rejilla de escenarios de IV
+  const grid=[-10,-5,0,5,10].map(d=>{
+    const v=Math.max((st.IV+d)/100,.01);
+    return{d,val:sVal(S,t,v)*100,pnl:pnl(S,t,v)};});
+  const vp=st.volPack;
+  let src='';
+  if(vp&&vp.ok){
+    src=`<span class="eyebrow">De dónde sale la volatilidad del modelo</span>
+      GARCH(1,1) ajustado sobre <b class="num">${vp.n}</b> retornos diarios reales.
+      Persistencia <b class="num">${vp.garchParams?vp.garchParams.persistence.toFixed(3):'—'}</b>
+      (cuánto dura un shock de volatilidad).
+      Vol realizada <b class="num">${pc(vp.realized)}</b> ·
+      EWMA <b class="num">${pc(vp.ewma)}</b> ·
+      GARCH a ${st.DTE} días <b class="num">${pc(vp.garch)}</b>.<br>`;
+  }
+  const lean=gap>0?'up':'dn';
+  const head=gap>0
+    ? `El mercado te paga <span class="n">${money(Math.abs(gap))}</span> <em>de más</em> por esta estructura de lo que vale si el subyacente se mueve como predice el modelo.`
+    : `El mercado te cobra <span class="n">${money(Math.abs(gap))}</span> <em>de más</em> de lo que valdría con la volatilidad del modelo.`;
+  const advice=credit
+    ? (gap>0?'Como estás <b>cobrando</b> prima, esto juega a tu favor: te pagan por encima del valor del modelo.'
+            :'Como estás <b>cobrando</b> prima, esto juega en tu contra: cobras menos de lo que el riesgo merece según el modelo.')
+    : (gap>0?'Como estás <b>pagando</b> prima, esto juega en tu contra: pagas por encima del valor del modelo.'
+            :'Como estás <b>pagando</b> prima, esto juega a tu favor: compras por debajo del valor del modelo.');
+  e.innerHTML=`
+    <div class="verdict ${lean}">${head}</div>
+    <div class="figs">
+      ${fg('Valor con IV mercado',money(valMkt),'mdl')}
+      ${fg('Valor con vol modelo',money(valMdl),'mk')}
+      ${fg('Diferencia',money(gap),gap>=0?'up':'dn','',false)}
+      ${fg('IV mercado',pc(vMkt))}
+      ${fg('Vol modelo',pc(vMdl),'mk')}
+      ${fg('VRP',((vMkt-vMdl)*100>=0?'+':'')+((vMkt-vMdl)*100).toFixed(1)+'pts',(vMkt-vMdl)>0?'up':'dn',HELP.vrp)}
+    </div>
+    <div class="note ${lean}">${src}${advice}</div>
+    <h3 style="margin-top:18px">Si la volatilidad se mueve</h3>
+    <table class="quotes"><thead><tr><th>Escenario IV</th><th>IV resultante</th><th>Valor estructura</th><th>Resultado</th></tr></thead><tbody>
+    ${grid.map(r=>`<tr${r.d===0?' class="atm"':''}>
+      <td class="tk">${r.d===0?'Hoy':(r.d>0?'+':'')+r.d+' pts'}</td>
+      <td>${(st.IV+r.d).toFixed(1)}%</td>
+      <td>${money(r.val)}</td>
+      <td class="${r.pnl>=0?'up':'dn'}">${money(r.pnl)}</td></tr>`).join('')}
+    </tbody></table>
+    <p class="cap">Manteniendo precio y tiempo constantes. Sirve para ver el riesgo de vega aislado:
+      cuánto te duele (o te beneficia) un cambio de volatilidad puro.</p>`;
+}
+
+/* ══════════════ MONTE CARLO ══════════════ */
+let mcR=null;
+const gss=()=>{let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();
+  return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);};
+
+/* ─────────────────────────────────────────────────────────────
+   DOS MEDIDAS, Y LA DIFERENCIA ES TODO
+   ─────────────────────────────────────────────────────────────
+   Simular con la IV del mercado y deriva risk-neutral (r−q) da la
+   probabilidad QUE EL MERCADO DESCUENTA. Bajo esa medida el valor
+   esperado de cualquier estrategia es ~0 por construcción: es una
+   martingala. No puede mostrar edge, por definición.
+
+   Tu edge, si existe, está en discrepar del mercado: si el GARCH dice
+   que la vol real será 17% y el mercado cobra 26%, tu probabilidad
+   real de ganar vendiendo prima es MAYOR que la que descuenta el
+   mercado. Eso solo se ve simulando bajo la medida REAL.
+
+   Simulamos ambas y mostramos la diferencia.
+   ───────────────────────────────────────────────────────────── */
+function simulate(n,volSim,drift,model,t,steps){
+  const dt=t/steps,en=entry(),vMkt=VV();
+  const P=new Float64Array(n);
+  const hk=2,hth=volSim*volSim,hxi=.5,hr=-.6,jl=1,jm=-.03,js=.08;
+  for(let k=0;k<n;k++){
+    let S=st.S,vv=volSim*volSim;
+    for(let s=0;s<steps;s++){
+      const vol=Math.sqrt(Math.max(vv,1e-6));
+      if(model==='heston'){const z1=gss(),z2=hr*z1+Math.sqrt(1-hr*hr)*gss();
+        S*=Math.exp((drift-.5*vv)*dt+vol*Math.sqrt(dt)*z1);
+        vv+=hk*(hth-vv)*dt+hxi*vol*Math.sqrt(dt)*z2;vv=Math.max(vv,1e-6);}
+      else{S*=Math.exp((drift-.5*vol*vol)*dt+vol*Math.sqrt(dt)*gss());
+        if(model==='merton'&&Math.random()<jl*dt)S*=Math.exp(jm+js*gss());}
+    }
+    // El P&L a vencimiento se liquida al valor intrínseco: no depende
+    // de ninguna vol. Lo que cambia entre medidas es la DISTRIBUCIÓN
+    // de precios finales, no cómo se valora al final.
+    P[k]=(sVal(S,1e-6,vMkt)-en)*100;
+  }
+  const srt=Float64Array.from(P).sort();
+  let w=0,sum=0;for(let i=0;i<n;i++){if(P[i]>0)w++;sum+=P[i];}
+  const pop=w/n,ev=sum/n;
+  let sw=0,cw=0,sl=0,cl=0;
+  for(const x of P){if(x>0){sw+=x;cw++}else if(x<0){sl+=x;cl++}}
+  const mw=cw?sw/cw:0,ml=cl?sl/cl:0;
+  // Kelly solo tiene sentido si hay pérdidas en la muestra. Si nunca
+  // pierde, el estimador degenera: lo marcamos como no disponible.
+  const kelly=(cl>0&&ml!==0)?(pop-(1-pop)/Math.abs(mw/ml)):NaN;
+  return{n,pop,ev,p5:srt[Math.floor(n*.05)],p95:srt[Math.floor(n*.95)],
+    kelly:isFinite(kelly)?Math.max(-1,Math.min(kelly,1)):NaN,srt};
+}
+function runMC(){
+  read();
+  if(!st.legs.length){alert('Monta una estructura primero.');return;}
+  if(!(st.S>0)||!(st.IV>0)||!(st.DTE>=0)){alert('Revisa precio, IV y vencimiento.');return;}
+  const n=20000,t=T(),steps=Math.max(Math.round(st.DTE),20);
+  const m=$('mcM').value;
+  // (A) MEDIDA DEL MERCADO: IV implícita + deriva risk-neutral
+  const rn=simulate(n,VV(),RR()-QQ(),m,t,steps);
+  // (B) MEDIDA REAL: vol del GARCH + deriva real (si hay estimación)
+  let real=null;
+  if(isFinite(st.expVol)&&st.expVol>0.005){
+    // deriva bajo medida real: usamos r−q como neutral por defecto.
+    // No inventamos una prima de riesgo del subyacente: eso sería otra
+    // suposición no verificable. El edge que aislamos es el de VOLATILIDAD.
+    real=simulate(n,st.expVol,RR()-QQ(),m,t,steps);
+  }
+  mcR={rn,real,hasReal:!!real};
+  showMC();
+}
+function showMC(){
+  const {rn,real,hasReal}=mcR;
+  const R=hasReal?real:rn;   // la medida real manda si existe
+  // Cifras principales: bajo la medida REAL si la tenemos
+  $('mcFigs').innerHTML=
+    fg(hasReal?'P(ganar) · tu modelo':'P(ganar) · mercado',pc(R.pop),R.pop>.5?'up':'mk',HELP.pop)+
+    fg('Valor esperado',money(R.ev),R.ev>=0?'up':'dn',HELP.ev)+
+    fg('Rango 90%',money(R.p5)+' · '+money(R.p95),'','',true)+
+    fg('Kelly',isFinite(R.kelly)?(R.kelly*100).toFixed(1)+'%':'n/d',
+       isFinite(R.kelly)?(R.kelly>0?'up':'dn'):'',HELP.kelly);
+  // histograma de la medida activa
+  const[x,W,H]=cvs('mcHist',140);x.clearRect(0,0,W,H);
+  const a=R.srt,lo=a[0],hi=a[a.length-1];
+  if(hi>lo){
+    const bins=52,c=new Array(bins).fill(0);
+    a.forEach(v=>{let b=Math.floor((v-lo)/(hi-lo)*bins);b=Math.max(0,Math.min(bins-1,b));c[b]++;});
+    const mm=Math.max(...c),bw=W/bins,zx=(0-lo)/(hi-lo)*W;
+    c.forEach((n2,i)=>{const bx=lo+(i+.5)/bins*(hi-lo);
+      x.fillStyle=bx>=0?C.bullA:C.bearA;
+      const bh=n2/mm*(H-18);x.fillRect(i*bw,H-14-bh,Math.max(bw-1,1),bh);});
+    x.strokeStyle=C.ink2;x.lineWidth=1;x.beginPath();x.moveTo(zx,0);x.lineTo(zx,H-14);x.stroke();
+    x.fillStyle=C.ink3;x.font=C.mono;
+    x.fillText(money(lo),2,H-3);x.fillText(money(hi),W-46,H-3);
+  }
+  const e=$('mcNote');
+  if(!hasReal){
+    // Solo tenemos la medida del mercado: hay que ser explícito sobre su límite
+    e.className='note mk';
+    e.innerHTML=`<span class="eyebrow">Atención · qué mide esto exactamente</span>
+      Esta simulación usa la <b>volatilidad implícita del mercado</b> y deriva neutral al riesgo.
+      Es decir: te está dando <b>la probabilidad que descuenta el mercado</b>, no la tuya.
+      Bajo esa medida el valor esperado es cero por construcción —el ${money(R.ev)} que ves es ruido
+      de muestreo—, así que <b>no puede mostrar ninguna ventaja</b>. Es una propiedad matemática,
+      no un defecto de la estrategia.<br><br>
+      Para ver si <em>tú</em> tienes ventaja, pulsa <b>Estimar volatilidad</b> arriba: ajusta un GARCH
+      sobre el histórico real y vuelve a simular. Si tu estimación de volatilidad difiere de la del
+      mercado, ahí es donde aparece (o se desmiente) el edge.`;
+    return;
+  }
+  // Tenemos las dos: la comparación ES el resultado
+  const dPop=real.pop-rn.pop, dEv=real.ev-rn.ev;
+  const vrp=VV()-st.expVol;
+  const favour=dEv>0;
+  const head=Math.abs(dEv)<2
+    ? `Tu estimación de volatilidad apenas discrepa de la del mercado: <em>no hay ventaja clara</em> por esta vía.`
+    : favour
+    ? `Bajo tu modelo ganas <span class="n">${money(dEv)}</span> más de lo que el mercado descuenta. <em>Ahí está tu ventaja</em>, y viene de discrepar en volatilidad.`
+    : `Bajo tu modelo ganas <span class="n">${money(-dEv)}</span> <em>menos</em> de lo que el mercado descuenta. Esta estructura juega en tu contra según tu propia estimación.`;
+  const v=$('mcNote');
+  v.className='note '+(Math.abs(dEv)<2?'mk':favour?'up':'dn');
+  v.innerHTML=`
+    <span class="eyebrow">Dos medidas · y la diferencia es lo único que importa</span>
+    ${head}
+    <table class="quotes" style="margin-top:10px">
+      <thead><tr><th>Medida</th><th>Volatilidad</th><th>P(ganar)</th><th>Valor esperado</th><th>Rango 90%</th></tr></thead>
+      <tbody>
+        <tr><td class="tk">Lo que descuenta el mercado</td><td class="mdl">${pc(VV())}</td>
+            <td>${pc(rn.pop)}</td><td class="mute">${money(rn.ev)}</td>
+            <td class="mute">${money(rn.p5)} · ${money(rn.p95)}</td></tr>
+        <tr><td class="tk">Lo que predice tu modelo</td><td class="mk">${pc(st.expVol)}</td>
+            <td class="${real.pop>rn.pop?'up':'dn'}">${pc(real.pop)}</td>
+            <td class="${real.ev>=0?'up':'dn'}">${money(real.ev)}</td>
+            <td>${money(real.p5)} · ${money(real.p95)}</td></tr>
+        <tr class="atm"><td class="tk">Diferencia</td><td class="${vrp>0?'up':'dn'}">${(vrp*100>=0?'+':'')}${(vrp*100).toFixed(1)} pts</td>
+            <td class="${dPop>0?'up':'dn'}">${(dPop*100>=0?'+':'')}${(dPop*100).toFixed(1)} pts</td>
+            <td class="${dEv>0?'up':'dn'}">${money(dEv)}</td><td class="mute">—</td></tr>
+      </tbody>
+    </table>
+    <p style="margin-top:9px;font-size:13px;line-height:1.55">
+      La fila del mercado siempre da un valor esperado cercano a cero: es una martingala, no puede
+      mostrar ventaja. La fila de tu modelo sí puede, porque parte de una volatilidad distinta.
+      <b>La ventaja no está en la estrategia: está en tener razón sobre la volatilidad.</b>
+      Si tu GARCH se equivoca, esta cifra miente.
+    </p>
+    ${isFinite(real.kelly)?`<p style="margin-top:7px;font-size:13px">Kelly bajo tu modelo sugiere no arriesgar más del
+      <b class="num">${(real.kelly*100).toFixed(0)}%</b> del capital; en la práctica se usa un cuarto de eso.</p>`
+      :`<p style="margin-top:7px;font-size:13px">Kelly no disponible: en la muestra la estrategia no pierde nunca, y el estimador degenera.</p>`}`;
+}
+
+/* ══════════════ GLOSARIO ══════════════ */
+const GL=[
+ ['Delta','Tu apuesta direccional. Un delta neto de +50 se comporta como tener 50 acciones largas.'],
+ ['Gamma','La aceleración del delta. Alto significa direccionalidad que se dispara cerca del strike.'],
+ ['Theta','El reloj. Lo que te da o te quita cada día que pasa, sin que el precio se mueva.'],
+ ['Vega','Tu exposición al miedo del mercado: cuánto ganas o pierdes por cada punto de volatilidad.'],
+ ['Volatilidad implícita','El precio del seguro. La volatilidad futura que el mercado descuenta en las opciones.'],
+ ['Volatilidad del modelo','Lo que predice un GARCH(1,1) ajustado sobre el histórico real de precios del subyacente.'],
+ ['VRP','La diferencia entre ambas. Positiva quiere decir que el mercado paga de más por asegurarse — el argumento estructural para vender prima. No es dinero gratis: la cobras precisamente porque a veces te comes una cola.'],
+ ['Curva SVI','Una curva suave ajustada a la volatilidad de todos los strikes. Los que se despegan de ella están dislocados frente a sus vecinos.'],
+ ['Ejercicio anticipado','Lo que vale de más una opción americana por poder ejercerse antes. Importa en puts muy dentro de dinero y con tipos altos.'],
+ ['Distribución implícita','La distribución de precios que el mercado descuenta a vencimiento, extraída de la curva de precios de las opciones.'],
+ ['Medida risk-neutral','La probabilidad que el mercado descuenta en los precios. Bajo esta medida, el valor esperado de cualquier estrategia es cero: es una martingala. Por eso una simulación hecha con la volatilidad implícita <b>nunca</b> puede mostrar ventaja — no porque la estrategia sea mala, sino porque es matemáticamente imposible.'],
+ ['Medida real','La probabilidad bajo tu propia estimación de volatilidad. Es la única donde puede aparecer una ventaja, y aparece precisamente cuando discrepas del mercado. Si tu GARCH acierta y el mercado cobra de más, vendes prima con edge. Si tu GARCH se equivoca, la ventaja era un espejismo.']
+];
+const gloss=()=>{$('gloss').innerHTML=GL.map(([k,v])=>`<dt>${k}</dt><dd>${v}</dd>`).join('');};
+
+/* ══════════════ CONEXIÓN ══════════════ */
+const led=(t,c)=>{$('ledTx').textContent=t;$('led').className='led'+(c?' '+c:'');};
+function setup(){
+  const u=prompt('Dirección del Worker:',CN.url||'https://mesa-opt-proxy.xxx.workers.dev');if(u===null)return;
+  const k=prompt('Clave de acceso:',CN.key||'');if(k===null)return;
+  localStorage.setItem('tt_url',u.replace(/\/+$/,''));localStorage.setItem('tt_key',k.trim());
+  led('Configurado');
+}
+async function api(a,p={}){
+  if(!CN.url||!CN.key)throw new Error('Configura el acceso primero');
+  const qs=new URLSearchParams(p).toString();
+  const r=await fetch(`${CN.url}/${a}${qs?'?'+qs:''}`,{headers:{'X-Proxy-Key':CN.key}});
+  const j=await r.json();if(!r.ok||!j.ok)throw new Error(j.error||('HTTP '+r.status));return j.data;
+}
+async function pullMarket(){
+  const sym=($('sym').value||'SPY').toUpperCase();st.sym=sym;
+  const e=$('volNote');e.className='note';e.innerHTML=`<span class="eyebrow">Mercado</span>Cargando ${sym}…`;
+  try{
+    const[ch,mt]=await Promise.all([api('chain',{symbol:sym}),api('metrics',{symbol:sym}).catch(()=>null)]);
+    const it=ch?.data?.items||ch?.items||[];
+    st.exps=(it[0]?.expirations)||[];
+    $('expSel').innerHTML='<option value="">Manual</option>'+st.exps.map((x,i)=>
+      `<option value="${i}">${x['expiration-date']} · ${x['days-to-expiration']} días</option>`).join('');
+    const m=(mt?.data?.items||mt?.items||[])[0];
+    if(m){const iv=parseFloat(m['implied-volatility-index']);
+      if(isFinite(iv)){st.IV=iv*100;$('IV').value=st.IV.toFixed(1);}}
+    calc();
+    e.innerHTML=`<span class="eyebrow">Mercado</span>${st.exps.length} vencimientos disponibles para ${sym}.
+      Pulsa <b>Estimar volatilidad</b> para ajustar el GARCH sobre su histórico.`;
+  }catch(err){e.className='note dn';e.innerHTML=`<span class="eyebrow">No se pudo cargar</span>${err.message}`;}
+}
+$('expSel').addEventListener('change',e=>{
+  const i=e.target.value;if(i==='')return;
+  const x=st.exps[+i];if(!x)return;
+  st.DTE=+x['days-to-expiration'];$('DTE').value=st.DTE;calc();
+});
+/* GARCH real: pide velas por el websocket y ajusta */
+async function pullGarch(){
+  const sym=($('sym').value||'SPY').toUpperCase();st.sym=sym;
+  const e=$('volNote');e.className='note';
+  e.innerHTML=`<span class="eyebrow">Volatilidad</span>Descargando histórico de ${sym}…`;
+  if(!CN.url||!CN.key){e.className='note dn';
+    e.innerHTML='<span class="eyebrow">Sin acceso</span>Configura la conexión para descargar el histórico real.';return;}
+  try{
+    const candles=[];
+    const dx=new DXLink();
+    dx.onCandle=(s,c)=>candles.push(c);
+    await dx.connect(CN.url,CN.key);
+    await new Promise(r=>setTimeout(r,400));
+    dx.subscribeCandles(sym,500,'d');
+    await new Promise(r=>setTimeout(r,4000));
+    dx.disconnect();
+    if(candles.length<80){e.className='note dn';
+      e.innerHTML=`<span class="eyebrow">Histórico insuficiente</span>Solo llegaron ${candles.length} velas de ${sym}. Prueba con un ticker más líquido.`;return;}
+    const pack=volForecast(candles,st.DTE);
+    if(!pack.ok){e.className='note dn';
+      e.innerHTML=`<span class="eyebrow">No se pudo ajustar</span>${pack.reason}`;return;}
+    st.volPack=pack;st.expVol=pack.expected;
+    calc();
+    const vrp=VV()-st.expVol;
+    const lean=vrp>.04?'up':vrp<-.02?'dn':'mk';
+    const verdict=vrp>.04?'El mercado paga <b>de más</b> por el seguro. Favorece <b>vender</b> prima.'
+      :vrp<-.02?'La IV está <b>por debajo</b> de lo que predice el modelo. Favorece <b>comprar</b> prima.'
+      :'La IV y el modelo están alineados. Sin ventaja clara de volatilidad.';
+    e.className='note '+lean;
+    e.innerHTML=`<span class="eyebrow">GARCH(1,1) sobre ${pack.n} días reales</span>
+      Vol realizada <b class="num">${pc(pack.realized)}</b> ·
+      EWMA <b class="num">${pc(pack.ewma)}</b> ·
+      GARCH a ${st.DTE} días <b class="num">${pc(pack.garch)}</b>
+      ${pack.garchParams?`· persistencia <b class="num">${pack.garchParams.persistence.toFixed(3)}</b>`:''}<br>
+      Frente a una IV de mercado del <b class="num">${pc(VV())}</b>, la prima de riesgo es de
+      <b class="num">${(vrp*100>=0?'+':'')}${(vrp*100).toFixed(1)} puntos</b>. ${verdict}`;
+  }catch(err){e.className='note dn';
+    e.innerHTML=`<span class="eyebrow">Error</span>${err.message}`;}
+}
+
+/* ══════════════ MI CUENTA ══════════════ */
+const BK={dx:null,pos:[],nlv:null};
+function toStreamer(p){
+  if(p['streamer-symbol'])return p['streamer-symbol'];
+  if(String(p['instrument-type']||'').includes('Option')){
+    const o=(p.symbol||'').replace(/\s+/g,'');const m=o.match(/^([A-Z]+)(\d{6})([CP])(\d{8})$/);
+    if(m)return `.${m[1]}${m[2]}${m[3]}${parseInt(m[4],10)/1000}`;return '.'+o;}
+  return p['underlying-symbol']||p.symbol;
+}
+const lp=p=>{const mid=p.live.bid!=null&&p.live.ask!=null?(p.live.bid+p.live.ask)/2:(p.live.price||p.avg);
+  return(mid-p.avg)*p.qty*p.mult;};
+async function connect(){
+  if(!CN.url||!CN.key){setup();return;}
+  try{
+    led('Cargando…');
+    const d=await api('accounts');const it=d?.data?.items||d?.items||[];
+    CN.acct=it[0]?.account?.['account-number']||it[0]?.['account-number'];
+    if(!CN.acct)throw new Error('No se encontró ninguna cuenta');
+    const[bl,ps]=await Promise.all([api('balances',{account:CN.acct}),api('positions',{account:CN.acct})]);
+    BK.nlv=(bl?.data||bl)?.['net-liquidating-value'];
+    const raw=ps?.data?.items||ps?.items||[];
+    if(!raw.length){led('Sin posiciones');alert('La cuenta no tiene posiciones abiertas.');return;}
+    BK.pos=raw.map(p=>({sym:p.symbol,und:p['underlying-symbol']||p.symbol,type:p['instrument-type'],
+      qty:Number(p.quantity)*(p['quantity-direction']==='Short'?-1:1),avg:Number(p['average-open-price']||0),
+      mult:Number(p.multiplier||(String(p['instrument-type']).includes('Option')?100:1)),
+      streamer:toStreamer(p),live:{}}));
+    BK.dx=new DXLink();
+    BK.dx.onStatus=s=>{if(s==='en vivo')led('En directo','live');else if(s==='error')led('Error de feed','bad');};
+    BK.dx.onQuote=(s,q)=>mkt(s,q);BK.dx.onGreeks=(s,g)=>mkt(s,g);
+    await BK.dx.connect(CN.url,CN.key);
+    const sy=[...new Set(BK.pos.map(p=>p.streamer))];
+    BK.pos.forEach(p=>{if(!p.streamer.startsWith('.'))sy.push(p.und);});
+    BK.dx.subscribe([...new Set(sy)]);
+    $('bkOff').style.display='none';$('bkOn').style.display='block';$('fromBk').style.display='';
+    $('bkCount').textContent=BK.pos.length+' contratos';
+    renderBk();
+  }catch(e){led('Error','bad');alert('No se pudo conectar: '+e.message);}
+}
+const stopStream=()=>{if(BK.dx)BK.dx.disconnect();led('Detenido');};
+function mkt(s,d){
+  BK.pos.forEach(p=>{if(p.streamer===s)Object.assign(p.live,d);
+    if(p.und===s&&d.bid!=null)p.live.und=(d.bid+d.ask)/2;});
+  if(BK._r)return;BK._r=requestAnimationFrame(()=>{BK._r=null;renderBk();});
+}
+function renderBk(){
+  if(BK.nlv)$('bkNlv').textContent='Patrimonio $'+Number(BK.nlv).toLocaleString('es-ES',{maximumFractionDigits:0});
+  $('bkList').innerHTML=BK.pos.map(p=>{
+    const mid=p.live.bid!=null&&p.live.ask!=null?(p.live.bid+p.live.ask)/2:p.live.price;
+    const P=lp(p);const isO=String(p.type).includes('Option');const g=p.live;
+    return `<div class="pos">
+      <div class="hd">
+        <span class="id">${mid!=null?'<span class="dotlive"></span>':''}${p.sym}</span>
+        <span class="pl" style="color:${P>=0?'var(--bull)':'var(--bear)'}">${mid!=null?money(P):'—'}</span>
+      </div>
+      <div class="meta">${p.qty>0?'Largo':'Corto'} ${Math.abs(p.qty)} · abierto a ${p.avg.toFixed(2)}${mid!=null?' · ahora '+mid.toFixed(2):''}${p.live.und?' · subyacente '+p.live.und.toFixed(2):''}</div>
+      ${isO&&g.delta!=null?`<div class="grk">
+        <span>Δ <b>${(g.delta*p.qty*p.mult/100).toFixed(1)}</b></span>
+        <span>Θ <b style="color:${g.theta*p.qty>=0?'var(--bull)':'var(--bear)'}">${money(g.theta*p.qty*p.mult)}</b></span>
+        <span>Vega <b>${(g.vega*p.qty*p.mult/100).toFixed(1)}</b></span>
+        <span>IV <b>${(g.iv*100).toFixed(0)}%</b></span></div>`:''}
+      ${isO&&g.delta!=null?posNote(p,g):''}</div>`;
+  }).join('');
+  bkAgg();
+}
+function posNote(p,g){
+  const nd=g.delta*p.qty;
+  const t=Math.abs(nd)<.05?'Neutral al precio ahora mismo.'
+    :nd>0?`Te beneficia que <b>suba</b>: unos <b class="num">${money(g.delta*p.qty*p.mult)}</b> por cada punto.`
+    :`Te beneficia que <b>baje</b>: unos <b class="num">${money(-g.delta*p.qty*p.mult)}</b> por cada punto.`;
+  const th=g.theta*p.qty*p.mult;
+  return `<div class="note ${th>=0?'up':'mk'}" style="margin-top:8px">${t}
+    ${th>=0?`El tiempo te suma <b class="num">${money(th)}</b> al día.`:`El tiempo te resta <b class="num">${money(-th)}</b> al día.`}</div>`;
+}
+function bkAgg(){
+  let nd=0,nt=0,nv=0,ng=0,P=0,has=false;
+  BK.pos.forEach(p=>{P+=lp(p);const g=p.live;if(g.delta!=null){has=true;
+    nd+=g.delta*p.qty*p.mult;nt+=g.theta*p.qty*p.mult;nv+=g.vega*p.qty*p.mult;ng+=(g.gamma||0)*p.qty*p.mult;}});
+  $('bkFigs').innerHTML=fg('Resultado abierto',money(P),P>=0?'up':'dn')+
+    fg('Delta neto',(nd/100).toFixed(1),'',HELP.delta)+
+    fg('Gamma neto',(ng/100).toFixed(2),'',HELP.gamma)+
+    fg('Theta/día',money(nt),nt>=0?'up':'dn',HELP.theta)+
+    fg('Vega neto',(nv/100).toFixed(1),'',HELP.vega);
+  if(!has){$('bkVerdict').innerHTML='';
+    $('bkNote').innerHTML='<p class="cap">Esperando las griegas del feed…</p>';return;}
+  const ds=nd/100;let cls,tx;
+  if(Math.abs(ds)<5){cls='up';tx=`Tu cartera está <em>neutral</em> al mercado. Vives del paso del tiempo y de la volatilidad, no de la dirección.`;}
+  else if(ds>0){cls='mk';tx=`Tu cartera es <em>alcista</em>: equivale a tener <span class="n">${ds.toFixed(0)}</span> acciones. Si el mercado cae, pierdes.`;}
+  else{cls='mk';tx=`Tu cartera es <em>bajista</em>: equivale a estar corto de <span class="n">${Math.abs(ds).toFixed(0)}</span> acciones. Si el mercado sube, pierdes.`;}
+  const v=$('bkVerdict');v.className='verdict '+cls;v.innerHTML=tx;
+  const n=$('bkNote');n.className='note';
+  n.innerHTML=`<span class="eyebrow">Tu riesgo ahora mismo</span>
+    ${nt>=0?`El tiempo te suma <b class="num">${money(nt)}</b> al día: eres vendedor neto de prima.`
+           :`El tiempo te resta <b class="num">${money(-nt)}</b> al día: eres comprador neto de prima y necesitas movimiento.`}<br>
+    ${Math.abs(nv/100)<2?'Tu exposición a la volatilidad es baja.'
+      :nv>0?'Te beneficia que suba la volatilidad general.'
+      :'Te perjudica que suba la volatilidad: estás corto de vega, lo típico de la venta de prima.'}
+    ${Math.abs(ng/100)>0.5?`<br>Tu gamma neto es <b class="num">${(ng/100).toFixed(2)}</b>: ${ng<0?'tu delta empeora cuando el mercado se mueve en tu contra — cuidado cerca de vencimiento.':'tu delta mejora con el movimiento.'}`:''}`;
+}
+function fromPosition(){
+  const o=BK.pos.filter(p=>String(p.type).includes('Option'));
+  if(!o.length){alert('No hay opciones en la cartera.');return;}
+  const u=o[0].und;
+  if(o[0].live.und){st.S=o[0].live.und;$('S').value=st.S.toFixed(2);}
+  $('sym').value=u;st.sym=u;st.legs=[];lid=0;
+  o.filter(p=>p.und===u).forEach(p=>{const m=p.streamer.match(/([CP])(\d+(?:\.\d+)?)$/);
+    st.legs.push({id:++lid,side:p.qty>0?'B':'S',type:m?m[1]:'C',K:m?+m[2]:Math.round(st.S),qty:Math.abs(p.qty)});});
+  legs();go('desk');calc();
+}
+
+/* ══════════════ CADENA ══════════════ */
+const CH={};
+async function loadExps(){
+  const sym=($('cSym').value||'SPY').toUpperCase();
+  try{
+    const ch=await api('chain',{symbol:sym});
+    const it=ch?.data?.items||ch?.items||[];
+    CH.exps=(it[0]?.expirations)||[];
+    $('cExp').innerHTML=CH.exps.map((x,i)=>
+      `<option value="${i}">${x['expiration-date']} · ${x['days-to-expiration']} días</option>`).join('');
+  }catch(e){$('cMsg').textContent='No se pudo cargar la cadena: '+e.message;}
+}
+$('cSym').addEventListener('change',loadExps);
+async function scanChain(){
+  const msg=$('cMsg');const sym=($('cSym').value||'SPY').toUpperCase();
+  try{
+    msg.textContent='Cargando estructura de la cadena…';
+    if(!CH.exps)await loadExps();
+    const ex=CH.exps[+$('cExp').value||0];
+    if(!ex)throw new Error('Elige un vencimiento');
+    const dte=+ex['days-to-expiration'],t=Math.max(dte/365,1/365);
+    const strikes=ex.strikes||[];
+    if(!strikes.length)throw new Error('El vencimiento no trae strikes');
+    const syms=[],meta={};
+    strikes.forEach(s=>{const K=parseFloat(s['strike-price']);
+      if(s['call-streamer-symbol']){syms.push(s['call-streamer-symbol']);meta[s['call-streamer-symbol']]={K,type:'C'};}
+      if(s['put-streamer-symbol']){syms.push(s['put-streamer-symbol']);meta[s['put-streamer-symbol']]={K,type:'P'};}});
+    msg.textContent=`Suscribiendo ${syms.length} contratos y descargando histórico…`;
+    const quotes={},candles=[];
+    const dx=new DXLink();
+    dx.onQuote=(s,q)=>{quotes[s]=Object.assign(quotes[s]||{},q);};
+    dx.onGreeks=(s,g)=>{quotes[s]=Object.assign(quotes[s]||{},g);};
+    dx.onCandle=(s,c)=>candles.push(c);
+    await dx.connect(CN.url,CN.key);
+    await new Promise(r=>setTimeout(r,300));
+    dx.subscribe([...syms,sym]);
+    dx.subscribeCandles(sym,500,'d');
+    await new Promise(r=>setTimeout(r,4500));
+    dx.disconnect();
+    let spot=st.S;
+    if(quotes[sym]&&quotes[sym].bid!=null)spot=(quotes[sym].bid+quotes[sym].ask)/2;
+    // volatilidad esperada con GARCH real
+    let expVol=st.expVol,pack=null;
+    if(candles.length>=80){pack=volForecast(candles,dte);if(pack.ok)expVol=pack.expected;}
+    const rows=[];
+    for(const s in meta){const q=quotes[s];
+      if(!q||q.bid==null||q.ask==null||q.ask<=0)continue;
+      rows.push({K:meta[s].K,type:meta[s].type,bid:q.bid,ask:q.ask,streamer:s});}
+    if(rows.length<6)throw new Error(`Solo ${rows.length} contratos con cotización. ¿Está el mercado cerrado?`);
+    const an=analyzeChain(rows,spot,t,RR(),QQ(),expVol);
+    const cmp=priceVsMarket(an.rows,spot,t,RR(),QQ(),expVol,an.svi);
+    an.rows=cmp;
+    const rk=rankChain(an);
+    Object.assign(CH,{an,rk,spot,t,dte,expVol,pack,sym,sortKey:'K',desc:false});
+    st.S=spot;$('S').value=spot.toFixed(2);
+    st.DTE=dte;$('DTE').value=dte;
+    if(isFinite(an.atmIv)){st.IV=an.atmIv*100;$('IV').value=st.IV.toFixed(1);}
+    if(isFinite(expVol)){st.expVol=expVol;st.volPack=pack;}
+    st.sym=sym;$('sym').value=sym;
+    $('cOut').style.display='block';msg.textContent='';
+    renderChain();ribbon();
+  }catch(e){msg.textContent='No se pudo escanear: '+e.message;}
+}
+function renderChain(){
+  const{an,rk,spot,dte,expVol,pack,sym}=CH;
+  const atm=an.atmIv,vrp=isFinite(expVol)?atm-expVol:NaN;
+  $('cSum').textContent=`${sym} · ${dte} días`;
+  $('cFigs').innerHTML=
+    fg('Precio',spot.toFixed(2))+
+    fg('IV en el dinero',pc(atm))+
+    fg('Vol del modelo',isFinite(expVol)?pc(expVol):'—','mk')+
+    fg('VRP',isFinite(vrp)?((vrp>=0?'+':'')+(vrp*100).toFixed(1)+'pts'):'—',vrp>.02?'up':vrp<-.02?'dn':'',HELP.vrp)+
+    fg('Ajuste SVI',an.svi?(an.svi.rmse*100).toFixed(2)+'pts':'—')+
+    fg('Contratos',an.rows.length);
+  const v=$('cVerdict');
+  if(isFinite(vrp)){
+    const c=vrp>.04?'up':vrp<-.02?'dn':'mk';
+    v.className='verdict '+c;
+    v.innerHTML=vrp>.04
+      ? `El mercado pide una volatilidad del <span class="n">${pc(atm)}</span> cuando el modelo predice <span class="n">${pc(expVol)}</span>. Te están pagando <span class="n">${(vrp*100).toFixed(1)} puntos</span> de más por el seguro: favorece <em>vender</em> prima.`
+      : vrp<-.02
+      ? `La IV del mercado (<span class="n">${pc(atm)}</span>) está por debajo de lo que predice el modelo (<span class="n">${pc(expVol)}</span>). Las opciones están baratas: favorece <em>comprar</em> prima.`
+      : `La IV del mercado y el modelo coinciden casi punto por punto. Sin ventaja de volatilidad; si operas, que sea por dirección o por una dislocación concreta.`;
+  }else v.innerHTML='';
+  const views=[['best','Mejores'],['richVsCurve','Caros vs curva'],['cheapVsCurve','Baratos vs curva'],
+    ['thetaEfficiency','Theta por delta'],['bestVRP','Mayor VRP'],['safestShort','Más seguros'],['bestEV','Mejor valor esperado']];
+  $('cChips').innerHTML=views.map(([k,l])=>
+    `<button class="chip${st.rkView===k?' on':''}" onclick="setRk('${k}')">${l}</button>`).join('');
+  renderRank();renderTable();drawSmile();drawRND();
+}
+const setRk=k=>{st.rkView=k;renderChain();};
+function renderRank(){
+  const list=CH.rk[st.rkView]||[];
+  $('cRankSub').textContent=list.length+' de '+CH.rk.candidates;
+  $('cRank').innerHTML=`<thead><tr>
+    <th>Contrato</th><th>Mercado</th><th>Modelo<span class="help">?<span class="bub">${HELP.gap}</span></span></th>
+    <th>Te pagan<span class="help">?<span class="bub">${HELP.gap}</span></span></th>
+    <th>En IV<span class="help">?<span class="bub">${HELP.gapiv}</span></span></th>
+    <th>vs curva<span class="help">?<span class="bub">${HELP.edge}</span></span></th>
+    <th>Delta</th><th>Theta</th><th>θ/Δ</th>
+    <th>P(sin valor)<span class="help">?<span class="bub">${HELP.otm}</span></span></th>
+    <th>σ</th><th>Liquidez<span class="help">?<span class="bub">${HELP.liq}</span></span></th></tr></thead><tbody>`+
+    list.map(o=>{
+      const rich=o.ivEdge>0.005,cheap=o.ivEdge<-0.005;
+      return `<tr class="${rich?'rich':cheap?'cheap':''}" onclick="pick(${o.K},'${o.type}')">
+      <td class="tk">${o.type} ${o.K}</td>
+      <td>${o.mid.toFixed(2)}</td>
+      <td class="mk">${isFinite(o.pxExpVol)?o.pxExpVol.toFixed(2):'—'}</td>
+      <td class="${o.gapContract>0?'up':'dn'}">${isFinite(o.gapContract)?money(o.gapContract):'—'}</td>
+      <td class="${o.gapIV>0?'up':'dn'}">${isFinite(o.gapIV)?((o.gapIV>=0?'+':'')+(o.gapIV*100).toFixed(1)):'—'}</td>
+      <td class="${rich?'up':cheap?'dn':'mute'}">${isFinite(o.ivEdge)?((o.ivEdge>=0?'+':'')+(o.ivEdge*100).toFixed(2)):'—'}</td>
+      <td>${o.delta.toFixed(3)}</td>
+      <td class="dn">${(o.theta*100).toFixed(2)}</td>
+      <td class="mk">${isFinite(o.thetaPerDelta)?o.thetaPerDelta.toFixed(2):'—'}</td>
+      <td class="${o.probOTM>.8?'up':''}">${(o.probOTM*100).toFixed(0)}%</td>
+      <td class="mute">${o.sigmas.toFixed(2)}</td>
+      <td class="mute">${(o.liquidity*100).toFixed(0)}%</td></tr>`;}).join('')+'</tbody>';
+  const EXP={
+    best:'Combina cuatro cosas: cuánta theta cobras por unidad de delta, la probabilidad de que expire sin valor, la prima de volatilidad aislada del sesgo, y la calidad de ejecución. <b>Los pesos son una heurística, no están calibrados contra ningún backtest</b>: úsalo para ordenar candidatos, no como veredicto.',
+    richVsCurve:'Cotizan con una volatilidad <b>por encima</b> de la curva que ajusta a sus vecinos. En términos relativos, el mercado los está pagando caros: candidatos a vender.',
+    cheapVsCurve:'Cotizan <b>por debajo</b> de su curva. Candidatos a comprar, o a usar como pata larga de un spread.',
+    thetaEfficiency:'Cuánto tiempo cobras por cada unidad de riesgo direccional que asumes. Alto significa que te pagan bien por esperar sin apostar a dirección.',
+    bestVRP:'Mayor prima de volatilidad, ya <b>normalizada</b> por el sesgo de la curva. Sin esa normalización, el ranking lo dominarían siempre los puts más lejanos, cuya IV alta es sesgo, no anomalía.',
+    safestShort:'Mayor probabilidad de expirar sin valor, con una prima mínima que compense. Los conservadores.',
+    bestEV:'Prima cobrada menos el payoff esperado, calculado con la <b>volatilidad de tu modelo</b>, no con la del mercado. Bajo la volatilidad del mercado este número sería cero por construcción (es el precio justo): solo se separa de cero si tu estimación de volatilidad discrepa de la implícita. Es el edge de volatilidad, contrato a contrato.'};
+  const e=$('cRankNote');e.className='note';
+  e.innerHTML=`<span class="eyebrow">Qué mide este ranking</span>${EXP[st.rkView]||''}`;
+}
+function renderTable(){
+  const rows=[...CH.an.rows].sort((a,b)=>CH.desc?b[CH.sortKey]-a[CH.sortKey]:a[CH.sortKey]-b[CH.sortKey]);
+  $('cCount').textContent=rows.length+' contratos';
+  const cols=[['type','Tipo'],['K','Strike'],['mid','Mercado'],['pxExpVol','Modelo'],['gapContract','Te pagan'],
+    ['iv','IV'],['ivModel','Curva'],['ivEdge','Desvío'],['gapIV','VRP'],['delta','Δ'],['gamma','Γ'],
+    ['theta','Θ'],['vega','Vega'],['probOTM','P(sin valor)'],['eep','Ej.antic.']];
+  $('cTable').innerHTML='<thead><tr>'+cols.map(([k,l])=>
+    `<th class="${CH.sortKey===k?'sorted':''}" onclick="sortCh('${k}')">${l}</th>`).join('')+'</tr></thead><tbody>'+
+    rows.map(o=>{
+      const atm=Math.abs(o.K-CH.spot)<CH.spot*.012;
+      const rich=o.ivEdge>0.005,cheap=o.ivEdge<-0.005;
+      return `<tr class="${atm?'atm':''} ${rich?'rich':cheap?'cheap':''}" onclick="pick(${o.K},'${o.type}')">
+      <td class="tk">${o.type}</td><td class="tk">${o.K}</td>
+      <td>${o.mid.toFixed(2)}</td>
+      <td class="mk">${isFinite(o.pxExpVol)?o.pxExpVol.toFixed(2):'—'}</td>
+      <td class="${o.gapContract>0?'up':'dn'}">${isFinite(o.gapContract)?money(o.gapContract):'—'}</td>
+      <td>${(o.iv*100).toFixed(1)}</td>
+      <td class="mute">${isFinite(o.ivModel)?(o.ivModel*100).toFixed(1):'—'}</td>
+      <td class="${rich?'up':cheap?'dn':'mute'}">${isFinite(o.ivEdge)?((o.ivEdge>=0?'+':'')+(o.ivEdge*100).toFixed(2)):'—'}</td>
+      <td class="${o.gapIV>0?'up':'dn'}">${isFinite(o.gapIV)?((o.gapIV>=0?'+':'')+(o.gapIV*100).toFixed(1)):'—'}</td>
+      <td>${o.delta.toFixed(3)}</td><td class="mute">${o.gamma.toFixed(4)}</td>
+      <td class="dn">${(o.theta*100).toFixed(2)}</td><td class="mute">${o.vega.toFixed(3)}</td>
+      <td class="${o.probOTM>.8?'up':''}">${(o.probOTM*100).toFixed(0)}%</td>
+      <td class="mute">${isFinite(o.eep)&&o.eep>0.001?o.eep.toFixed(3):'—'}</td></tr>`;}).join('')+'</tbody>';
+}
+const sortCh=k=>{if(CH.sortKey===k)CH.desc=!CH.desc;else{CH.sortKey=k;CH.desc=false;}renderTable();};
+function pick(K,type){
+  st.legs=[{id:++lid,side:'S',type,K,qty:1}];
+  st.S=CH.spot;$('S').value=CH.spot.toFixed(2);
+  st.DTE=CH.dte;$('DTE').value=CH.dte;
+  $('sym').value=CH.sym;st.sym=CH.sym;
+  legs();go('desk');calc();
+}
+function drawSmile(){
+  const[x,W,H]=cvs('smile',220);x.clearRect(0,0,W,H);
+  const{an,t}=CH;const p=an.rows.filter(o=>o.otm&&isFinite(o.iv));
+  if(p.length<3)return;
+  const ks=p.map(o=>o.k),vs=p.map(o=>o.iv);
+  const k0=Math.min(...ks),k1=Math.max(...ks);
+  const v0=Math.min(...vs)*.94,v1=Math.max(...vs)*1.05;
+  const PX=k=>34+(k-k0)/(k1-k0)*(W-42),PY=v=>H-20-(v-v0)/(v1-v0)*(H-32);
+  x.strokeStyle=C.rule2;x.beginPath();x.moveTo(PX(0),6);x.lineTo(PX(0),H-20);x.stroke();
+  if(an.svi){x.strokeStyle=C.mark;x.lineWidth=1.6;x.beginPath();
+    for(let i=0;i<=100;i++){const k=k0+(k1-k0)*i/100;const v=sviIV(an.svi.params,k,t);
+      if(!isFinite(v))continue;i?x.lineTo(PX(k),PY(v)):x.moveTo(PX(k),PY(v));}
+    x.stroke();}
+  p.forEach(o=>{const d=o.ivEdge;const off=Math.abs(d)>.01;
+    x.fillStyle=off?(d>0?C.bull:C.bear):C.model;
+    x.beginPath();x.arc(PX(o.k),PY(o.iv),off?3.8:2.3,0,7);x.fill();});
+  x.fillStyle=C.ink3;x.font=C.mono;
+  x.fillText('puts',36,H-5);x.fillText('ATM',PX(0)-8,H-5);x.fillText('calls',W-34,H-5);
+  x.fillText((v1*100).toFixed(0)+'%',3,13);x.fillText((v0*100).toFixed(0)+'%',3,H-24);
+}
+function drawRND(){
+  const[x,W,H]=cvs('rnd',220);x.clearRect(0,0,W,H);
+  const{an,t,spot}=CH;
+  if(!an.svi){x.fillStyle=C.ink3;x.font='12px Inter,sans-serif';
+    x.fillText('No hay strikes suficientes para ajustar la curva.',10,H/2);return;}
+  const kg=[];for(let i=0;i<=110;i++)kg.push(-.42+.84*i/110);
+  const d=riskNeutralDensity(an.svi.params,an.F,t,RR(),kg);
+  if(!d.length)return;
+  const Ks=d.map(p=>p[0]),Ds=d.map(p=>p[1]);
+  const k0=Math.min(...Ks),k1=Math.max(...Ks),dm=Math.max(...Ds);
+  if(!(dm>0))return;
+  const PX=K=>28+(K-k0)/(k1-k0)*(W-36),PY=v=>H-18-v/dm*(H-28);
+  x.beginPath();x.moveTo(PX(k0),PY(0));
+  d.forEach(([K,v])=>x.lineTo(PX(K),PY(v)));x.lineTo(PX(k1),PY(0));x.closePath();
+  x.fillStyle=C.modelA;x.fill();
+  x.strokeStyle=C.model;x.lineWidth=1.6;x.beginPath();
+  d.forEach(([K,v],i)=>i?x.lineTo(PX(K),PY(v)):x.moveTo(PX(K),PY(v)));x.stroke();
+  x.strokeStyle=C.ink2;x.setLineDash([3,3]);x.beginPath();
+  x.moveTo(PX(spot),6);x.lineTo(PX(spot),H-18);x.stroke();x.setLineDash([]);
+  x.fillStyle=C.ink3;x.font=C.mono;
+  x.fillText(k0.toFixed(0),28,H-4);x.fillText(k1.toFixed(0),W-30,H-4);
+  x.fillText('precio hoy',PX(spot)-22,12);
+}
+
+/* ══════════════ NAVEGACIÓN ══════════════ */
+function go(v){
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
+  ['book','desk','chain'].forEach(k=>$('v-'+k).classList.toggle('on',k===v));
+  if(v==='desk')setTimeout(calc,20);
+  if(v==='chain'&&CH.an)setTimeout(renderChain,20);
+}
+$('tpl').innerHTML=Object.keys(TPL).map(n=>`<button class="chip" onclick="tpl('${n}')">${n}</button>`).join('');
+['S','DTE','IV','r','q','model'].forEach(i=>$(i).addEventListener('input',calc));
+
+/* arranque */
+tpl('Iron condor');
+gloss();
+calc();
+led(CN.url&&CN.key?'Listo':'Sin conectar');
+
+</script>
+</body>
+</html>
