@@ -929,7 +929,9 @@ function analyzeChain(rows, S, t, r, q, expectedVol) {
   // 1) IV de mercado por contrato (usando el mid)
   for (const row of rows) {
     const mid = (row.bid + row.ask) / 2;
-    if (!(mid > 0) || !(row.ask > 0)) continue;
+    // Guardas contra datos sucios del feed: precios no negativos, ask>0,
+    // y bid<=ask (un mercado cruzado es dato corrupto, no oportunidad).
+    if (!(mid > 0) || !(row.ask > 0) || !(row.bid >= 0) || row.bid > row.ask) continue;
     const iv = impliedVol(row.type, mid, S, row.K, t, r, q);
     if (!isFinite(iv) || iv <= 0.001 || iv > 4) continue;
     const g = greeks(row.type, S, row.K, t, r, q, iv);
@@ -993,12 +995,7 @@ function analyzeChain(rows, S, t, r, q, expectedVol) {
     const df = Math.exp(r * t);
     const payoffEsperado = bsm(o.type, S, o.K, t, r, q, o.iv) * df;  // E[payoff] sin descontar
     o.evShort = (o.mid * df - payoffEsperado) * 100;  // prima capitalizada − payoff esperado
-    // OJO: bajo la medida risk-neutral esto es ~0 por construcción (es el precio justo).
-    // Solo se separa de cero si la IV del strike difiere de la vol esperada real:
-    if (isFinite(expectedVol)) {
-      const payoffReal = bsm(o.type, S, o.K, t, r, q, expectedVol) * df;
-      o.evShortReal = (o.mid * df - payoffReal) * 100;   // ESTE es el EV con edge de verdad
-    } else o.evShortReal = NaN;
+    o.evShortReal = NaN;   // se calcula abajo: necesita la IV ATM, que aún no existe
     // calidad de ejecución: penaliza spreads anchos respecto a la prima
     o.liquidity = isFinite(o.spreadPct) ? Math.max(0, 1 - o.spreadPct / 0.20) : 0;  // 1=perfecto, 0=intragable
   }
@@ -1006,11 +1003,28 @@ function analyzeChain(rows, S, t, r, q, expectedVol) {
   // IV ATM de referencia (para normalizar el VRP)
   const atmIv = svi ? sviIV(svi.params, 0, t)
     : out.reduce((best, o) => Math.abs(o.k) < Math.abs(best.k) ? o : best, out[0]).iv;
+  const df2 = Math.exp(r * t);
   for (const o of out) {
     if (isFinite(expectedVol) && isFinite(atmIv) && atmIv > 0) {
-      // vol esperada "ajustada" a este strike por la forma de la curva
-      const skewFactor = isFinite(o.ivModel) ? o.ivModel / atmIv : 1;
-      o.vrpNorm = o.iv - expectedVol * skewFactor;
+      // ── LA VOL QUE TÚ CREES PARA ESTE STRIKE ──
+      // Aceptamos la FORMA de la curva (el skew es estructural y real),
+      // discrepamos solo de su NIVEL (que es lo que el GARCH puede decir).
+      //   vol_propia(K) = vol_GARCH + [ IV(K) − IV_ATM ]
+      const skewK = o.iv - atmIv;                 // la forma, la acepto
+      o.skewPts = skewK;
+      o.volPropia = Math.max(expectedVol + skewK, 0.01);
+
+      // El VRP genuino: el error de NIVEL. Es el MISMO para todos los strikes,
+      // y eso es correcto: el mercado cobra N puntos de más sobre TODA la curva.
+      o.vrpNivel = atmIv - expectedVol;
+
+      // vrpNorm (legado): el exceso de este strike sobre su curva ajustada.
+      // Debería ser ≈0 si no hay anomalía local. Es prácticamente ivEdge.
+      o.vrpNorm = o.iv - o.volPropia;
+
+      // EV de vender, bajo TU volatilidad (con skew, no plana).
+      const payoffReal = bsm(o.type, S, o.K, t, r, q, o.volPropia) * df2;
+      o.evShortReal = (o.mid * df2 - payoffReal) * 100;
     }
     // Score compuesto para venta de prima. IMPORTANTE: los pesos son una
     // heurística razonada, NO están calibrados contra ningún backtest.
@@ -1081,18 +1095,50 @@ function volScenario(legs, S, t, r, q, ivMarket, volExpected) {
    2. BSM con la curva SVI → "lo que valdría según sus vecinos"
    3. Binomial americano → captura el ejercicio anticipado
    ═══════════════════════════════════════════════════════ */
-function priceVsMarket(rows, S, t, r, q, expectedVol, svi) {
+function priceVsMarket(rows, S, t, r, q, expectedVol, svi, atmIv) {
   return rows.map(o => {
     const out = { ...o };
-    // (1) valor teórico con la vol esperada del modelo GARCH/EWMA
     if (isFinite(expectedVol)) {
-      out.pxExpVol = bsm(o.type, S, o.K, t, r, q, expectedVol);
-      out.gapExpVol = o.mid - out.pxExpVol;                    // $ por acción (× 100 = por contrato)
-      out.gapContract = out.gapExpVol * 100;                   // $ por contrato: lo que cobras de más al vender
-      // OJO: el gap PORCENTUAL explota en strikes lejanos (teórico≈0 → %→∞).
-      // La medida honesta y comparable entre strikes es en PUNTOS DE IV:
-      // cuánta volatilidad de más te está pagando el mercado.
-      out.gapIV = o.iv - expectedVol;                          // puntos de IV (esto sí es comparable)
+      // ─────────────────────────────────────────────────────────────────
+      // CÓMO SE CALCULA EL PRECIO TEÓRICO (y por qué NO con vol plana)
+      //
+      // Error tentador: valorar todos los strikes con la vol del GARCH.
+      // Eso está MAL. Los precios de mercado incluyen SKEW: los puts
+      // lejanos siempre cotizan con IV muy superior a la ATM porque la
+      // gente paga por protegerse de las caídas. Es estructural, lleva
+      // ahí desde 1987, y NO es una anomalía explotable.
+      //
+      // Si comparas un precio CON skew contra un teórico SIN skew, todos
+      // los puts OTM parecen chollo. Lo son en un 100% de los casos, lo
+      // cual debería bastar para sospechar: no es señal, es un artefacto.
+      //
+      // Lo correcto: aceptar la FORMA de la curva (el skew), discrepar
+      // solo de su NIVEL (que es lo que el GARCH sí puede decir):
+      //
+      //     vol_propia(K) = vol_GARCH + [ IV(K) − IV_ATM ]
+      //                     └─ nivel ─┘   └── forma, del mercado ──┘
+      //
+      // El gap que queda mide SOLO el error de nivel, que es el edge real.
+      // ─────────────────────────────────────────────────────────────────
+      const ivAtm = isFinite(atmIv) ? atmIv : expectedVol;
+      const skewK = isFinite(o.iv) ? (o.iv - ivAtm) : 0;   // la forma, la acepto
+      const volPropia = Math.max(expectedVol + skewK, 0.01);
+      out.volPropia = volPropia;
+      out.pxExpVol = bsm(o.type, S, o.K, t, r, q, volPropia);
+      out.gapExpVol = o.mid - out.pxExpVol;
+      out.gapContract = out.gapExpVol * 100;               // $ por contrato: el edge REAL
+
+      // Guardamos también el cálculo ingenuo, para poder explicar la diferencia
+      out.pxVolPlana = bsm(o.type, S, o.K, t, r, q, expectedVol);
+      out.gapIngenuo = (o.mid - out.pxVolPlana) * 100;
+      out.inflacionSkew = out.gapIngenuo - out.gapContract; // cuánto engañaba el skew
+      out.skewPts = skewK;                                  // el skew de este strike
+      // El error de NIVEL en puntos de IV. Es el MISMO para todos los strikes
+      // (por construcción), y esa es justamente la señal: el mercado cobra
+      // N puntos de más sobre toda la curva. Antes restaba la vol plana, lo
+      // que daba un número distinto por strike que era casi todo skew.
+      out.gapIV = ivAtm - expectedVol;                        // el VRP genuino
+      out.gapIVstrike = o.iv - volPropia;                     // residuo (≈0 si no hay anomalía)
       // ratio acotado, solo informativo y con techo para que no engañe
       out.gapRatio = out.pxExpVol > 0.05 ? Math.min(out.gapExpVol / out.pxExpVol, 5) : NaN;
     }
@@ -1105,11 +1151,11 @@ function priceVsMarket(rows, S, t, r, q, expectedVol, svi) {
     // (3) americana: prima de ejercicio anticipado sobre su propia IV
     out.pxAmerican = crr(o.type, S, o.K, t, r, q, o.iv, 200);
     out.eep = out.pxAmerican - bsm(o.type, S, o.K, t, r, q, o.iv);
-    // Veredicto: basado en PUNTOS DE IV (no en % del teórico, que engaña)
+    // Veredicto: sobre el error de NIVEL (el VRP), que es el edge real.
     const gi = out.gapIV;
     out.verdict = !isFinite(gi) ? 'n/d'
-      : gi > 0.10 ? 'muy_caro' : gi > 0.04 ? 'caro'
-      : gi < -0.06 ? 'muy_barato' : gi < -0.02 ? 'barato' : 'justo';
+      : gi > 0.08 ? 'muy_caro' : gi > 0.03 ? 'caro'
+      : gi < -0.05 ? 'muy_barato' : gi < -0.015 ? 'barato' : 'justo';
     return out;
   });
 }
@@ -1367,6 +1413,20 @@ Esa flexibilidad vale algo, sobre todo en <b>puts muy dentro de dinero</b> cuand
 
 Casi siempre es una cifra pequeña. Si sale cero, es que no compensa ejercer antes.`
   },
+  skew: {
+    titulo: 'Por qué los puts siempre parecen chollo',
+    jerga: 'Skew de volatilidad',
+    corto: 'Los puts lejanos SIEMPRE cuestan más. Y no es una anomalía.',
+    largo: `Fíjate en algo: los puts alejados del precio actual <b>siempre</b> cotizan con una volatilidad implícita mucho más alta que los que están en el dinero. Y las calls, más baja.
+
+Eso no es un error del mercado. Es el <b>skew</b>, y lleva ahí desde el crash del 87. La gente paga una prima extra por protegerse de las caídas, porque las caídas son rápidas y brutales, mientras que las subidas son lentas. Es miedo, y está en el precio desde hace 40 años.
+
+<b>Aquí está la trampa</b>, y es fácil caer en ella: si comparas el precio de mercado de un put lejano (que lleva skew) contra un precio teórico calculado con una volatilidad plana, <em>siempre</em> te saldrá que es un chollo. Siempre. En el 100% de los casos.
+
+Y cuando algo te sale bien el 100% de las veces, no has encontrado una mina de oro: has encontrado un error en tus cuentas.
+
+<b>Lo que hacemos aquí:</b> aceptamos la forma de la curva (el skew es real, no lo vamos a discutir) y solo discrepamos de su <em>altura</em>. El GARCH puede decir "el mercado está cobrando 3 puntos de más en toda la curva". Eso sí es una opinión defendible. Decir "este put lejano está tirado de precio" solo porque tiene skew, no lo es.`
+  },
   kelly: {
     titulo: 'Cuánto capital deberías arriesgar',
     jerga: 'Criterio de Kelly',
@@ -1440,16 +1500,41 @@ const C={
 
 /* ══════════════ VALORACIÓN ══════════════ */
 const px=(ty,S,K,t,r,q,v)=>st.model==='crr'?crr(ty,S,K,t,r,q,v,200):bsm(ty,S,K,t,r,q,v);
-const legPx=(l,S,t,v)=>(l.side==='B'?1:-1)*l.qty*px(l.type,S,l.K,t,RR(),QQ(),v);
+
+/* ─────────────────────────────────────────────────────────────
+   EL SKEW EN LAS ESTRUCTURAS MULTIPATA
+   Un iron condor tiene 4 patas en strikes muy distintos. En el
+   mercado real, cada uno cotiza con SU volatilidad: el put lejano
+   con IV alta, la call lejana con IV baja. Valorar las 4 con la
+   misma vol (la del campo IV, que es la ATM) da un precio que no
+   existe.
+   Si venimos de la cadena, tenemos la curva SVI: la usamos para
+   dar a cada pata la IV que le corresponde. El campo IV solo fija
+   el NIVEL; la curva pone la forma.
+   ───────────────────────────────────────────────────────────── */
+function ivDePata(l, S, t, vNivel){
+  // Sin curva de la cadena: vol plana (es lo único que tenemos)
+  if(!CH.an || !CH.an.svi || !isFinite(CH.atmIvRef)) return vNivel;
+  const F = S*Math.exp((RR()-QQ())*t);
+  const k = Math.log(l.K/F);
+  const ivCurva = sviIV(CH.an.svi.params, k, t);
+  if(!isFinite(ivCurva)) return vNivel;
+  // desplazamos la curva entera al nivel pedido
+  const skewPata = ivCurva - CH.atmIvRef;
+  return Math.max(vNivel + skewPata, 0.01);
+}
+const legPx=(l,S,t,v)=>(l.side==='B'?1:-1)*l.qty*px(l.type,S,l.K,t,RR(),QQ(),ivDePata(l,S,t,v));
 const sVal=(S,t,v)=>st.legs.reduce((a,l)=>a+legPx(l,S,t,v),0);
 const entry=()=>sVal(st.S,T(),VV());
 const pnl=(S,t,v)=>(sVal(S,t,v)-entry())*100;
 function sGrk(S,t,v){
   const g={delta:0,gamma:0,vega:0,theta:0,rho:0,vanna:0,volga:0,charm:0,speed:0,zomma:0,color:0};
   st.legs.forEach(l=>{
-    // griegas siempre por BSM: son exactas. El binomial es discreto y su
-    // gamma oscila con el nº de pasos. El binomial se usa para el PRECIO.
-    const gg=greeks(l.type,S,l.K,t,RR(),QQ(),v);const s=(l.side==='B'?1:-1)*l.qty;
+    // Cada pata con SU volatilidad (skew), no con una vol plana.
+    // Griegas siempre por BSM: son exactas. El binomial es discreto y su
+    // gamma oscila con el nº de pasos, así que solo lo usamos para el PRECIO.
+    const gg=greeks(l.type,S,l.K,t,RR(),QQ(),ivDePata(l,S,t,v));
+    const s=(l.side==='B'?1:-1)*l.qty;
     for(const k in g)g[k]+=s*gg[k];});
   return g;
 }
@@ -1459,7 +1544,46 @@ function stats(){
   for(let i=0;i<=200;i++){const S=lo+(hi-lo)*i/200;const v=pnl(S,1e-6,VV());p.push([S,v]);if(v>mx)mx=v;if(v<mn)mn=v;}
   const be=[];for(let i=1;i<p.length;i++){const[a,pa]=p[i-1],[b,pb]=p[i];
     if((pa<0&&pb>=0)||(pa>0&&pb<=0))be.push(a+(b-a)*(0-pa)/(pb-pa));}
-  return{max:mx,min:mn,be,net:entry()*100,cap:Math.abs(mn)};
+
+  // ─────────────────────────────────────────────────────────────────
+  // ¿ES EL RIESGO ILIMITADO?
+  // El bucle de arriba solo explora el rango del GRÁFICO (±3.2σ). Si la
+  // estrategia tiene riesgo ilimitado (put desnudo, call desnuda...), el
+  // peor punto de ese rango NO es la pérdida máxima: es solo el peor punto
+  // que cabe en pantalla. Reportarlo como "pérdida máxima" es mentir, y
+  // mentir justo donde más duele.
+  //
+  // Lo detectamos evaluando MUY lejos y viendo si la curva sigue cayendo.
+  // ─────────────────────────────────────────────────────────────────
+  const pnlAbajo = pnl(0.01, 1e-6, VV());             // el precio se va casi a cero
+  const pnlArriba = pnl(st.S * 10, 1e-6, VV());       // el precio se multiplica por 10
+
+  // PÉRDIDA ilimitada: la curva sigue CAYENDO más allá del gráfico
+  const ilimitadoAbajo = pnlAbajo < mn - 1;
+  const ilimitadoArriba = pnlArriba < mn - 1;
+  const ilimitado = ilimitadoAbajo || ilimitadoArriba;
+
+  // GANANCIA ilimitada: la curva sigue SUBIENDO más allá del gráfico.
+  // Mismo bug en espejo: una call comprada gana sin tope al alza, pero el
+  // bucle solo mira ±3.2σ y reporta el borde como si fuera el máximo.
+  const ganaArriba = pnlArriba > mx + 1;              // sigue ganando si se dispara
+  const ganaAbajo = pnlAbajo > mx + 1;                // sigue ganando si se desploma (put comprada)
+  const gananciaIlimitada = ganaArriba || ganaAbajo;
+
+  // Escenarios REALISTAS (no el infinito teórico), para pérdidas Y ganancias
+  const crash = pnl(st.S * 0.7, 1e-6, VV());          // -30%: un crash serio
+  const crashFuerte = pnl(st.S * 0.5, 1e-6, VV());    // -50%: un 2008
+  const rally = pnl(st.S * 1.3, 1e-6, VV());          // +30%: un squeeze
+  const rallyFuerte = pnl(st.S * 1.5, 1e-6, VV());    // +50%
+
+  return{
+    max:mx, min:mn, be, net:entry()*100, cap:Math.abs(mn),
+    ilimitado, ilimitadoAbajo, ilimitadoArriba,
+    gananciaIlimitada, ganaArriba, ganaAbajo,
+    crash, crashFuerte, rally, rallyFuerte,
+    perdidaMax: ilimitado ? Infinity : Math.abs(mn),
+    gananciaMax: gananciaIlimitada ? Infinity : mx,
+  };
 }
 let lid=0;
 const addLeg=(sd='S',ty='P',K=null,q=1)=>{st.legs.push({id:++lid,side:sd,type:ty,K:K??Math.round(st.S),qty:q});legs();calc();};
@@ -1515,12 +1639,18 @@ function ribbon(){
 }
 function payFigs(){
   if(!st.legs.length){$('payFigs').innerHTML='';$('payNote').innerHTML='';return;}
-  const s=stats();const roc=s.max/Math.max(s.cap,1)*100;
+  const s=stats();const roc=s.gananciaIlimitada?Infinity:s.max/Math.max(s.cap,1)*100;
   $('payFigs').innerHTML=
     fig2(s.net<0?'Te pagan hoy':'Pagas hoy', money(Math.abs(s.net)), s.net<0?'up':'dn', s.net<0?'Crédito':'Débito')+
-    fig2('Lo máximo que ganas', money(s.max), 'up', 'Beneficio máximo')+
-    fig2('Lo máximo que pierdes', money(Math.abs(s.min)), 'dn', 'Pérdida máxima')+
-    fig2('Ganas hasta', isFinite(roc)?roc.toFixed(0)+'% de lo que arriesgas':'ilimitado', 'mk', 'Retorno sobre riesgo')+
+    fig2('Lo máximo que ganas',
+         s.gananciaIlimitada ? 'SIN LÍMITE' : money(s.max),
+         'up',
+         s.gananciaIlimitada ? '△ ganancia ilimitada' : 'Beneficio máximo')+
+    fig2('Lo máximo que pierdes',
+         s.ilimitado ? 'SIN LÍMITE' : money(Math.abs(s.min)),
+         'dn',
+         s.ilimitado ? '⚠ riesgo ilimitado' : 'Pérdida máxima')+
+    fig2('Si cae un 30%', money(s.crash), s.crash>=0?'up':'dn', 'Escenario de crash')+
     fig2('La frontera está en', s.be.map(b=>b.toFixed(1)).join('  y  ')||'—', '', 'Puntos de equilibrio');
   payNote(s);
 }
@@ -1548,9 +1678,43 @@ function payNote(s){
       Por cada euro que baje, ganas unos ${money(-g.delta*100)}.</p>`;
   }
 
-  // Lo máximo y lo mínimo
-  t+=`<p><b>El mejor caso:</b> ganas <b class="num">${money(s.max)}</b>.
-    <b>El peor:</b> pierdes <b class="num">${money(Math.abs(s.min))}</b>.</p>`;
+  // Lo máximo y lo mínimo — SIN MENTIR sobre el riesgo ilimitado
+  if(s.ilimitado){
+    t+=`<p><b>El mejor caso:</b> ganas <b class="num">${money(s.max)}</b>.</p>`;
+    t+=`<p class="clave dn"><b>⚠ El peor caso NO TIENE LÍMITE.</b>
+      Esta estructura pierde ${s.ilimitadoAbajo?'sin tope si el precio se desploma':'sin tope si el precio se dispara'}.
+      No hay un "máximo que puedes perder": cuanto más se mueva en tu contra, más pierdes.</p>`;
+    t+=`<p><b>Para que te hagas una idea de lo que está en juego:</b></p>
+      <table class="quotes" style="margin:10px 0">
+        <thead><tr><th>Si ${st.sym}…</th><th>El precio queda en</th><th>Tú…</th></tr></thead>
+        <tbody>
+          <tr><td class="tk">cae un 30%</td><td>${(st.S*0.7).toFixed(2)}</td>
+              <td class="${s.crash>=0?'up':'dn'}">${s.crash>=0?'ganas ':'pierdes '}${money(Math.abs(s.crash))}</td></tr>
+          <tr><td class="tk">cae un 50% <small class="mute">(como en 2008)</small></td><td>${(st.S*0.5).toFixed(2)}</td>
+              <td class="${s.crashFuerte>=0?'up':'dn'}">${s.crashFuerte>=0?'ganas ':'pierdes '}${money(Math.abs(s.crashFuerte))}</td></tr>
+          <tr><td class="tk">sube un 30%</td><td>${(st.S*1.3).toFixed(2)}</td>
+              <td class="${s.rally>=0?'up':'dn'}">${s.rally>=0?'ganas ':'pierdes '}${money(Math.abs(s.rally))}</td></tr>
+          <tr><td class="tk">sube un 50%</td><td>${(st.S*1.5).toFixed(2)}</td>
+              <td class="${s.rallyFuerte>=0?'up':'dn'}">${s.rallyFuerte>=0?'ganas ':'pierdes '}${money(Math.abs(s.rallyFuerte))}</td></tr>
+        </tbody>
+      </table>`;
+    t+=`<p class="tip"><b>Cómo se arregla:</b> compra una opción más lejana del mismo tipo para
+      poner un techo a la pérdida. Se llama <em>spread</em>: cobras menos prima, pero sabes exactamente
+      cuánto puedes perder. Casi siempre es mejor idea que vender a pelo.</p>`;
+  } else if(s.gananciaIlimitada){
+    t+=`<p class="clave up"><b>El mejor caso no tiene techo.</b>
+      Esta posición gana ${s.ganaArriba?'cuanto más suba':'cuanto más caiga'} ${st.sym},
+      sin límite. ${s.ganaArriba
+        ? `Si sube un 50%, ganas <b class="num">${money(s.rallyFuerte)}</b>, y de ahí para arriba.`
+        : `Si cae un 50%, ganas <b class="num">${money(s.crashFuerte)}</b>, y de ahí para abajo.`}</p>
+      <p><b>El peor caso:</b> pierdes <b class="num">${money(Math.abs(s.min))}</b>, y esa pérdida
+      <b>sí tiene tope</b> — es lo que pagaste. Ni un céntimo más.
+      Es la asimetría de comprar opciones: pérdida limitada, ganancia abierta.</p>`;
+  } else {
+    t+=`<p><b>El mejor caso:</b> ganas <b class="num">${money(s.max)}</b>.
+      <b>El peor:</b> pierdes <b class="num">${money(Math.abs(s.min))}</b>.
+      Ambos <b>tienen tope</b>: pase lo que pase, te mueves dentro de esos límites.</p>`;
+  }
 
   // Los breakevens: la frontera
   if(s.be.length===1){
@@ -1959,9 +2123,20 @@ function showMC(){
       (una opinión sobre la dirección, por ejemplo), pero no porque las opciones estén mal valoradas.</p>`;
   }
 
-  txt+=`<p><b>El riesgo, en cristiano:</b> en el 5% de los peores casos pierdes <b class="num">${money(R.p5)}</b>.
-    ${perdMax>500?`Y en el peor absoluto, hasta ${money(-perdMax)}.`:''}
-    Pregúntate si puedes asumir eso sin que te quite el sueño.</p>`;
+  if(s.ilimitado){
+    txt+=`<p class="clave dn"><b>⚠ Y ahora el aviso que de verdad importa:</b> esta estructura tiene
+      <b>pérdida ilimitada</b>. En el 5% peor pierdes <b class="num">${money(R.p5)}</b>,
+      pero eso <b>no es el suelo</b>. Si ${st.sym} se desploma un 50%, pierdes
+      <b class="num">${money(Math.abs(s.crashFuerte))}</b>. Y no hay tope.</p>
+      <p>Cobras <b class="num">${money(Math.abs(s.net))}</b> de prima por asumir eso.
+      <b>Casi siempre la respuesta correcta es comprar una opción más lejana</b> para poner un techo
+      (un <em>spread</em>): cobras menos prima, pero sabes exactamente cuánto puedes perder.</p>`;
+  } else {
+    txt+=`<p><b>El riesgo, en cristiano:</b> en el 5% de los peores casos pierdes
+      <b class="num">${money(R.p5)}</b>, y como mucho <b class="num">${money(-perdMax)}</b>.
+      Esa pérdida <b>tiene tope</b>: pase lo que pase, no puedes perder más de ahí.
+      Pregúntate si puedes asumirlo sin que te quite el sueño.</p>`;
+  }
 
   if(isFinite(R.kelly)&&R.kelly>0){
     txt+=`<p>Sobre <b>cuánto dinero meter</b>: la matemática dice que como máximo el
@@ -2377,10 +2552,10 @@ async function scanChain(){
       rows.push({K:meta[s].K,type:meta[s].type,bid:q.bid,ask:q.ask,streamer:s});}
     if(rows.length<6)throw new Error(`Solo ${rows.length} contratos con cotización. ¿Está el mercado cerrado?`);
     const an=analyzeChain(rows,spot,t,RR(),QQ(),expVol);
-    const cmp=priceVsMarket(an.rows,spot,t,RR(),QQ(),expVol,an.svi);
+    const cmp=priceVsMarket(an.rows,spot,t,RR(),QQ(),expVol,an.svi,an.atmIv);
     an.rows=cmp;
     const rk=rankChain(an);
-    Object.assign(CH,{an,rk,spot,t,dte,expVol,pack,sym,sortKey:'K',desc:false});
+    Object.assign(CH,{an,rk,spot,t,dte,expVol,pack,sym,sortKey:'K',desc:false,atmIvRef:an.atmIv});
     st.S=spot;$('S').value=spot.toFixed(2);
     st.DTE=dte;$('DTE').value=dte;
     if(isFinite(an.atmIv)){st.IV=an.atmIv*100;$('IV').value=st.IV.toFixed(1);}
@@ -2464,9 +2639,27 @@ function renderChain(){
   $('cChips').innerHTML=views.map(([k,l])=>
     `<button class="chip${st.rkView===k?' on':''}" onclick="setRk('${k}')">${l}</button>`).join('');
   const vista = views.find(v=>v[0]===st.rkView);
-  $('cRankIntro').innerHTML = `<p class="intro-rank">${vista[2]}</p>`;
+  let intro = `<p class="intro-rank">${vista[2]}</p>`;
+  // Aviso sobre el skew, la trampa nº1
+  if(hayModelo){
+    intro += `<div class="historia" style="font-size:13.5px;margin-bottom:12px">
+      <p class="tip"><b>Ojo con una cosa.</b> Los puts lejanos <em>siempre</em> parecen chollo
+      si los comparas con una volatilidad plana. Eso es el <b>skew</b>, y no es una anomalía:
+      es miedo estructural que lleva en el precio desde 1987.
+      Aquí lo hemos descontado, así que la columna <b>"Ventaja real"</b> mide lo que de verdad
+      te llevas, no el espejismo.</p>
+      ${ayuda('skew')}
+    </div>`;
+  }
+  $('cRankIntro').innerHTML = intro;
 
   renderRank();renderTable();drawSmile();drawRND();
+}
+
+/* Cambia el ranking activo. Sin esto, los botones no hacen nada. */
+function setRk(k){
+  st.rkView = k;
+  renderChain();
 }
 
 function renderRank(){
@@ -2477,26 +2670,28 @@ function renderRank(){
   $('cRank').innerHTML=`<thead><tr>
     <th>Contrato</th>
     <th>Te pagan<br><small>prima</small></th>
-    <th>Debería valer<br><small>según el histórico</small></th>
-    <th>Diferencia<br><small>por contrato</small></th>
-    <th>Caduca sin valor<br><small>probabilidad</small></th>
+    <th>Debería valer<br><small>según tu modelo</small></th>
+    <th>Ventaja real<br><small>por contrato</small></th>
+    <th>Caduca sin valor<br><small>según el mercado</small></th>
     <th>Cobras al día<br><small>por esperar</small></th>
-    <th>Se sale de la curva<br><small>vs vecinas</small></th>
+    <th>Anomalía<br><small>vs sus vecinas</small></th>
     <th>Fácil de operar<br><small>liquidez</small></th>
     </tr></thead><tbody>`+
     list.map(o=>{
       const rich=o.ivEdge>0.005,cheap=o.ivEdge<-0.005;
       const tipo = o.type==='P'?'Put':'Call';
+      const infl = isFinite(o.inflacionSkew)&&Math.abs(o.inflacionSkew)>10;
       return `<tr class="${rich?'rich':cheap?'cheap':''}" onclick="pick(${o.K},'${o.type}')">
-      <td class="tk">${tipo} ${o.K}<br><small class="mute">${o.sigmas.toFixed(1)}σ de distancia</small></td>
+      <td class="tk">${tipo} ${o.K}<br><small class="mute">${Math.abs(o.sigmas).toFixed(1)}σ de distancia</small></td>
       <td class="num">${o.mid.toFixed(2)}<br><small class="mute">$${(o.mid*100).toFixed(0)}/contrato</small></td>
-      <td class="mk">${isFinite(o.pxExpVol)?o.pxExpVol.toFixed(2):'—'}</td>
+      <td class="mk">${isFinite(o.pxExpVol)?o.pxExpVol.toFixed(2):'—'}
+        <br><small class="mute">${isFinite(o.volPropia)?'con vol '+pc(o.volPropia):''}</small></td>
       <td class="${o.gapContract>0?'up':'dn'}">${isFinite(o.gapContract)?(o.gapContract>0?'+':'')+'$'+Math.abs(o.gapContract).toFixed(0):'—'}
-        <br><small class="mute">${isFinite(o.gapIV)?((o.gapIV>=0?'+':'')+(o.gapIV*100).toFixed(1)+' pts vol'):''}</small></td>
+        ${infl?`<br><small class="mute" style="color:var(--mark)">sin el skew: $${o.gapIngenuo.toFixed(0)}</small>`:''}</td>
       <td class="${o.probOTM>.8?'up':''}">${(o.probOTM*100).toFixed(0)}%</td>
       <td class="mk">$${Math.abs(o.theta*100).toFixed(2)}</td>
       <td class="${rich?'up':cheap?'dn':'mute'}">${isFinite(o.ivEdge)?
-        (Math.abs(o.ivEdge)<0.005?'normal':(o.ivEdge>0?'CARA':'BARATA')):'—'}
+        (Math.abs(o.ivEdge)<0.005?'ninguna':(o.ivEdge>0?'CARA':'BARATA')):'—'}
         <br><small class="mute">${isFinite(o.ivEdge)?((o.ivEdge>=0?'+':'')+(o.ivEdge*100).toFixed(2)+' pts'):''}</small></td>
       <td>${o.liquidity>0.8?'✓ fácil':o.liquidity>0.5?'· regular':'⚠ difícil'}
         <br><small class="mute">${(o.liquidity*100).toFixed(0)}%</small></td>
@@ -2514,9 +2709,22 @@ function renderRank(){
     Hay un <b class="num">${(top.probOTM*100).toFixed(0)}%</b> de probabilidad de que caduque sin que tengas que pagar nada,
     y te quedes la prima entera.</p>`;
   if(hayModelo&&isFinite(top.gapContract)&&top.gapContract>0){
-    lectura+=`<p class="clave up">Y lo importante: según el histórico real de ${CH.sym}, ese contrato
+    lectura+=`<p class="clave up">Y lo importante: según tu modelo, ese contrato
       <b>debería costar $${(top.pxExpVol*100).toFixed(0)}</b>, no $${(top.mid*100).toFixed(0)}.
       Te están pagando <b class="num">$${top.gapContract.toFixed(0)} de más</b>.</p>`;
+    if(isFinite(top.inflacionSkew)&&Math.abs(top.inflacionSkew)>15){
+      lectura+=`<p><b>Y aquí una advertencia honesta:</b> si hubiéramos usado una volatilidad plana,
+        te habríamos dicho que la ventaja es de <b>$${top.gapIngenuo.toFixed(0)}</b> —casi
+        $${Math.abs(top.inflacionSkew).toFixed(0)} más. Pero eso sería mentira: esa diferencia
+        es <em>skew</em>, no ventaja. Los puts lejanos siempre cotizan caros, y eso no se puede
+        cobrar como si fuera un error del mercado.</p>`;
+    }
+  }
+  if(isFinite(top.probOTM)){
+    lectura+=`<p class="tip"><b>Sobre ese ${(top.probOTM*100).toFixed(0)}%:</b> es la probabilidad
+      que descuenta <em>el mercado</em>, calculada con su propia volatilidad.
+      Si tú crees que ${CH.sym} se va a mover menos, tu probabilidad real es <b>mayor</b>
+      que esa. Y si crees que se va a mover más, es <b>menor</b>.</p>`;
   }
   lectura+=`<p><b>El riesgo:</b> en el ${((1-top.probOTM)*100).toFixed(0)}% de casos restante, ${CH.sym} ${dir}
     de ${top.K} y empiezas a perder. Y ahí no hay techo:
@@ -2566,6 +2774,13 @@ function pick(K,type){
   st.S=CH.spot;$('S').value=CH.spot.toFixed(2);
   st.DTE=CH.dte;$('DTE').value=CH.dte;
   $('sym').value=CH.sym;st.sym=CH.sym;
+  // La IV de ESTE strike, no la ATM. Por el skew pueden diferir varios puntos,
+  // y valorar un put lejano con la IV ATM da un precio que no existe en el mercado.
+  const o = CH.an.rows.find(x=>x.K===K && x.type===type);
+  if(o && isFinite(o.iv)){
+    st.IV = o.iv*100;
+    $('IV').value = st.IV.toFixed(1);
+  }
   legs();go('desk');calc();
 }
 function drawSmile(){
