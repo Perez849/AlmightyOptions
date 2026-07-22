@@ -272,6 +272,20 @@ details.explica summary:hover{color:var(--ink)}
 
 
 
+
+/* ── veredicto direccional ── */
+.dir-head{display:flex;align-items:baseline;gap:14px;margin-bottom:8px}
+.dir-verdict{font-family:var(--disp);font-size:26px;font-weight:700;letter-spacing:.05em}
+.dir-score{font-size:15px;color:var(--ink2)}
+.dir-bar{position:relative;height:10px;border-radius:5px;background:var(--paper3);overflow:hidden;margin-bottom:14px}
+.dir-fill{position:absolute;top:0;bottom:0;border-radius:5px}
+.dir-zero{position:absolute;left:50%;top:-2px;bottom:-2px;width:2px;background:var(--rule2)}
+.dir-señales{display:flex;flex-direction:column;gap:8px;margin:10px 0}
+.dir-s{display:flex;gap:10px;font-size:13.5px;line-height:1.5;color:var(--ink2)}
+.dir-s b{color:var(--ink)}
+.dir-pts{font-family:var(--num);font-weight:700;font-size:13px;min-width:34px;text-align:right}
+.dir-pts.up{color:var(--bull)}.dir-pts.dn{color:var(--bear)}
+
 /* ── favoritos ── */
 .fav-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .fav{display:inline-flex;align-items:center;gap:7px;padding:7px 12px;border:1px solid var(--rule2);
@@ -645,6 +659,10 @@ summary:hover{color:var(--ink)}
       </section>
 
       <div class="cols c2">
+        <section class="blk">
+          <h2>¿Hacia dónde apunta este vencimiento?<span class="sub">todas las señales direccionales, juntas</span></h2>
+          <div id="dirBox"></div>
+        </section>
         <section class="blk">
           <h2>El movimiento que anticipa el mercado</h2>
           <div class="plot"><canvas id="cone" height="240"></canvas></div>
@@ -1202,6 +1220,11 @@ function analyzeChain(rows, S, t, r, q, expectedVol) {
 function rankChain(analyzed, opts = {}) {
   const maxSpreadPct = opts.maxSpreadPct ?? 0.25;
   const minPrice = opts.minPrice ?? 0.05;
+  // El precio del subyacente: NO heredar del scope global (bug sutil). Lo
+  // derivamos del análisis — el forward y la t están en analyzed.
+  // El precio del subyacente: se pasa explícito (opts.spot). Como respaldo,
+  // el forward del análisis. NUNCA heredar S del scope global (era un bug).
+  const S = opts.spot ?? analyzed.F ?? (analyzed.rows[0]?analyzed.rows[0].K:1);
   const cand = analyzed.rows.filter(o =>
     o.otm && o.spreadPct <= maxSpreadPct && o.mid >= minPrice && isFinite(o.iv)
   );
@@ -1225,24 +1248,44 @@ function rankChain(analyzed, opts = {}) {
     .filter(o => isFinite(o.probOTM) && o.probOTM >= lo && o.probOTM < hi && o.mid * 100 >= 15)
     .sort((a, b) => b.mid - a.mid);   // más prima primero
 
+  // ── COMPRAR opciones ──
+  // Al comprar, el "nivel" no es probabilidad de acertar sino cuánto pagas y
+  // cuánto apalancamiento tienes. Ordenamos por la mejor relación: las que dan
+  // más delta (exposición direccional) por dólar pagado, priorizando las que
+  // además cotizan baratas frente a su curva (ivEdge negativo = de oferta).
+  const paraComprar = (arr, loM, hiM) => arr
+    .filter(o => {
+      const m = Math.abs(o.K / S - 1);       // distancia relativa al precio
+      return o.mid * 100 >= 8 && m >= loM && m < hiM && isFinite(o.delta);
+    })
+    .map(o => ({ ...o, apal: Math.abs(o.delta) / Math.max(o.mid, 0.01),
+                 gangaVsCurva: isFinite(o.ivEdge) ? -o.ivEdge : 0 }))
+    .sort((a, b) => (b.apal + b.gangaVsCurva * 30) - (a.apal + a.gangaVsCurva * 30));
+
   return {
     candidates: cand.length,
 
-    // Puts por nivel de riesgo
+    // VENDER puts / calls por nivel de riesgo (ordenado por prima)
     putsConservador: porNivel(puts, 0.85, 1.01),
     putsMedio:       porNivel(puts, 0.70, 0.85),
     putsAgresivo:    porNivel(puts, 0.55, 0.70),
-    // Calls por nivel de riesgo
     callsConservador: porNivel(calls, 0.85, 1.01),
     callsMedio:       porNivel(calls, 0.70, 0.85),
     callsAgresivo:    porNivel(calls, 0.55, 0.70),
 
-    // Ventaja real (mercado vs tu modelo) y anomalías, sin cambios
+    // COMPRAR calls / puts por convicción (cercano = caro y sensible; lejano = barato y apalancado)
+    // Conservador: casi en el dinero (se mueve punto a punto con la acción).
+    // Medio / Agresivo: cada vez más OTM (más barato, más apalancado, menos probable).
+    compraCallsConservador: paraComprar(calls, 0.00, 0.03),
+    compraCallsMedio:       paraComprar(calls, 0.03, 0.08),
+    compraCallsAgresivo:    paraComprar(calls, 0.08, 0.25),
+    compraPutsConservador:  paraComprar(puts, 0.00, 0.03),
+    compraPutsMedio:        paraComprar(puts, 0.03, 0.08),
+    compraPutsAgresivo:     paraComprar(puts, 0.08, 0.25),
+
     bestEdge: top(cand.filter(o => o.mid * 100 >= 20), 'edgeContrato', 6),
     richVsCurve: top(cand, 'ivEdge', 5),
     cheapVsCurve: top(cand, 'ivEdge', 5, false),
-
-    // compat
     best: top(cand, 'shortScore', 8),
     bestEV: top(cand.filter(o => o.mid * 100 >= 20), 'edgeContrato', 6),
   };
@@ -2774,7 +2817,7 @@ async function scanChain(){
     const an=analyzeChain(rows,spot,t,RR(),QQ(),expVol);
     const cmp=priceVsMarket(an.rows,spot,t,RR(),QQ(),expVol,an.svi,an.atmIv);
     an.rows=cmp;
-    const rk=rankChain(an);
+    const rk=rankChain(an,{spot});
     const flw=dealerFlows(an.rows,spot,t,RR(),QQ());
     const tilt=skewTilt(an,spot,t,RR(),QQ());
     const rnd=rndSignals(an,spot,t,RR(),QQ());
@@ -2827,7 +2870,7 @@ function renderChain(){
           <b class="num">${(CH.mom.m6*100).toFixed(0)}%</b> en 6 meses y cotiza sobre su media de 200 sesiones.
           Dirección a favor + opciones baratas es <b>la combinación clásica para COMPRAR CALLS</b>:
           pagas poco por el billete y el viento sopla hacia donde apuestas.
-          Mira en "Baratas vs vecinas" cuáles están además de oferta frente a su curva.</p>`;
+          Pon el selector de abajo en <b>Comprar → Calls</b> y elige el nivel de convicción.</p>`;
       } else if(CH.mom&&CH.mom.bajista){
         historia += `<p class="clave dn"><b>Y la tendencia es bajista:</b> ${sym} pierde
           <b class="num">${Math.abs(CH.mom.m6*100).toFixed(0)}%</b> en 6 meses bajo su media de 200.
@@ -2894,44 +2937,64 @@ function renderChain(){
     ? ayuda('vrp',{sym, iv:pc(atm), modelo:pc(expVol)})
     : ayuda('iv',{sym});
 
-  /* ── ACTO 2: qué vender, según tu apetito de riesgo ── */
-  st.rkTipo = st.rkTipo || 'puts';       // 'puts' o 'calls'
-  st.rkNivel = st.rkNivel || 'Medio';    // 'Conservador' / 'Medio' / 'Agresivo'
+  /* ── ACTO 2: qué operar. Dos ejes: acción (comprar/vender) × instrumento ── */
+  st.rkAccion = st.rkAccion || 'vender';   // 'comprar' o 'vender'
+  st.rkTipo = st.rkTipo || 'puts';         // 'puts' o 'calls'
+  st.rkNivel = st.rkNivel || 'Medio';      // 'Conservador' / 'Medio' / 'Agresivo'
 
-  const tipoTxt = st.rkTipo==='puts'
-    ? `Vender un <b>put</b> es apostar a que ${sym} <b>no cae</b> por debajo del strike. Cobras hoy; si el precio aguanta, te quedas la prima.`
-    : `Vender una <b>call</b> es apostar a que ${sym} <b>no sube</b> por encima del strike. Cobras hoy; si el precio no llega, te quedas la prima.`;
+  const vender = st.rkAccion==='vender';
 
-  const nivelTxt = {
-    'Conservador':'Strikes lejos del precio. Es muy improbable que te toquen (más del 85% de las veces caducan sin valor), pero cobras menos.',
-    'Medio':'Equilibrio entre lo que cobras y el riesgo. Aciertas en torno a 7 de cada 10 veces.',
-    'Agresivo':'Strikes cerca del precio. Cobras mucha más prima, pero te tocan con bastante frecuencia. Solo si tienes una opinión clara.'
-  }[st.rkNivel];
+  const tipoTxt = vender
+    ? (st.rkTipo==='puts'
+      ? `Vender un <b>put</b> es apostar a que ${sym} <b>no cae</b> por debajo del strike. Cobras hoy; si el precio aguanta, te quedas la prima. Sesgo alcista-neutral.`
+      : `Vender una <b>call</b> es apostar a que ${sym} <b>no sube</b> por encima del strike. Cobras hoy; si no llega, te quedas la prima. Sesgo bajista-neutral.`)
+    : (st.rkTipo==='calls'
+      ? `Comprar una <b>call</b> es apostar a que ${sym} <b>sube</b>. Pagas hoy una prima; si sube con fuerza, ganas sin techo. Pérdida limitada a lo que pagas.`
+      : `Comprar un <b>put</b> es apostar a que ${sym} <b>baja</b> (o proteger lo que tienes). Pagas hoy; si cae con fuerza, ganas. Pérdida limitada a la prima.`);
 
+  const nivelTxt = vender
+    ? {
+      'Conservador':'Strikes lejos del precio: muy improbable que te toquen (>85% caducan sin valor), pero cobras menos.',
+      'Medio':'Equilibrio entre lo que cobras y el riesgo. Aciertas en torno a 7 de cada 10 veces.',
+      'Agresivo':'Strikes cerca del precio: cobras mucha más prima, pero te tocan a menudo. Solo con opinión clara.'
+    }[st.rkNivel]
+    : {
+      'Conservador':'Casi en el dinero: caras, pero se mueven punto por punto con la acción. Menos apalancamiento, más probabilidad.',
+      'Medio':'Algo fuera del dinero: más baratas y apalancadas. Necesitan que el movimiento llegue.',
+      'Agresivo':'Muy fuera del dinero: billetes de lotería. Baratísimas y explosivas si aciertas, cero si no.'
+    }[st.rkNivel];
+
+  const btn=(activo,val,fn,txt)=>`<button class="chip${activo?' on':''}" onclick="${fn}('${val}')">${txt}</button>`;
   $('cChips').innerHTML = `
     <div class="selector-grupo">
-      <span class="sel-label">Quiero vender:</span>
-      <button class="chip${st.rkTipo==='puts'?' on':''}" onclick="setRkTipo('puts')">PUTS (creo que no baja)</button>
-      <button class="chip${st.rkTipo==='calls'?' on':''}" onclick="setRkTipo('calls')">CALLS (creo que no sube)</button>
+      <span class="sel-label">Quiero:</span>
+      ${btn(vender,'vender','setRkAccion','VENDER prima (cobrar)')}
+      ${btn(!vender,'comprar','setRkAccion','COMPRAR opciones (apostar)')}
     </div>
     <div class="selector-grupo" style="margin-top:8px">
-      <span class="sel-label">Nivel de riesgo:</span>
-      ${['Conservador','Medio','Agresivo'].map(n=>
-        `<button class="chip${st.rkNivel===n?' on':''}" onclick="setRkNivel('${n}')">${n}</button>`).join('')}
+      <span class="sel-label">Instrumento:</span>
+      ${st.rkTipo==='puts'
+        ? btn(true,'puts','setRkTipo',vender?'PUTS (no baja)':'PUTS (bajará)')+btn(false,'calls','setRkTipo',vender?'CALLS (no sube)':'CALLS (subirá)')
+        : btn(false,'puts','setRkTipo',vender?'PUTS (no baja)':'PUTS (bajará)')+btn(true,'calls','setRkTipo',vender?'CALLS (no sube)':'CALLS (subirá)')}
+    </div>
+    <div class="selector-grupo" style="margin-top:8px">
+      <span class="sel-label">${vender?'Nivel de riesgo:':'Convicción:'}</span>
+      ${['Conservador','Medio','Agresivo'].map(n=>btn(st.rkNivel===n,n,'setRkNivel',n)).join('')}
     </div>`;
 
-  let intro = `<div class="historia" style="font-size:13.5px">
-    <p>${tipoTxt}</p>
-    <p class="tip">${nivelTxt}</p></div>`;
-  $('cRankIntro').innerHTML = intro;
+  $('cRankIntro').innerHTML = `<div class="historia" style="font-size:13.5px">
+    <p>${tipoTxt}</p><p class="tip">${nivelTxt}</p></div>`;
 
-  // La clave del ranking a mostrar
-  st.rkView = st.rkTipo + st.rkNivel;   // ej: 'putsMedio'
+  // clave del ranking: 'putsMedio' al vender, 'compraCallsMedio' al comprar
+  st.rkView = vender
+    ? st.rkTipo + st.rkNivel
+    : 'compra' + (st.rkTipo==='calls'?'Calls':'Puts') + st.rkNivel;
 
-  renderRank();renderTable();drawCone();renderGex();drawSmile();drawRND();
+  renderDir();renderRank();renderTable();drawCone();renderGex();drawSmile();drawRND();
 }
 
-/* Cambia tipo (puts/calls) y nivel de riesgo */
+/* Cambia acción / instrumento / nivel */
+function setRkAccion(a){ st.rkAccion=a; renderChain(); }
 function setRkTipo(t){ st.rkTipo=t; renderChain(); }
 function setRkNivel(n){ st.rkNivel=n; renderChain(); }
 /* compat: algún sitio viejo aún llama setRk */
@@ -2940,67 +3003,108 @@ function setRk(k){ st.rkView=k; renderChain(); }
 function renderRank(){
   const list=CH.rk[st.rkView]||[];
   const hayModelo=isFinite(CH.expVol);
+  const comprar=st.rkAccion==='comprar';
   if(!list.length){
     $('cRank').innerHTML='';
-    $('cRankNote').innerHTML=`<div class="historia"><p>No hay opciones en este nivel de riesgo
-      para ${CH.sym}. Prueba otro nivel, u otro vencimiento con más strikes.</p></div>`;
+    $('cRankNote').innerHTML=`<div class="historia"><p>No hay opciones en este nivel para ${CH.sym}.
+      Prueba otro nivel, otra acción (comprar/vender) u otro vencimiento con más strikes.</p></div>`;
     return;
   }
 
-  // Tabla simple: lo justo para decidir al vender
+  if(comprar){
+    // ── TABLA DE COMPRA ──
+    $('cRank').innerHTML=`<thead><tr>
+      <th>Strike</th><th>Pagas<br><small>por contrato</small></th>
+      <th>Apalanca<br><small>Δ por $</small></th>
+      <th>Distancia<br><small>para ganar</small></th>
+      ${hayModelo?'<th>Precio<br><small>vs curva</small></th>':''}
+      <th>Operable</th></tr></thead><tbody>`+
+      list.map((o,i)=>{
+        const distPct=((o.K/CH.spot-1)*100).toFixed(1);
+        const barata=o.gangaVsCurva>0.003;
+        return `<tr class="${i===0?'destacada':''}" onclick="pick(${o.K},'${o.type}')">
+        <td class="tk">${o.type==='P'?'Put':'Call'} ${o.K}${i===0?'<br><small style="color:var(--brand)">▸ la mejor relación</small>':''}</td>
+        <td class="num">$${(o.mid*100).toFixed(0)}</td>
+        <td class="num ${o.apal>3?'up':''}">${o.apal.toFixed(1)}×</td>
+        <td class="mute">${distPct>0?'+':''}${distPct}%<br><small class="mute">${Math.abs(o.sigmas).toFixed(1)}σ</small></td>
+        ${hayModelo?`<td class="${barata?'up':o.gangaVsCurva<-0.003?'dn':'mute'}">${barata?'barata':o.gangaVsCurva<-0.003?'cara':'justa'}</td>`:''}
+        <td>${o.liquidity>0.8?'✓':o.liquidity>0.5?'·':'⚠'}</td></tr>`;}).join('')+'</tbody>';
+
+    const top=list[0];
+    const dir=top.type==='C'?'suba':'baje';
+    const be=top.type==='C'?top.K+top.mid:top.K-top.mid;
+    const bePct=((be/CH.spot-1)*100);
+    let L=`<p><b>La mejor relación de este grupo:</b> ${top.type==='C'?'la call':'el put'} de strike ${top.K}.</p>`;
+    L+=`<p>Pagas <b class="num">$${(top.mid*100).toFixed(0)}</b> por contrato. Eso es lo máximo que puedes perder,
+      pase lo que pase. A cambio, por cada dólar que metes controlas
+      <b class="num">${top.apal.toFixed(1)}×</b> de exposición a ${CH.sym}.</p>`;
+    L+=`<p>Empiezas a ganar de verdad si ${CH.sym} ${dir} de <b class="num">${be.toFixed(2)}</b>
+      (un ${bePct>0?'+':''}${bePct.toFixed(1)}% desde aquí) antes del vencimiento. Cuanto más ${dir}, más ganas${top.type==='C'?', sin techo':''}.</p>`;
+    if(hayModelo){
+      if(top.gangaVsCurva>0.003)
+        L+=`<p class="clave up"><b>Y está barata:</b> cotiza por debajo de lo que le tocaría según la curva
+          de sus vecinas. Pagas poco por el billete — la mejor situación para comprar.</p>`;
+      else if(top.gangaVsCurva<-0.003)
+        L+=`<p class="clave dn"><b>Ojo:</b> está algo cara frente a sus vecinas. El movimiento tiene que
+          ser más grande para compensar lo que pagas de más.</p>`;
+    }
+    // conexión con el veredicto direccional
+    const D=direccion();
+    const aFavor=(top.type==='C'&&D.score>=20)||(top.type==='P'&&D.score<=-20);
+    const enContra=(top.type==='C'&&D.score<=-20)||(top.type==='P'&&D.score>=20);
+    if(aFavor)L+=`<p class="clave up"><b>Las señales acompañan:</b> el veredicto direccional de arriba
+      (${D.veredicto}) apunta a tu favor. Dirección y apuesta en el mismo sentido.</p>`;
+    else if(enContra)L+=`<p class="clave dn"><b>A contracorriente:</b> el veredicto de arriba (${D.veredicto})
+      apunta al lado opuesto de esta compra. Puede salir, pero remas contra las señales. Piénsalo.</p>`;
+    L+=`<p class="tip">Comprar opciones tiene el tiempo en contra (theta): cada día que pasa sin moverse,
+      pierde valor. Necesitas que el movimiento llegue <em>y</em> que no tarde demasiado.</p>`;
+    L+=`<p class="tip">Pulsa cualquier fila para llevártela a <b>Estudiar</b> y ver todos los escenarios.</p>`;
+    $('cRankNote').innerHTML=L;
+    return;
+  }
+
+  // ── TABLA DE VENTA ──
   $('cRank').innerHTML=`<thead><tr>
-    <th>Strike</th>
-    <th>Cobras<br><small>por contrato</small></th>
+    <th>Strike</th><th>Cobras<br><small>por contrato</small></th>
     <th>Aciertas<br><small>de cada 100</small></th>
     <th>Distancia<br><small>al precio</small></th>
     ${hayModelo?'<th>Ventaja<br><small>vs tu modelo</small></th>':''}
-    <th>Operable</th>
-    </tr></thead><tbody>`+
+    <th>Operable</th></tr></thead><tbody>`+
     list.map((o,i)=>{
-      const dist=Math.abs(o.K-CH.spot);
-      const distPct=(dist/CH.spot*100).toFixed(1);
+      const distPct=(Math.abs(o.K-CH.spot)/CH.spot*100).toFixed(1);
       return `<tr class="${i===0?'destacada':''}" onclick="pick(${o.K},'${o.type}')">
-      <td class="tk">${o.type==='P'?'Put':'Call'} ${o.K}${i===0?'<br><small class="mute" style="color:var(--bull)">▸ la mejor pagada</small>':''}</td>
+      <td class="tk">${o.type==='P'?'Put':'Call'} ${o.K}${i===0?'<br><small style="color:var(--bull)">▸ la mejor pagada</small>':''}</td>
       <td class="num">$${(o.mid*100).toFixed(0)}</td>
       <td class="${o.probOTM>.8?'up':''}">${(o.probOTM*100).toFixed(0)}</td>
       <td class="mute">${distPct}%<br><small class="mute">${Math.abs(o.sigmas).toFixed(1)}σ</small></td>
       ${hayModelo?`<td class="${o.edgeContrato>5?'up':o.edgeContrato<-5?'dn':'mute'}">${isFinite(o.edgeContrato)?(o.edgeContrato>=0?'+':'')+'$'+o.edgeContrato.toFixed(0):'—'}</td>`:''}
-      <td>${o.liquidity>0.8?'✓':o.liquidity>0.5?'·':'⚠'}</td>
-      </tr>`;}).join('')+'</tbody>';
+      <td>${o.liquidity>0.8?'✓':o.liquidity>0.5?'·':'⚠'}</td></tr>`;}).join('')+'</tbody>';
 
-  /* Lectura del primero: la recomendación en cristiano */
   const top=list[0];
   const tipo=top.type==='P'?'put':'call';
   const dir=top.type==='P'?'baje':'suba';
-  const dist=Math.abs(top.K-CH.spot);
-  const distPct=(dist/CH.spot*100).toFixed(1);
-  const cerca = Math.abs(top.sigmas)<0.8;
-
+  const distPct=(Math.abs(top.K-CH.spot)/CH.spot*100).toFixed(1);
+  const cerca=Math.abs(top.sigmas)<0.8;
   let lectura=`<p><b>La mejor pagada de este grupo:</b> el ${tipo} de strike ${top.K}.</p>`;
   lectura+=`<p>Te embolsas <b class="num">$${(top.mid*100).toFixed(0)}</b> hoy. A cambio te comprometes a
     ${top.type==='P'?'comprar':'vender'} ${CH.sym} a ${top.K} si el precio acaba
     ${top.type==='P'?'por debajo':'por encima'} de ahí.</p>`;
-  lectura+=`<p>El strike está a un <b>${distPct}%</b> del precio de ahora (${cerca?'<b>cerca</b> — cobras bien pero te pueden tocar':'a una distancia cómoda'}).
-    Hay un <b class="num">${(top.probOTM*100).toFixed(0)}%</b> de que caduque sin valor y te quedes la prima entera.</p>`;
-
+  lectura+=`<p>El strike está a un <b>${distPct}%</b> del precio (${cerca?'<b>cerca</b> — cobras bien pero te pueden tocar':'a distancia cómoda'}).
+    Hay un <b class="num">${(top.probOTM*100).toFixed(0)}%</b> de que caduque sin valor y te quedes la prima.</p>`;
   if(hayModelo&&isFinite(top.edgeContrato)){
-    if(top.edgeContrato>5){
-      lectura+=`<p class="clave up"><b>Además hay ventaja real:</b> según tu modelo de volatilidad,
-        el mercado te está pagando <b class="num">$${top.edgeContrato.toFixed(0)} por encima</b>
-        de lo que vale el riesgo. Eso es lo que buscas.</p>`;
-    } else if(top.edgeContrato<-5){
-      lectura+=`<p class="clave dn"><b>Cuidado:</b> según tu modelo, esto está
-        <b class="num">$${Math.abs(top.edgeContrato).toFixed(0)} por debajo</b> de lo que valdría.
-        Cobras, pero estás vendiendo barato. El mercado no te compensa el riesgo real.</p>`;
-    }
+    if(top.edgeContrato>5)
+      lectura+=`<p class="clave up"><b>Además hay ventaja real:</b> el mercado te paga
+        <b class="num">$${top.edgeContrato.toFixed(0)} por encima</b> de lo que vale el riesgo según tu modelo.</p>`;
+    else if(top.edgeContrato<-5)
+      lectura+=`<p class="clave dn"><b>Cuidado:</b> esto está <b class="num">$${Math.abs(top.edgeContrato).toFixed(0)} por debajo</b>
+        de lo que valdría. Cobras, pero vendes barato.</p>`;
   }
-
   lectura+=`<p class="tip"><b>Ese ${(top.probOTM*100).toFixed(0)}%</b> es la probabilidad del <em>mercado</em>.
     Si crees que ${CH.sym} se moverá menos de lo que descuenta, la tuya es mayor.</p>`;
   lectura+=`<p><b>El riesgo:</b> en el ${((1-top.probOTM)*100).toFixed(0)}% restante, ${CH.sym} ${dir}
-    de ${top.K} y pierdes — ${top.type==='P'?'cuanto más caiga, más':'cuanto más suba, más'}, sin techo.
-    Para acotarlo, compra otro ${tipo} más lejano y conviértelo en un <em>spread</em>.</p>`;
-  lectura+=`<p class="tip">Pulsa cualquier fila para llevártela a <b>Estudiar</b> y ver todos los escenarios.</p>`;
+    de ${top.K} y pierdes — ${top.type==='P'?'cuanto más caiga':'cuanto más suba'}, sin techo.
+    Para acotarlo, compra otro ${tipo} más lejano (un <em>spread</em>).</p>`;
+  lectura+=`<p class="tip">Pulsa cualquier fila para llevártela a <b>Estudiar</b>.</p>`;
   $('cRankNote').innerHTML=lectura;
 }
 
@@ -3055,6 +3159,117 @@ function pick(K,type){
 }
 
 /* ── EL CONO: rango que el mercado anticipa hasta el vencimiento ── */
+/* ═══════════════════════════════════════════════════════════════════
+   ¿HACIA DÓNDE APUNTA? · veredicto direccional agregado
+
+   Ninguna señal predice la dirección por sí sola — quien te diga lo
+   contrario te está vendiendo humo. Pero varias señales INDEPENDIENTES
+   apuntando al mismo lado sí desplazan las probabilidades. Aquí se
+   agregan las que tienen evidencia, pesadas por la calidad de esa
+   evidencia:
+
+   · Momentum 6m + media 200 (peso mayor: décadas de literatura)
+   · Cercanía a máximos de 52 semanas (George & Hwang 2004)
+   · Skew tilt RR25 (demanda real de calls vs puts, de la cadena de HOY)
+   · Asimetría de colas de la RND (dónde carga probabilidad el mercado)
+   · Deriva a max pain (solo con ≤10 días; señal débil documentada)
+
+   El score va de −100 (muy bajista) a +100 (muy alcista).
+   ═══════════════════════════════════════════════════════════════════ */
+function direccion(){
+  const S=[];const add=(pts,nombre,detalle)=>{if(pts)S.push({pts,nombre,detalle});};
+
+  // 1 · Momentum (la señal con más literatura detrás)
+  if(CH.mom){
+    const m=CH.mom;
+    if(m.alcista)add(35,'Tendencia 6 meses',`+${(m.m6*100).toFixed(0)}% y sobre su media de 200 sesiones`);
+    else if(m.bajista)add(-35,'Tendencia 6 meses',`${(m.m6*100).toFixed(0)}% y bajo su media de 200`);
+    else if(m.m6>0.08)add(18,'Tendencia 6 meses',`+${(m.m6*100).toFixed(0)}% (la media de 200 no confirma)`);
+    else if(m.m6<-0.08)add(-18,'Tendencia 6 meses',`${(m.m6*100).toFixed(0)}% (la media de 200 no confirma)`);
+    if(m.m6>0&&m.distMax52>-0.03)add(10,'Pegado a máximos','a menos del 3% del máximo de 52 semanas: los rompimientos de máximo tienen deriva alcista documentada');
+  }
+
+  // 2 · Skew tilt: qué lado del seguro paga caro el dinero HOY
+  if(CH.tilt&&Number.isFinite(CH.tilt.rr)){
+    const rr=CH.tilt.rr;
+    if(rr>0)add(22,'Skew invertido',`las calls 25Δ cuestan MÁS que las puts (+${rr.toFixed(1)} pts): demanda alcista agresiva, muy raro`);
+    else if(rr>-0.5)add(14,'Skew plano',`calls y puts 25Δ casi al mismo precio (${rr.toFixed(1)} pts): demanda de subida inusual`);
+    else if(rr<-8)add(-6,'Skew extremo a puts',`el seguro de caída se paga carísimo (${rr.toFixed(1)} pts): miedo fuerte (señal débil)`);
+  }
+
+  // 3 · Colas de la RND: a qué lado asigna el mercado probabilidad de sobra
+  if(CH.rnd&&Number.isFinite(CH.rnd.excesoUp)&&Number.isFinite(CH.rnd.excesoDn)){
+    const neto=CH.rnd.excesoUp-CH.rnd.excesoDn;
+    const pts=Math.max(-15,Math.min(15,Math.round(neto*5)));
+    if(Math.abs(pts)>=4)add(pts,'Colas de la distribución',
+      neto>0?`el mercado paga por subidas fuertes un ${CH.rnd.excesoUp.toFixed(1)}% más de lo normal`
+            :`el mercado paga por caídas fuertes un ${CH.rnd.excesoDn.toFixed(1)}% más de lo normal`);
+  }
+
+  // 4 · Max pain (solo pesa cerca del vencimiento)
+  if(CH.flw&&CH.flw.ok&&Number.isFinite(CH.flw.maxPain)&&CH.dte<=10){
+    const d=(CH.flw.maxPain/CH.spot-1)*100;
+    if(Math.abs(d)>1.5)add(d>0?10:-10,'Imán de vencimiento',
+      `max pain en ${CH.flw.maxPain} (${d>0?'+':''}${d.toFixed(1)}%), con ${CH.dte} días la deriva documentada tira hacia él`);
+  }
+
+  const score=Math.max(-100,Math.min(100,S.reduce((a,s)=>a+s.pts,0)));
+  const veredicto = score>=45?'MUY ALCISTA':score>=20?'ALCISTA'
+                  :score<=-45?'MUY BAJISTA':score<=-20?'BAJISTA':'SIN SEÑAL CLARA';
+  return {score,veredicto,señales:S};
+}
+
+function renderDir(){
+  const el=$('dirBox');if(!el||!CH.an)return;
+  const D=direccion();
+  const vrp=isFinite(CH.expVol)?(CH.an.atmIv-CH.expVol)*100:NaN;
+  const col=D.score>=20?'var(--bull)':D.score<=-20?'var(--bear)':'var(--ink2)';
+  const pctBar=(D.score+100)/2;   // 0..100 para la barra
+
+  let t=`<div class="dir-head">
+    <span class="dir-verdict" style="color:${col}">${D.veredicto}</span>
+    <span class="dir-score num">${D.score>0?'+':''}${D.score}</span>
+  </div>
+  <div class="dir-bar"><div class="dir-fill" style="left:${Math.min(pctBar,50)}%;width:${Math.abs(pctBar-50)}%;background:${col}"></div><div class="dir-zero"></div></div>`;
+
+  if(D.señales.length){
+    t+='<div class="dir-señales">'+D.señales.map(s=>
+      `<div class="dir-s"><span class="dir-pts ${s.pts>0?'up':'dn'}">${s.pts>0?'+':''}${s.pts}</span>
+       <span><b>${s.nombre}.</b> ${s.detalle}</span></div>`).join('')+'</div>';
+  } else {
+    t+=`<p class="mute" style="font-size:13px">Ninguna señal direccional activa en ${CH.sym} ahora mismo.
+      Sin datos suficientes de tendencia y con la cadena sin sesgos: no hay dirección que defender.</p>`;
+  }
+
+  /* la traducción a operación concreta, cruzando dirección × precio de la vol */
+  let op='';
+  const alc=D.score>=20,baj=D.score<=-20;
+  if(alc&&vrp<-2)op=`<b>La jugada que casa con todo: COMPRAR CALLS.</b> Dirección a favor y encima las opciones
+    baratas (vol. implícita ${Math.abs(vrp).toFixed(1)} pts bajo la histórica). Abajo, en "Dónde está el dinero",
+    pon el selector en <b>Comprar → Calls</b> y elige el nivel.`;
+  else if(alc&&vrp>2)op=`<b>La jugada que casa con todo: VENDER PUTS.</b> Dirección a favor pero la prima está cara
+    — mejor cobrarla que pagarla: vendes el seguro de caída con el viento a tu espalda.`;
+  else if(alc)op=`<b>La jugada: un CALL SPREAD.</b> Dirección a favor con la vol bien valorada: compras una call
+    y vendes otra más arriba para no pagar de más por la volatilidad.`;
+  else if(baj&&vrp<-2)op=`<b>La jugada que casa con todo: COMPRAR PUTS.</b> Señales bajistas y opciones baratas:
+    la protección (o la apuesta a la caída) está de oferta.`;
+  else if(baj&&vrp>2)op=`<b>La jugada: vender CALLS con protección</b> (un call credit spread). Señales bajistas
+    y prima cara: cobras el seguro de subida, con techo de pérdida por si te equivocas.`;
+  else if(baj)op=`<b>La jugada: un PUT SPREAD.</b> Señales bajistas con la vol bien valorada.`;
+  else if(vrp>3)op=`<b>Sin dirección clara pero la prima está cara:</b> terreno de venta neutral —
+    un iron condor cobra por ambos lados sin apostar dirección.`;
+  else if(vrp<-2)op=`<b>Sin dirección clara pero las opciones están baratas:</b> un straddle compra
+    movimiento a buen precio, gane quien gane.`;
+  else op=`Sin dirección clara y con la vol en su sitio: <b>hoy, en ${CH.sym}, la mejor operación
+    probablemente es ninguna.</b> No pasa nada por no operar.`;
+  t+=`<div class="historia" style="margin-top:12px;font-size:13.5px"><p>${op}</p>
+    <p class="tip">Calibración honesta: estas señales, incluso las buenas, aciertan poco más que una moneda
+    (55-58% en los estudios). Su fuerza no está en una sola, sino en que varias <em>independientes</em>
+    coincidan — y en operar solo cuando además el precio de la volatilidad te da margen de error.</p>
+    ${ayuda('momentum')}</div>`;
+  el.innerHTML=t;
+}
+
 /* ── LOS MUROS: cifras, perfil por strike y lectura ── */
 function fmtM(x){
   const a=Math.abs(x);
@@ -3079,10 +3294,10 @@ function renderGex(){
   F.innerHTML=
     fig2('Los dealers ahora', amort?'PLANCHAN el precio':'AMPLIFICAN el precio',
          amort?'up':'dn', 'GEX '+fmtM(flw.gexTotal)+' por 1% de movimiento')+
-    (isFinite(flw.flip)?fig2('El precio se destapa bajo', flw.flip.toFixed(1), 'mk', 'Gamma flip'):'')+
+    (Number.isFinite(flw.flip)?fig2('El precio se destapa bajo', flw.flip.toFixed(1), 'mk', 'Gamma flip'):'')+
     (flw.callWall?fig2('Techo de gamma', flw.callWall.K, 'mdl', 'Call wall'):'')+
     (flw.putWall?fig2('Suelo de gamma', flw.putWall.K, 'mdl', 'Put wall'):'')+
-    (flw.maxPain?fig2('Imán de vencimiento', flw.maxPain, '', 'Max pain'):'');
+    (Number.isFinite(flw.maxPain)?fig2('Imán de vencimiento', flw.maxPain, '', 'Max pain'):'');
 
   /* perfil por strike: barras netas, calls arriba puts abajo */
   const per=flw.perfil.filter(x=>Math.abs(x.neto)>0);
@@ -3102,13 +3317,13 @@ function renderGex(){
       x.fillRect(X(p.K)-bw/2, p.neto>=0?Y0-hgt:Y0, bw, hgt);
     });
     // spot, flip, walls
-    const marca=(K,col,txt,arriba)=>{if(!isFinite(K)||K<k0||K>k1)return;
+    const marca=(K,col,txt,arriba)=>{if(!Number.isFinite(K)||K<k0||K>k1)return;
       x.strokeStyle=col;x.setLineDash([4,3]);x.beginPath();
       x.moveTo(X(K),pad.t);x.lineTo(X(K),H-pad.b);x.stroke();x.setLineDash([]);
       x.fillStyle=col;x.font=C.mono;x.textAlign='center';
       x.fillText(txt,X(K),arriba?pad.t-4:H-8);};
     marca(CH.spot,C.ink,'precio',true);
-    if(isFinite(flw.flip))marca(flw.flip,C.mark,'flip',false);
+    if(Number.isFinite(flw.flip))marca(flw.flip,C.mark,'flip',false);
     if(flw.callWall)marca(flw.callWall.K,C.model,'techo',true);
     if(flw.putWall)marca(flw.putWall.K,C.model,'suelo',true);
   }
@@ -3132,7 +3347,7 @@ function renderGex(){
       Los desplazamientos pueden ser más violentos de lo que la volatilidad sugiere.
       Terreno de <b>comprador de opciones</b>, y peligroso para vender prima desnuda.</p>`;
   }
-  if(isFinite(flw.flip)){
+  if(Number.isFinite(flw.flip)){
     n+= CH.spot>flw.flip
       ?`<p>El <b>gamma flip</b> está en <b class="num">${flw.flip.toFixed(1)}</b>. Por encima (donde está ahora),
         régimen estable; <b>si cae por debajo, el mercado cambia de carácter</b> y los movimientos se amplifican.
@@ -3141,7 +3356,7 @@ function renderGex(){
         inestable donde la cobertura de los dealers amplifica cada movimiento. Los rebotes y las caídas
         aquí son más violentos.</p>`;
   }
-  if(flw.maxPain&&CH.dte<=10){
+  if(Number.isFinite(flw.maxPain)&&CH.dte<=10){
     const d=(flw.maxPain/CH.spot-1)*100;
     if(Math.abs(d)>1.5)
       n+=`<p><b>Max pain</b> en <b class="num">${flw.maxPain}</b> (${d>0?'+':''}${d.toFixed(1)}% desde aquí).
@@ -3169,7 +3384,7 @@ function renderGex(){
   if(!amort&&isFinite(vrpPts)&&vrpPts<-2&&CH.mom&&CH.mom.alcista){
     n+=`<p class="clave up"><b>La foto completa, y es de compra:</b> mecánica amplificadora (los movimientos
       corren), opciones baratas (vol. implícita bajo la histórica) y tendencia alcista. Las tres cosas a la vez
-      es la configuración de manual para <b>COMPRAR CALLS</b>. Mira "Baratas vs vecinas" para elegir el strike.</p>`;
+      es la configuración de manual para <b>COMPRAR CALLS</b>. Pon el selector de abajo en <b>Comprar → Calls</b>.</p>`;
   } else if(amort&&isFinite(vrpPts)&&vrpPts>2){
     n+=`<p class="clave up"><b>La foto completa favorece vender:</b> los dealers planchan el precio Y la prima
       está cara. Cobras de más por un riesgo que la propia mecánica del mercado está conteniendo.</p>`;
