@@ -6,25 +6,27 @@
 <title>Almighty Options</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
-  /* carbón azulado · terminal oscura sobria */
-  --paper:#12161C;      /* fondo */
-  --paper2:#1A1F27;     /* superficie elevada */
-  --paper3:#232935;     /* superficie 2 / hover */
-  --ink:#E6E9EE;        /* texto principal, blanco hueso */
-  --ink2:#A8B0BC;       /* secundario */
-  --ink3:#727C8A;     /* terciario, etiquetas */
-  --rule:#242A34;       /* separadores sutiles */
-  --rule2:#333B48;      /* separadores marcados */
-  --bull:#3FB984;       /* verde desaturado */
-  --bear:#E5484D;       /* rojo desaturado */
-  --model:#5B8DEF;      /* azul: lo que dice el modelo */
+  /* grafito profundo con temperatura cálida · identidad de cinta de bolsa */
+  --paper:#0C0E12;      /* fondo: casi negro */
+  --paper2:#14171D;     /* superficie elevada */
+  --paper3:#1C2029;     /* superficie 2 / hover */
+  --ink:#EAE7E0;        /* hueso cálido (no blanco frío) */
+  --ink2:#A9A49B;       /* secundario, cálido */
+  --ink3:#767068;       /* terciario, etiquetas */
+  --rule:#20242C;       /* separadores sutiles */
+  --rule2:#323844;      /* separadores marcados */
+  --bull:#4CBB8B;       /* verde: ganancias, te pagan de más */
+  --bear:#E05656;       /* rojo: pérdidas */
+  --model:#8FA8DC;      /* azul suavizado: lo que dice el mercado/modelo */
   --mark:#D9A441;       /* ámbar: atención */
-  --disp:"Inter",system-ui,sans-serif;
+  --brand:#C9622B;      /* naranja quemado: LA marca. Cinta, foco, primario */
+  --brand-soft:rgba(201,98,43,.14);
+  --disp:"Barlow Condensed",system-ui,sans-serif;
   --body:"Inter",system-ui,sans-serif;
-  --num:"IBM Plex Mono",ui-monospace,monospace;
+  --num:"JetBrains Mono",ui-monospace,monospace;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html{-webkit-text-size-adjust:100%;background:var(--paper);min-height:100%}
@@ -32,11 +34,32 @@ body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:
   min-height:100vh;padding-bottom:80px;-webkit-font-smoothing:antialiased}
 .w{max-width:1220px;margin:0 auto;padding:0 20px}
 
-/* ── cabecera de periódico ── */
+/* ── cabecera: rótulo de bolsa ── */
 header{border-bottom:1px solid var(--rule2);background:var(--paper);position:sticky;top:0;z-index:60}
 .mast{display:flex;align-items:baseline;gap:20px;padding:12px 0 10px;flex-wrap:wrap}
-.name{font-family:var(--disp);font-size:20px;font-weight:700;letter-spacing:-.02em;line-height:1;color:var(--ink)}
-.name em{font-style:normal;font-weight:400;color:var(--ink2)}
+.name{font-family:var(--disp);font-size:26px;font-weight:700;letter-spacing:.06em;line-height:1;
+  color:var(--ink);text-transform:uppercase}
+.name em{font-style:normal;font-weight:700;color:var(--brand)}
+
+/* ── LA CINTA · firma visual: teletipo de favoritos ── */
+.tape{border-bottom:1px solid var(--rule);background:linear-gradient(180deg,var(--paper2),var(--paper));
+  overflow:hidden;position:relative;height:34px}
+.tape::before,.tape::after{content:"";position:absolute;top:0;bottom:0;width:44px;z-index:2;pointer-events:none}
+.tape::before{left:0;background:linear-gradient(90deg,var(--paper),transparent)}
+.tape::after{right:0;background:linear-gradient(270deg,var(--paper),transparent)}
+.tape-in{display:flex;align-items:center;height:100%;width:max-content;
+  animation:tapeRun 38s linear infinite}
+.tape:hover .tape-in{animation-play-state:paused}
+@keyframes tapeRun{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media(prefers-reduced-motion:reduce){.tape-in{animation:none}}
+.tk-item{display:flex;align-items:baseline;gap:8px;padding:0 22px;border-right:1px solid var(--rule);
+  font-family:var(--num);white-space:nowrap;cursor:pointer}
+.tk-item:hover .tk-sym{color:var(--brand)}
+.tk-sym{font-size:12px;font-weight:700;letter-spacing:.04em;color:var(--ink2)}
+.tk-px{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--ink)}
+.tk-chg{font-size:11px;font-weight:500}
+.tk-chg.up{color:var(--bull)}.tk-chg.dn{color:var(--bear)}
+.tk-empty{font-family:var(--body);font-size:12px;color:var(--ink3);padding:0 22px;white-space:nowrap}
 .dek{font-family:var(--body);font-size:12px;font-weight:450;letter-spacing:0;color:var(--ink3);
   border-left:1px solid var(--rule2);padding-left:13px;align-self:center}
 .state{margin-left:auto;display:flex;align-items:center;gap:7px;font-family:var(--body);font-size:12px;
@@ -72,7 +95,7 @@ nav button:focus-visible{outline:2px solid var(--model);outline-offset:2px}
 
 /* ── secciones: reglas finas, sin cajas ── */
 section.blk{margin-bottom:26px}
-h2{font-family:var(--disp);font-size:15px;font-weight:600;letter-spacing:-.005em;color:var(--ink);
+h2{font-family:var(--disp);font-size:18px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--ink);
   padding-bottom:9px;margin-bottom:16px;border-bottom:1px solid var(--rule2);display:flex;align-items:baseline;gap:10px}
 h2 .sub{font-family:var(--num);font-size:11px;letter-spacing:0;text-transform:none;
   color:var(--ink3);font-weight:400;margin-left:auto}
@@ -130,7 +153,7 @@ select{cursor:pointer}
   background:var(--paper2);border:1px solid var(--rule2);color:var(--ink);cursor:pointer;transition:.12s;border-radius:6px}
 .btn:hover{background:var(--paper3);border-color:var(--ink2)}
 .btn:focus-visible{outline:2px solid var(--model);outline-offset:2px}
-.btn.solid{background:var(--model);color:#fff;border-color:var(--model);font-weight:500}
+.btn.solid{background:var(--brand);color:#0C0E12;border-color:var(--brand);font-weight:700}
 .btn.solid:hover{background:#7BA3F2;border-color:#7BA3F2}
 .btn.quiet{background:transparent;border-color:var(--rule2);color:var(--ink2)}
 .btn.quiet:hover{background:var(--paper2);color:var(--ink)}
@@ -196,7 +219,7 @@ select{cursor:pointer}
 .chip{font-family:var(--body);font-size:12.5px;font-weight:450;letter-spacing:0;padding:5px 11px;background:var(--paper2);
   border:1px solid var(--rule2);color:var(--ink2);cursor:pointer;transition:.12s;border-radius:20px}
 .chip:hover{border-color:var(--ink2);color:var(--ink)}
-.chip.on{background:var(--model);color:#fff;border-color:var(--model);font-weight:500}
+.chip.on{background:var(--brand-soft);border-color:var(--brand);color:var(--ink)}
 
 /* ── sliders ── */
 .sldr{margin-bottom:15px}
@@ -246,6 +269,54 @@ details.explica summary:hover{color:var(--ink)}
 .explica-txt p:last-child{margin-bottom:0}
 .explica-txt b{color:var(--ink);font-weight:600}
 .explica-txt em{font-style:italic}
+
+
+
+/* ── favoritos ── */
+.fav-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.fav{display:inline-flex;align-items:center;gap:7px;padding:7px 12px;border:1px solid var(--rule2);
+  border-radius:6px;background:var(--paper2);font-family:var(--num);font-size:13px;font-weight:600;
+  letter-spacing:.03em;color:var(--ink)}
+.fav .x{cursor:pointer;color:var(--ink3);font-weight:400;font-size:15px;line-height:1}
+.fav .x:hover{color:var(--bear)}
+.fav-add{display:inline-flex;gap:6px;align-items:center}
+.fav-add input{width:86px;padding:7px 10px;border:1px dashed var(--rule2);border-radius:6px;
+  background:transparent;color:var(--ink);font-family:var(--num);font-size:13px;font-weight:600;
+  letter-spacing:.03em;text-transform:uppercase}
+.fav-add input:focus{outline:none;border-color:var(--brand);border-style:solid}
+.fav-add button{padding:7px 12px;border:1px solid var(--rule2);border-radius:6px;background:var(--paper3);
+  color:var(--ink2);font-size:13px;cursor:pointer}
+.fav-add button:hover{border-color:var(--brand);color:var(--ink)}
+
+/* ── tarjetas de oportunidad ── */
+.opp{border:1px solid var(--rule2);border-radius:8px;background:var(--paper2);padding:16px 18px;
+  margin-bottom:12px;cursor:pointer;transition:border-color .15s}
+.opp:hover{border-color:var(--brand)}
+.opp-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.opp-sym{font-family:var(--disp);font-size:22px;font-weight:700;letter-spacing:.05em;color:var(--ink)}
+.opp-px{font-family:var(--num);font-size:14px;font-weight:600;color:var(--ink2)}
+.opp-badge{margin-left:auto;font-family:var(--body);font-size:11px;font-weight:600;letter-spacing:.02em;
+  padding:4px 10px;border-radius:4px;text-transform:uppercase}
+.opp-badge.vender{background:rgba(76,187,139,.15);color:var(--bull);border:1px solid rgba(76,187,139,.4)}
+.opp-badge.comprar{background:rgba(143,168,220,.14);color:var(--model);border:1px solid rgba(143,168,220,.4)}
+.opp-badge.nada{background:var(--paper3);color:var(--ink3);border:1px solid var(--rule2)}
+.opp-badge.pos{background:var(--brand-soft);color:var(--brand);border:1px solid var(--brand)}
+.opp-line{font-size:13.5px;line-height:1.55;color:var(--ink2);margin-top:8px}
+.opp-line b{color:var(--ink)}
+.opp-warn{font-size:12.5px;color:var(--mark);margin-top:6px}
+.opp-figs{display:flex;gap:18px;margin-top:10px;flex-wrap:wrap}
+.opp-f{display:flex;flex-direction:column;gap:2px}
+.opp-f .k{font-size:10px;color:var(--ink3);letter-spacing:.02em}
+.opp-f .v{font-family:var(--num);font-size:14px;font-weight:600;color:var(--ink)}
+.opp-f .v.up{color:var(--bull)}.opp-f .v.dn{color:var(--bear)}.opp-f .v.mk{color:var(--mark)}
+
+/* selectores de tipo y riesgo */
+.selector-grupo{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sel-label{font-size:12px;color:var(--ink2);font-weight:500;min-width:95px}
+.quotes tbody tr.destacada{background:rgba(63,185,132,.06)}
+.quotes tbody tr.destacada td{border-top:1px solid var(--bull);border-bottom:1px solid var(--bull)}
+.quotes tbody tr{cursor:pointer}
+.quotes tbody tr:hover{background:var(--paper2)}
 
 /* intro de cada ranking */
 .intro-rank{font-size:14px;line-height:1.6;color:var(--ink2);margin-bottom:14px;
@@ -368,19 +439,50 @@ summary:hover{color:var(--ink)}
     <span class="dek">Análisis de derivados</span>
     <span class="state"><span class="led" id="led"></span><span id="ledTx">Sin conectar</span></span>
   </div>
+  <div class="tape" id="tape" aria-label="Cinta de favoritos"><div class="tape-in" id="tapeIn"></div></div>
 </header>
 
 <div class="ribbon"><div class="w"><div class="in" id="ribbon"></div></div></div>
 
 <div class="w">
   <nav>
-    <button class="on" data-v="book" onclick="go('book')">Mi cuenta</button>
+    <button class="on" data-v="today" onclick="go('today')">Hoy</button>
+    <button data-v="book" onclick="go('book')">Mi cuenta</button>
     <button data-v="desk" onclick="go('desk')">Estudiar</button>
     <button data-v="chain" onclick="go('chain')">Cadena</button>
   </nav>
 
+  <!-- ═══════════ HOY · oportunidades del día ═══════════ -->
+  <div class="view on" id="v-today">
+    <section class="blk">
+      <h2>Tus favoritos<span class="sub">el monitor los revisa de un tirón</span></h2>
+      <div class="fav-row" id="favRow"></div>
+      <div class="btns" style="margin-top:14px">
+        <button class="btn solid" onclick="scanFavs()">Buscar oportunidades hoy</button>
+      </div>
+      <div class="caveat" id="tdMsg" style="display:none"></div>
+    </section>
+    <div id="tdOut" style="display:none">
+      <section class="blk">
+        <h2>Dónde está el jugo<span class="sub" id="tdSub"></span></h2>
+        <div class="historia" id="tdIntro"></div>
+        <div id="tdCards"></div>
+      </section>
+      <section class="blk" id="tdPortSec" style="display:none">
+        <h2>Cómo casa con tu cartera</h2>
+        <div class="historia" id="tdPort"></div>
+      </section>
+    </div>
+    <div class="empty" id="tdEmpty">
+      <strong>Tu radar de oportunidades</strong>
+      Añade tus tickers favoritos arriba y pulsa <b>Buscar oportunidades hoy</b>.
+      Para cada uno comparamos el susto que cobra el mercado con lo que dice su histórico real,
+      y te decimos dónde te pagan de más — tengas la cuenta llena o vacía.
+    </div>
+  </div>
+
   <!-- ═══════════ MI CUENTA ═══════════ -->
-  <div class="view on" id="v-book">
+  <div class="view" id="v-book">
     <div id="bkOff">
       <div class="empty">
         <strong>Conecta tu cuenta</strong>
@@ -543,6 +645,11 @@ summary:hover{color:var(--ink)}
       </section>
 
       <div class="cols c2">
+        <section class="blk">
+          <h2>El movimiento que anticipa el mercado</h2>
+          <div class="plot"><canvas id="cone" height="240"></canvas></div>
+          <div class="historia" id="coneNote" style="font-size:13.5px"></div>
+        </section>
         <section class="blk">
           <h2>Cuáles se salen de lo normal</h2>
           <div class="plot"><canvas id="smile" height="220"></canvas></div>
@@ -893,6 +1000,18 @@ function winsorize(r,p=0.005){
 }
 /* Devuelve el paquete completo de volatilidad esperada hasta el horizonte */
 function volForecast(candles,horizonDays){
+  // ── BLINDAJE DE DATOS ──
+  // dxfeed puede entregar velas en cualquier orden (el snapshot suele venir
+  // del más reciente al más antiguo) y puede repetir velas (snapshot + update).
+  // Un duplicado mete un retorno CERO espurio que hunde la vol estimada y con
+  // ella infla el VRP → veredicto de "caro/barato" envenenado. Ordenamos por
+  // timestamp y nos quedamos con la ÚLTIMA versión de cada vela, aquí dentro,
+  // para proteger a TODOS los llamadores (escáner, cadena, estudiar).
+  {
+    const porTime=new Map();
+    for(const c of candles) if(c&&isFinite(c.time)) porTime.set(c.time,c);
+    candles=[...porTime.values()].sort((a,b)=>a.time-b.time);
+  }
   const raw=returnsFromCandles(candles);
   if(raw.length<60)return {ok:false,reason:`solo ${raw.length} retornos (mínimo 60)`};
   const rets=winsorize(raw);              // recorta outliers antes de ajustar
@@ -1026,13 +1145,48 @@ function analyzeChain(rows, S, t, r, q, expectedVol) {
       const payoffReal = bsm(o.type, S, o.K, t, r, q, o.volPropia) * df2;
       o.evShortReal = (o.mid * df2 - payoffReal) * 100;
     }
-    // Score compuesto para venta de prima. IMPORTANTE: los pesos son una
-    // heurística razonada, NO están calibrados contra ningún backtest.
-    // Sirve para ordenar candidatos, no como medida objetiva de calidad.
-    const zTheta = isFinite(o.thetaPerDelta) ? Math.min(o.thetaPerDelta / 0.5, 2) : 0;
-    const zProb = isFinite(o.probOTM) ? (o.probOTM - 0.5) * 2 : 0;
-    const zVrp = isFinite(o.vrpNorm) ? Math.max(-1, Math.min(o.vrpNorm / 0.05, 2)) : 0;
-    o.shortScore = (zTheta * 0.3 + zProb * 0.3 + zVrp * 0.25 + o.liquidity * 0.15);
+    // ═══════════════════════════════════════════════════════════════
+    // MÉTRICAS QUE DE VERDAD IMPORTAN AL VENDER UNA OPCIÓN
+    //
+    // El error del score anterior: premiaba P(OTM) alta. Pero un put muy
+    // lejano SIEMPRE tiene P(OTM) altísima y prima ridícula. Vender algo
+    // que paga $7 por asumir riesgo de cola no es "la mejor oportunidad".
+    // Lo que importa es CUÁNTO COBRAS POR EL RIESGO QUE ASUMES.
+    // ═══════════════════════════════════════════════════════════════
+    const primaContrato = o.mid * 100;            // $/contrato que cobras
+    const distancia = Math.abs(o.K - S);          // margen hasta el strike
+    const probTocar = isFinite(o.probOTM) ? 2 * (1 - o.probOTM) : 1;
+
+    // (1) CRÉDITO POR UNIDAD DE RIESGO: el corazón de la venta de prima.
+    //
+    //   Al vender una opción cobras la prima P. Si expira OTM, te la quedas.
+    //   Si expira ITM, pagas el intrínseco. Bajo la vol del mercado, el valor
+    //   esperado de ese pago es EXACTAMENTE la prima (precio justo) — por eso
+    //   no sirve. La medida útil es cuánta prima cobras frente a la PÉRDIDA
+    //   ESPERADA EN LA COLA: cuando te va mal, ¿cuánto pierdes de media?
+    //
+    //   Aproximamos la pérdida-en-cola con la distancia esperada más allá
+    //   del strike, que para una lognormal escala con σ_precio y con la
+    //   probabilidad de tocar. Un put a 1σ es el punto dulce: cobras prima
+    //   sustancial y la cola es manejable. Pegado al dinero cobras mucho pero
+    //   te tocan casi siempre; en la cola lejana no te tocan pero cobras nada.
+    const sigmaPrecio = S * o.iv * Math.sqrt(t);           // desviación esperada del precio
+    const perdidaCola = probTocar * sigmaPrecio * 100 * 0.4 + primaContrato * 0.1;
+    o.creditoPorRiesgo = perdidaCola > 0 ? primaContrato / perdidaCola : 0;
+
+    // (2) EDGE POR CONTRATO: lo que te paga el mercado por encima de tu
+    //     modelo (evShortReal). Si es negativo, vendes barato.
+    o.edgeContrato = isFinite(o.evShortReal) ? o.evShortReal : 0;
+
+    // ── SCORE para "las mejores para vender" ──
+    // Ya NO usa P(OTM) suelta (que empujaba arriba lo barato). Combina
+    // crédito por riesgo + edge real + liquidez, con filtro de prima mínima.
+    const primaDecente = primaContrato >= 20;
+    const zCredito = Math.min(o.creditoPorRiesgo / 0.5, 2);
+    const zEdge = isFinite(o.evShortReal) ? Math.max(-1, Math.min(o.evShortReal / 50, 2)) : 0;
+    o.shortScore = primaDecente
+      ? (zCredito * 0.5 + zEdge * 0.35 + o.liquidity * 0.15)
+      : -1;
   }
 
   return { rows: out, svi, F, atmIv };
@@ -1050,24 +1204,41 @@ function rankChain(analyzed, opts = {}) {
       .sort((a, b) => desc ? b[key] - a[key] : a[key] - b[key])
       .slice(0, n);
 
+  const puts = cand.filter(o => o.type === 'P');
+  const calls = cand.filter(o => o.type === 'C');
+
+  // ── NIVELES DE RIESGO ──
+  // El usuario elige cuánto riesgo asumir; dentro de cada nivel ordenamos
+  // por la PRIMA (lo que cobras), que es lo que de verdad quieres maximizar
+  // una vez fijado el riesgo. Los niveles se definen por distancia al precio
+  // medida en probabilidad de expirar sin valor (P(OTM)):
+  //   conservador: muy improbable que te toquen (P(OTM) ≥ 85%)
+  //   medio:       equilibrio (70-85%)
+  //   agresivo:    cerca del dinero, más prima y más riesgo (55-70%)
+  const porNivel = (arr, lo, hi) => arr
+    .filter(o => isFinite(o.probOTM) && o.probOTM >= lo && o.probOTM < hi && o.mid * 100 >= 15)
+    .sort((a, b) => b.mid - a.mid);   // más prima primero
+
   return {
     candidates: cand.length,
-    // RANKING PRINCIPAL: score compuesto para venta de prima
-    best: top(cand, 'shortScore', 8),
-    // más theta por unidad de riesgo direccional: el pan de la venta de prima
-    thetaEfficiency: top(cand, 'thetaPerDelta', 5),
-    // cotizan CAROS respecto a la curva de sus vecinos → candidatos a VENDER
+
+    // Puts por nivel de riesgo
+    putsConservador: porNivel(puts, 0.85, 1.01),
+    putsMedio:       porNivel(puts, 0.70, 0.85),
+    putsAgresivo:    porNivel(puts, 0.55, 0.70),
+    // Calls por nivel de riesgo
+    callsConservador: porNivel(calls, 0.85, 1.01),
+    callsMedio:       porNivel(calls, 0.70, 0.85),
+    callsAgresivo:    porNivel(calls, 0.55, 0.70),
+
+    // Ventaja real (mercado vs tu modelo) y anomalías, sin cambios
+    bestEdge: top(cand.filter(o => o.mid * 100 >= 20), 'edgeContrato', 6),
     richVsCurve: top(cand, 'ivEdge', 5),
-    // cotizan BARATOS respecto a la curva → candidatos a COMPRAR
     cheapVsCurve: top(cand, 'ivEdge', 5, false),
-    // mayor prima de riesgo de vol NORMALIZADA (aislada del skew)
-    bestVRP: top(cand, 'vrpNorm', 5),
-    // mayor probabilidad de expirar sin valor con prima decente
-    safestShort: top(cand.filter(o => o.mid >= 0.15), 'probOTM', 5),
-    // mejor EV de venta desnuda
-    bestEV: top(cand, 'evShortReal', 5),
-    // mejor prima por día
-    premiumPerDay: top(cand, 'premiumPerDay', 5),
+
+    // compat
+    best: top(cand, 'shortScore', 8),
+    bestEV: top(cand.filter(o => o.mid * 100 >= 20), 'edgeContrato', 6),
   };
 }
 
@@ -1489,13 +1660,14 @@ const fg=(k,v,cls='',help='',wide=false)=>
 /* Paleta única para los canvas: mantiene el CSS y el JS sincronizados.
    Si cambia el tema, se cambia aquí y en :root, no en veinte sitios. */
 const C={
-  bg:'#12161C', surf:'#1A1F27',
-  ink:'#E6E9EE', ink2:'#A8B0BC', ink3:'#727C8A',
-  rule:'#242A34', rule2:'#333B48',
-  bull:'#3FB984', bear:'#E5484D', model:'#5B8DEF', mark:'#D9A441',
-  bullA:'rgba(63,185,132,.55)', bearA:'rgba(229,72,77,.5)',
-  modelA:'rgba(91,141,239,.16)', bandA:'rgba(91,141,239,.06)',
-  mono:'9px "IBM Plex Mono",monospace'
+  bg:'#0C0E12', surf:'#14171D',
+  ink:'#EAE7E0', ink2:'#A9A49B', ink3:'#767068',
+  rule:'#20242C', rule2:'#323844',
+  bull:'#4CBB8B', bear:'#E05656', model:'#8FA8DC', mark:'#D9A441', brand:'#C9622B',
+  bullA:'rgba(76,187,139,.55)', bearA:'rgba(224,86,86,.5)',
+  modelA:'rgba(143,168,220,.16)', bandA:'rgba(143,168,220,.06)',
+  brandA:'rgba(201,98,43,.18)',
+  mono:'9px "JetBrains Mono",monospace'
 };
 
 /* ══════════════ VALORACIÓN ══════════════ */
@@ -1515,11 +1687,15 @@ const px=(ty,S,K,t,r,q,v)=>st.model==='crr'?crr(ty,S,K,t,r,q,v,200):bsm(ty,S,K,t
 function ivDePata(l, S, t, vNivel){
   // Sin curva de la cadena: vol plana (es lo único que tenemos)
   if(!CH.an || !CH.an.svi || !isFinite(CH.atmIvRef)) return vNivel;
-  const F = S*Math.exp((RR()-QQ())*t);
+  // ⚠ La SVI se ajustó con el t DE LA CADENA. Evaluarla con otra t (si cambias
+  // DTE en Estudiar) desvía el skew varios puntos: los parámetros codifican
+  // varianza total a ese plazo. La FORMA se toma siempre a su t de ajuste;
+  // el NIVEL lo pone vNivel.
+  const tSvi = isFinite(CH.t) ? CH.t : t;
+  const F = S*Math.exp((RR()-QQ())*tSvi);
   const k = Math.log(l.K/F);
-  const ivCurva = sviIV(CH.an.svi.params, k, t);
+  const ivCurva = sviIV(CH.an.svi.params, k, tSvi);
   if(!isFinite(ivCurva)) return vNivel;
-  // desplazamos la curva entera al nivel pedido
   const skewPata = ivCurva - CH.atmIvRef;
   return Math.max(vNivel + skewPata, 0.01);
 }
@@ -2519,6 +2695,8 @@ async function scanChain(){
   const msg=$('cMsg');const sym=($('cSym').value||'SPY').toUpperCase();
   try{
     msg.textContent='Cargando estructura de la cadena…';
+    // métricas del subyacente: IV rank y earnings (para el aviso de IV crush)
+    api('metrics',{symbol:sym}).then(m=>{CH.met=(m?.data?.items||m?.items||[])[0]||null;}).catch(()=>{CH.met=null;});
     if(!CH.exps)await loadExps();
     const ex=CH.exps[+$('cExp').value||0];
     if(!ex)throw new Error('Elige un vencimiento');
@@ -2612,6 +2790,28 @@ function renderChain(){
       Pulsa <b>Estimar volatilidad</b> en la pestaña Estudiar para que lo calculemos.</p>`;
   }
 
+  // Eventos: earnings antes del vencimiento (IV crush) e IV rank
+  if(CH.met){
+    const eRaw=CH.met['earnings']||{};
+    const eDate=eRaw['expected-report-date']||null;
+    if(eDate){
+      const dias=Math.round((new Date(eDate)-Date.now())/86400000);
+      if(dias>=0&&dias<=dte){
+        historia+=`<p class="clave mk"><b>⚠ Earnings ${dias===0?'HOY':'en '+dias+' días'} (${eDate}), antes de este vencimiento.</b>
+          La volatilidad implícita está inflada por el evento: parte del "susto" que ves no es miedo normal,
+          es la apuesta al resultado. Justo después de publicar, esa parte se evapora de golpe — el <em>IV crush</em>.
+          Vender prima ahora es apostar al earnings, no cobrar el seguro tranquilamente.</p>`;
+      }
+    }
+    const rank=parseFloat(CH.met['implied-volatility-index-rank']);
+    if(isFinite(rank)){
+      historia+= rank>0.7
+        ?`<p>Contexto: la volatilidad implícita de ${sym} está <b>más alta que el ${(rank*100).toFixed(0)}%</b> de su último año. Los seguros están históricamente caros — terreno de vendedor, si el histórico acompaña.</p>`
+        :rank<0.25
+        ?`<p>Contexto: la IV de ${sym} está <b>más baja que el ${(100-rank*100).toFixed(0)}%</b> de su último año. Los seguros están históricamente baratos — mal momento para venderlos, quizá bueno para comprarlos.</p>`
+        :``;
+    }
+  }
   $('cHistoria').innerHTML = historia;
 
   /* ── Las cifras, con etiqueta doble ── */
@@ -2627,110 +2827,113 @@ function renderChain(){
     ? ayuda('vrp',{sym, iv:pc(atm), modelo:pc(expVol)})
     : ayuda('iv',{sym});
 
-  /* ── ACTO 2: qué hacer ── */
-  const views=[
-    ['best','Las mejores para vender','Ordenadas por lo bien que combinan todo: cobras mucho tiempo, es poco probable que te toque pagar, y se puede entrar y salir sin comerte el spread.'],
-    ['richVsCurve','Las que están caras','Estas cotizan por encima de lo que les tocaría comparadas con sus vecinas. Alguien está pagando de más por ellas. Buenas candidatas a vender.'],
-    ['cheapVsCurve','Las que están baratas','Estas cotizan por debajo de sus vecinas. Están de oferta. Buenas para comprar, o para usarlas como protección de un spread.'],
-    ['safestShort','Las más seguras','Las que es más improbable que acaben costándote dinero. Cobras menos, pero duermes mejor.'],
-    ['bestEV','Las que más ventaja tienen','Según el histórico real, las que te pagan más por encima de lo que vale su riesgo.'],
-  ];
-  st.rkView = views.some(v=>v[0]===st.rkView) ? st.rkView : 'best';
-  $('cChips').innerHTML=views.map(([k,l])=>
-    `<button class="chip${st.rkView===k?' on':''}" onclick="setRk('${k}')">${l}</button>`).join('');
-  const vista = views.find(v=>v[0]===st.rkView);
-  let intro = `<p class="intro-rank">${vista[2]}</p>`;
-  // Aviso sobre el skew, la trampa nº1
-  if(hayModelo){
-    intro += `<div class="historia" style="font-size:13.5px;margin-bottom:12px">
-      <p class="tip"><b>Ojo con una cosa.</b> Los puts lejanos <em>siempre</em> parecen chollo
-      si los comparas con una volatilidad plana. Eso es el <b>skew</b>, y no es una anomalía:
-      es miedo estructural que lleva en el precio desde 1987.
-      Aquí lo hemos descontado, así que la columna <b>"Ventaja real"</b> mide lo que de verdad
-      te llevas, no el espejismo.</p>
-      ${ayuda('skew')}
+  /* ── ACTO 2: qué vender, según tu apetito de riesgo ── */
+  st.rkTipo = st.rkTipo || 'puts';       // 'puts' o 'calls'
+  st.rkNivel = st.rkNivel || 'Medio';    // 'Conservador' / 'Medio' / 'Agresivo'
+
+  const tipoTxt = st.rkTipo==='puts'
+    ? `Vender un <b>put</b> es apostar a que ${sym} <b>no cae</b> por debajo del strike. Cobras hoy; si el precio aguanta, te quedas la prima.`
+    : `Vender una <b>call</b> es apostar a que ${sym} <b>no sube</b> por encima del strike. Cobras hoy; si el precio no llega, te quedas la prima.`;
+
+  const nivelTxt = {
+    'Conservador':'Strikes lejos del precio. Es muy improbable que te toquen (más del 85% de las veces caducan sin valor), pero cobras menos.',
+    'Medio':'Equilibrio entre lo que cobras y el riesgo. Aciertas en torno a 7 de cada 10 veces.',
+    'Agresivo':'Strikes cerca del precio. Cobras mucha más prima, pero te tocan con bastante frecuencia. Solo si tienes una opinión clara.'
+  }[st.rkNivel];
+
+  $('cChips').innerHTML = `
+    <div class="selector-grupo">
+      <span class="sel-label">Quiero vender:</span>
+      <button class="chip${st.rkTipo==='puts'?' on':''}" onclick="setRkTipo('puts')">PUTS (creo que no baja)</button>
+      <button class="chip${st.rkTipo==='calls'?' on':''}" onclick="setRkTipo('calls')">CALLS (creo que no sube)</button>
+    </div>
+    <div class="selector-grupo" style="margin-top:8px">
+      <span class="sel-label">Nivel de riesgo:</span>
+      ${['Conservador','Medio','Agresivo'].map(n=>
+        `<button class="chip${st.rkNivel===n?' on':''}" onclick="setRkNivel('${n}')">${n}</button>`).join('')}
     </div>`;
-  }
+
+  let intro = `<div class="historia" style="font-size:13.5px">
+    <p>${tipoTxt}</p>
+    <p class="tip">${nivelTxt}</p></div>`;
   $('cRankIntro').innerHTML = intro;
 
-  renderRank();renderTable();drawSmile();drawRND();
+  // La clave del ranking a mostrar
+  st.rkView = st.rkTipo + st.rkNivel;   // ej: 'putsMedio'
+
+  renderRank();renderTable();drawCone();drawSmile();drawRND();
 }
 
-/* Cambia el ranking activo. Sin esto, los botones no hacen nada. */
-function setRk(k){
-  st.rkView = k;
-  renderChain();
-}
+/* Cambia tipo (puts/calls) y nivel de riesgo */
+function setRkTipo(t){ st.rkTipo=t; renderChain(); }
+function setRkNivel(n){ st.rkNivel=n; renderChain(); }
+/* compat: algún sitio viejo aún llama setRk */
+function setRk(k){ st.rkView=k; renderChain(); }
 
 function renderRank(){
   const list=CH.rk[st.rkView]||[];
   const hayModelo=isFinite(CH.expVol);
-  if(!list.length){$('cRank').innerHTML='<p class="cap">No hay candidatos con datos suficientes.</p>';return;}
+  if(!list.length){
+    $('cRank').innerHTML='';
+    $('cRankNote').innerHTML=`<div class="historia"><p>No hay opciones en este nivel de riesgo
+      para ${CH.sym}. Prueba otro nivel, u otro vencimiento con más strikes.</p></div>`;
+    return;
+  }
 
+  // Tabla simple: lo justo para decidir al vender
   $('cRank').innerHTML=`<thead><tr>
-    <th>Contrato</th>
-    <th>Te pagan<br><small>prima</small></th>
-    <th>Debería valer<br><small>según tu modelo</small></th>
-    <th>Ventaja real<br><small>por contrato</small></th>
-    <th>Caduca sin valor<br><small>según el mercado</small></th>
-    <th>Cobras al día<br><small>por esperar</small></th>
-    <th>Anomalía<br><small>vs sus vecinas</small></th>
-    <th>Fácil de operar<br><small>liquidez</small></th>
+    <th>Strike</th>
+    <th>Cobras<br><small>por contrato</small></th>
+    <th>Aciertas<br><small>de cada 100</small></th>
+    <th>Distancia<br><small>al precio</small></th>
+    ${hayModelo?'<th>Ventaja<br><small>vs tu modelo</small></th>':''}
+    <th>Operable</th>
     </tr></thead><tbody>`+
-    list.map(o=>{
-      const rich=o.ivEdge>0.005,cheap=o.ivEdge<-0.005;
-      const tipo = o.type==='P'?'Put':'Call';
-      const infl = isFinite(o.inflacionSkew)&&Math.abs(o.inflacionSkew)>10;
-      return `<tr class="${rich?'rich':cheap?'cheap':''}" onclick="pick(${o.K},'${o.type}')">
-      <td class="tk">${tipo} ${o.K}<br><small class="mute">${Math.abs(o.sigmas).toFixed(1)}σ de distancia</small></td>
-      <td class="num">${o.mid.toFixed(2)}<br><small class="mute">$${(o.mid*100).toFixed(0)}/contrato</small></td>
-      <td class="mk">${isFinite(o.pxExpVol)?o.pxExpVol.toFixed(2):'—'}
-        <br><small class="mute">${isFinite(o.volPropia)?'con vol '+pc(o.volPropia):''}</small></td>
-      <td class="${o.gapContract>0?'up':'dn'}">${isFinite(o.gapContract)?(o.gapContract>0?'+':'')+'$'+Math.abs(o.gapContract).toFixed(0):'—'}
-        ${infl?`<br><small class="mute" style="color:var(--mark)">sin el skew: $${o.gapIngenuo.toFixed(0)}</small>`:''}</td>
-      <td class="${o.probOTM>.8?'up':''}">${(o.probOTM*100).toFixed(0)}%</td>
-      <td class="mk">$${Math.abs(o.theta*100).toFixed(2)}</td>
-      <td class="${rich?'up':cheap?'dn':'mute'}">${isFinite(o.ivEdge)?
-        (Math.abs(o.ivEdge)<0.005?'ninguna':(o.ivEdge>0?'CARA':'BARATA')):'—'}
-        <br><small class="mute">${isFinite(o.ivEdge)?((o.ivEdge>=0?'+':'')+(o.ivEdge*100).toFixed(2)+' pts'):''}</small></td>
-      <td>${o.liquidity>0.8?'✓ fácil':o.liquidity>0.5?'· regular':'⚠ difícil'}
-        <br><small class="mute">${(o.liquidity*100).toFixed(0)}%</small></td>
+    list.map((o,i)=>{
+      const dist=Math.abs(o.K-CH.spot);
+      const distPct=(dist/CH.spot*100).toFixed(1);
+      return `<tr class="${i===0?'destacada':''}" onclick="pick(${o.K},'${o.type}')">
+      <td class="tk">${o.type==='P'?'Put':'Call'} ${o.K}${i===0?'<br><small class="mute" style="color:var(--bull)">▸ la mejor pagada</small>':''}</td>
+      <td class="num">$${(o.mid*100).toFixed(0)}</td>
+      <td class="${o.probOTM>.8?'up':''}">${(o.probOTM*100).toFixed(0)}</td>
+      <td class="mute">${distPct}%<br><small class="mute">${Math.abs(o.sigmas).toFixed(1)}σ</small></td>
+      ${hayModelo?`<td class="${o.edgeContrato>5?'up':o.edgeContrato<-5?'dn':'mute'}">${isFinite(o.edgeContrato)?(o.edgeContrato>=0?'+':'')+'$'+o.edgeContrato.toFixed(0):'—'}</td>`:''}
+      <td>${o.liquidity>0.8?'✓':o.liquidity>0.5?'·':'⚠'}</td>
       </tr>`;}).join('')+'</tbody>';
 
-  /* Lectura del primero de la lista: la recomendación en cristiano */
+  /* Lectura del primero: la recomendación en cristiano */
   const top=list[0];
   const tipo=top.type==='P'?'put':'call';
   const dir=top.type==='P'?'baje':'suba';
-  let lectura=`<p><b>Si tuviera que quedarme con una:</b> el ${tipo} de strike ${top.K}.</p>`;
-  lectura+=`<p>Te pagan <b class="num">$${(top.mid*100).toFixed(0)}</b> por contrato.
-    A cambio te comprometes a comprar${top.type==='C'?'/vender':''} ${CH.sym} a ${top.K}
-    si acaba ${top.type==='P'?'por debajo':'por encima'} de ese precio.</p>`;
-  lectura+=`<p>Está a <b>${top.sigmas.toFixed(1)} desviaciones</b> del precio actual —o sea, bastante lejos.
-    Hay un <b class="num">${(top.probOTM*100).toFixed(0)}%</b> de probabilidad de que caduque sin que tengas que pagar nada,
-    y te quedes la prima entera.</p>`;
-  if(hayModelo&&isFinite(top.gapContract)&&top.gapContract>0){
-    lectura+=`<p class="clave up">Y lo importante: según tu modelo, ese contrato
-      <b>debería costar $${(top.pxExpVol*100).toFixed(0)}</b>, no $${(top.mid*100).toFixed(0)}.
-      Te están pagando <b class="num">$${top.gapContract.toFixed(0)} de más</b>.</p>`;
-    if(isFinite(top.inflacionSkew)&&Math.abs(top.inflacionSkew)>15){
-      lectura+=`<p><b>Y aquí una advertencia honesta:</b> si hubiéramos usado una volatilidad plana,
-        te habríamos dicho que la ventaja es de <b>$${top.gapIngenuo.toFixed(0)}</b> —casi
-        $${Math.abs(top.inflacionSkew).toFixed(0)} más. Pero eso sería mentira: esa diferencia
-        es <em>skew</em>, no ventaja. Los puts lejanos siempre cotizan caros, y eso no se puede
-        cobrar como si fuera un error del mercado.</p>`;
+  const dist=Math.abs(top.K-CH.spot);
+  const distPct=(dist/CH.spot*100).toFixed(1);
+  const cerca = Math.abs(top.sigmas)<0.8;
+
+  let lectura=`<p><b>La mejor pagada de este grupo:</b> el ${tipo} de strike ${top.K}.</p>`;
+  lectura+=`<p>Te embolsas <b class="num">$${(top.mid*100).toFixed(0)}</b> hoy. A cambio te comprometes a
+    ${top.type==='P'?'comprar':'vender'} ${CH.sym} a ${top.K} si el precio acaba
+    ${top.type==='P'?'por debajo':'por encima'} de ahí.</p>`;
+  lectura+=`<p>El strike está a un <b>${distPct}%</b> del precio de ahora (${cerca?'<b>cerca</b> — cobras bien pero te pueden tocar':'a una distancia cómoda'}).
+    Hay un <b class="num">${(top.probOTM*100).toFixed(0)}%</b> de que caduque sin valor y te quedes la prima entera.</p>`;
+
+  if(hayModelo&&isFinite(top.edgeContrato)){
+    if(top.edgeContrato>5){
+      lectura+=`<p class="clave up"><b>Además hay ventaja real:</b> según tu modelo de volatilidad,
+        el mercado te está pagando <b class="num">$${top.edgeContrato.toFixed(0)} por encima</b>
+        de lo que vale el riesgo. Eso es lo que buscas.</p>`;
+    } else if(top.edgeContrato<-5){
+      lectura+=`<p class="clave dn"><b>Cuidado:</b> según tu modelo, esto está
+        <b class="num">$${Math.abs(top.edgeContrato).toFixed(0)} por debajo</b> de lo que valdría.
+        Cobras, pero estás vendiendo barato. El mercado no te compensa el riesgo real.</p>`;
     }
   }
-  if(isFinite(top.probOTM)){
-    lectura+=`<p class="tip"><b>Sobre ese ${(top.probOTM*100).toFixed(0)}%:</b> es la probabilidad
-      que descuenta <em>el mercado</em>, calculada con su propia volatilidad.
-      Si tú crees que ${CH.sym} se va a mover menos, tu probabilidad real es <b>mayor</b>
-      que esa. Y si crees que se va a mover más, es <b>menor</b>.</p>`;
-  }
-  lectura+=`<p><b>El riesgo:</b> en el ${((1-top.probOTM)*100).toFixed(0)}% de casos restante, ${CH.sym} ${dir}
-    de ${top.K} y empiezas a perder. Y ahí no hay techo:
-    ${top.type==='P'?'cuanto más caiga, más pierdes':'cuanto más suba, más pierdes'}.
-    Por eso conviene cubrirlo comprando otro ${tipo} más lejano (un "spread") en vez de venderlo a pelo.</p>`;
-  lectura+=`<p class="tip">Pulsa cualquier fila para llevártela a <b>Estudiar</b> y ver el gráfico de qué pasa en cada escenario.</p>`;
+
+  lectura+=`<p class="tip"><b>Ese ${(top.probOTM*100).toFixed(0)}%</b> es la probabilidad del <em>mercado</em>.
+    Si crees que ${CH.sym} se moverá menos de lo que descuenta, la tuya es mayor.</p>`;
+  lectura+=`<p><b>El riesgo:</b> en el ${((1-top.probOTM)*100).toFixed(0)}% restante, ${CH.sym} ${dir}
+    de ${top.K} y pierdes — ${top.type==='P'?'cuanto más caiga, más':'cuanto más suba, más'}, sin techo.
+    Para acotarlo, compra otro ${tipo} más lejano y conviértelo en un <em>spread</em>.</p>`;
+  lectura+=`<p class="tip">Pulsa cualquier fila para llevártela a <b>Estudiar</b> y ver todos los escenarios.</p>`;
   $('cRankNote').innerHTML=lectura;
 }
 
@@ -2783,6 +2986,68 @@ function pick(K,type){
   }
   legs();go('desk');calc();
 }
+
+/* ── EL CONO: rango que el mercado anticipa hasta el vencimiento ── */
+function drawCone(){
+  const el=$('cone');if(!el||!CH.an)return;
+  const {spot,dte,expVol}=CH;const atm=CH.an.atmIv;
+  if(!isFinite(atm)||!isFinite(spot))return;
+  const [x,W,H]=cvs('cone',240);x.clearRect(0,0,W,H);
+  const pad={l:10,r:56,t:14,b:22};
+  const hayG=isFinite(expVol);
+  // rango vertical: hasta 2.4σ del mercado
+  const sMax=spot*Math.exp(2.4*atm*Math.sqrt(dte/365));
+  const sMin=spot*Math.exp(-2.4*atm*Math.sqrt(dte/365));
+  const X=d=>pad.l+(W-pad.l-pad.r)*d/dte;
+  const Y=s=>pad.t+(H-pad.t-pad.b)*(1-(s-sMin)/(sMax-sMin));
+  const N=60;
+  const band=(vol,nSig,fill)=>{
+    x.beginPath();
+    for(let i=0;i<=N;i++){const d=dte*i/N;x[i?'lineTo':'moveTo'](X(d),Y(spot*Math.exp(nSig*vol*Math.sqrt(d/365))));}
+    for(let i=N;i>=0;i--){const d=dte*i/N;x.lineTo(X(d),Y(spot*Math.exp(-nSig*vol*Math.sqrt(d/365))));}
+    x.closePath();x.fillStyle=fill;x.fill();
+  };
+  // mercado: 2σ tenue + 1σ visible
+  band(atm,2,'rgba(143,168,220,.07)');
+  band(atm,1,'rgba(143,168,220,.14)');
+  // histórico encima, en ámbar: si es más estrecho, el mercado exagera
+  if(hayG)band(expVol,1,'rgba(217,164,65,.16)');
+  // línea del precio actual
+  x.strokeStyle=C.ink2;x.lineWidth=1;x.setLineDash([3,3]);
+  x.beginPath();x.moveTo(pad.l,Y(spot));x.lineTo(W-pad.r,Y(spot));x.stroke();x.setLineDash([]);
+  // etiquetas al borde derecho
+  x.font=C.mono;x.textAlign='left';
+  const tag=(s,col,txt)=>{x.fillStyle=col;x.fillText(txt||s.toFixed(0),W-pad.r+5,Y(s)+3);};
+  tag(spot,C.ink,spot.toFixed(1));
+  tag(spot*Math.exp(atm*Math.sqrt(dte/365)),C.model);
+  tag(spot*Math.exp(-atm*Math.sqrt(dte/365)),C.model);
+  if(hayG){tag(spot*Math.exp(expVol*Math.sqrt(dte/365)),C.mark);
+           tag(spot*Math.exp(-expVol*Math.sqrt(dte/365)),C.mark);}
+  // eje temporal
+  x.fillStyle=C.ink3;x.textAlign='center';
+  x.fillText('hoy',pad.l+14,H-6);
+  x.fillText('vence · '+dte+'d',(pad.l+W-pad.r)/2,H-6);
+
+  // nota en cristiano
+  const mov1=spot*(Math.exp(atm*Math.sqrt(dte/365))-1);
+  let n=`<p><b style="color:var(--model)">Azul</b>: la franja donde el mercado espera que se quede ${CH.sym}
+    (la banda clara ≈ 2 de cada 3 veces; la tenue ≈ 19 de cada 20).
+    A vencimiento, eso es <b class="num">±${mov1.toFixed(2)}</b> desde hoy.</p>`;
+  if(hayG){
+    const movG=spot*(Math.exp(expVol*Math.sqrt(dte/365))-1);
+    n+= expVol<atm*0.92
+      ?`<p><b style="color:var(--mark)">Ámbar</b>: la franja según su histórico real — <b>más estrecha</b>
+        (±${movG.toFixed(2)}). Si la historia manda, el mercado está pagando por un movimiento que no llegará.
+        Ese hueco entre franjas es exactamente lo que cobras al vender prima.</p>`
+      :expVol>atm*1.08
+      ?`<p><b style="color:var(--mark)">Ámbar</b>: la franja según su histórico — <b>más ancha</b>
+        (±${movG.toFixed(2)}). La historia dice que ${CH.sym} se mueve más de lo que el mercado cobra.
+        Mal momento para vender seguros baratos.</p>`
+      :`<p><b style="color:var(--mark)">Ámbar</b>: el histórico (±${movG.toFixed(2)}) coincide con el mercado. Sin ventaja de volatilidad.</p>`;
+  }
+  $('coneNote').innerHTML=n;
+}
+
 function drawSmile(){
   const[x,W,H]=cvs('smile',220);x.clearRect(0,0,W,H);
   const{an,t}=CH;const p=an.rows.filter(o=>o.otm&&isFinite(o.iv));
@@ -2830,15 +3095,227 @@ function drawRND(){
 /* ══════════════ NAVEGACIÓN ══════════════ */
 function go(v){
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
-  ['book','desk','chain'].forEach(k=>$('v-'+k).classList.toggle('on',k===v));
+  ['today','book','desk','chain'].forEach(k=>$('v-'+k).classList.toggle('on',k===v));
   if(v==='desk')setTimeout(calc,20);
   if(v==='chain'&&CH.an)setTimeout(renderChain,20);
 }
 $('tpl').innerHTML=Object.keys(TPL).map(n=>`<button class="chip" onclick="tpl('${n}')">${n}</button>`).join('');
 ['S','DTE','IV','r','q','model'].forEach(i=>$(i).addEventListener('input',calc));
 
+/* ═══════════════════════════════════════════════════
+   HOY · radar de oportunidades sobre tus favoritos
+   Funciona con la cuenta llena, vacía o sin conectar posiciones:
+   solo necesita el acceso al Worker para datos de mercado.
+   ═══════════════════════════════════════════════════ */
+const TD={data:{}};   // resultados por símbolo
+
+function getFavs(){
+  try{const f=JSON.parse(localStorage.getItem('favs')||'[]');return Array.isArray(f)?f:[];}
+  catch{return[];}
+}
+function setFavs(f){localStorage.setItem('favs',JSON.stringify(f));renderFavs();tapeRender();}
+function addFav(){
+  const inp=$('favInp');const s=(inp.value||'').trim().toUpperCase();
+  if(!s)return;
+  if(!/^[A-Z.\/]{1,8}$/.test(s)){alert('Eso no parece un ticker.');return;}
+  const f=getFavs();
+  if(f.includes(s)){inp.value='';return;}
+  if(f.length>=12){alert('Máximo 12 favoritos: el escaneo tardaría demasiado.');return;}
+  f.push(s);setFavs(f);inp.value='';
+}
+function delFav(s){setFavs(getFavs().filter(x=>x!==s));}
+function renderFavs(){
+  const f=getFavs();
+  $('favRow').innerHTML=f.map(s=>
+    `<span class="fav">${s}<span class="x" onclick="delFav('${s}')" title="Quitar">×</span></span>`).join('')+
+    `<span class="fav-add"><input id="favInp" placeholder="AAPL" maxlength="8"
+      onkeydown="if(event.key==='Enter')addFav()"><button onclick="addFav()">+ Añadir</button></span>`;
+}
+
+/* ── LA CINTA: teletipo de favoritos en la cabecera ── */
+function tapeRender(){
+  const f=getFavs();
+  const el=$('tapeIn');
+  if(!f.length){
+    el.innerHTML='<span class="tk-empty">Añade favoritos en la pestaña Hoy y esta cinta cobrará vida.</span>';
+    el.style.animation='none';return;
+  }
+  const item=s=>{
+    const d=TD.data[s];
+    if(!d||!isFinite(d.spot))
+      return `<span class="tk-item" onclick="tapeGo('${s}')"><span class="tk-sym">${s}</span><span class="tk-px" style="color:var(--ink3)">—</span></span>`;
+    const chg=d.chgPct;
+    return `<span class="tk-item" onclick="tapeGo('${s}')">
+      <span class="tk-sym">${s}</span>
+      <span class="tk-px">${d.spot.toFixed(2)}</span>
+      ${isFinite(chg)?`<span class="tk-chg ${chg>=0?'up':'dn'}">${chg>=0?'▲':'▼'}${Math.abs(chg).toFixed(1)}%</span>`:''}
+      ${isFinite(d.vrp)&&Math.abs(d.vrp)>3?`<span class="tk-chg mk" style="color:var(--mark)">·${d.vrp>0?'+':''}${d.vrp.toFixed(0)}pts</span>`:''}
+    </span>`;
+  };
+  const row=f.map(item).join('');
+  // el loop del marquee necesita dos copias idénticas; con pocos favoritos
+  // repetimos la tanda para que la cinta no deje huecos
+  const rep=Math.max(1,Math.ceil(5/f.length));
+  const half=row.repeat(rep);
+  el.innerHTML=half+half;
+  el.style.animation='';
+}
+function tapeGo(s){$('cSym').value=s;go('chain');}
+
+/* ── EL ESCÁNER ── */
+async function scanFavs(){
+  const favs=getFavs();
+  const msg=$('tdMsg');
+  if(!favs.length){alert('Añade al menos un favorito.');return;}
+  if(!CN.url||!CN.key){
+    msg.style.display='block';
+    msg.innerHTML='Para escanear necesito el acceso a datos configurado. Ve a <b>Mi cuenta → Configurar acceso</b>. No hace falta que tengas posiciones: solo el acceso de lectura.';
+    return;
+  }
+  msg.style.display='block';msg.textContent='Pidiendo métricas de '+favs.length+' tickers…';
+  $('tdEmpty').style.display='none';
+  try{
+    // 1) métricas por HTTP en paralelo (IV índice, IV rank, earnings)
+    const mets={};
+    await Promise.all(favs.map(async s=>{
+      try{const m=await api('metrics',{symbol:s});
+        mets[s]=(m?.data?.items||m?.items||[])[0]||null;}catch{mets[s]=null;}
+    }));
+    // 2) UNA conexión de datos: quotes de todos + velas de todos
+    msg.textContent='Descargando precios e histórico de '+favs.length+' tickers…';
+    const quotes={},velas={};
+    const dx=new DXLink();
+    dx.onQuote=(s,q)=>{quotes[s]=Object.assign(quotes[s]||{},q);};
+    dx.onCandle=(s,c)=>{const und=s.replace(/\{.*\}$/,'');(velas[und]=velas[und]||[]).push(c);};
+    await dx.connect(CN.url,CN.key);
+    await new Promise(r=>setTimeout(r,300));
+    dx.subscribe(favs);
+    favs.forEach(s=>dx.subscribeCandles(s,500,'d'));
+    await new Promise(r=>setTimeout(r,6000));
+    dx.disconnect();
+    // 3) análisis por ticker
+    let ok=0;
+    for(const s of favs){
+      const q=quotes[s];const m=mets[s];const cs=(velas[s]||[]).sort((a,b)=>a.time-b.time);
+      // spot: quote en vivo; con el mercado cerrado, el último cierre
+      let spot=q&&q.bid!=null&&q.ask!=null?(q.bid+q.ask)/2:NaN;
+      let esCierre=false;
+      if(!isFinite(spot)&&cs.length){spot=cs[cs.length-1].close;esCierre=true;}
+      // Guarda de unidades: tastytrade da fracciones (0.26, 0.81), pero si el
+      // formato cambiara a porcentaje, el VRP saldría absurdo sin avisar.
+      let ivIdx=m?parseFloat(m['implied-volatility-index']):NaN;
+      if(isFinite(ivIdx)&&ivIdx>3)ivIdx/=100;          // 26.1 → 0.261
+      let ivRank=m?parseFloat(m['implied-volatility-index-rank']):NaN;
+      if(isFinite(ivRank)&&ivRank>1.5)ivRank/=100;     // 81 → 0.81
+      let garch=NaN,nVelas=cs.length,chgPct=NaN;
+      if(cs.length>=80){const pk=volForecast(cs,30);if(pk.ok)garch=pk.expected;}
+      if(cs.length>=2){const prev=cs[cs.length-2].close;if(prev>0)chgPct=(cs[cs.length-1].close/prev-1)*100;}
+      const vrp=(isFinite(ivIdx)&&isFinite(garch))?(ivIdx-garch)*100:NaN;
+      // earnings: tastytrade lo da dentro de m.earnings
+      let earn=null;
+      const eRaw=m&&(m['earnings']||{});
+      const eDate=eRaw['expected-report-date']||eRaw['actual-eps-date']||null;
+      if(eDate){const d=new Date(eDate);const dias=Math.round((d-Date.now())/86400000);
+        if(dias>=0&&dias<=45)earn={fecha:eDate,dias};}
+      TD.data[s]={spot,ivIdx,ivRank,garch,vrp,nVelas,chgPct,earn,esCierre};
+      if(isFinite(spot))ok++;
+    }
+    if(!ok)throw new Error('No llegó ningún dato (ni precios ni velas). Revisa la conexión con Diagnosticar en Mi cuenta.');
+    msg.style.display='none';
+    renderToday();tapeRender();
+  }catch(e){msg.style.display='block';msg.textContent='No se pudo escanear: '+e.message;}
+}
+
+function renderToday(){
+  const favs=getFavs();
+  const list=favs.map(s=>({s,...TD.data[s]})).filter(d=>isFinite(d.spot)||isFinite(d.ivIdx));
+  // orden: primero los de más |VRP| (donde está el jugo), los sin datos al final
+  list.sort((a,b)=>(isFinite(b.vrp)?Math.abs(b.vrp):-1)-(isFinite(a.vrp)?Math.abs(a.vrp):-1));
+  $('tdOut').style.display='block';
+  $('tdSub').textContent=new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'});
+
+  const conVrp=list.filter(d=>isFinite(d.vrp));
+  const mejor=conVrp[0];
+  let intro='';
+  if(mejor&&Math.abs(mejor.vrp)>4){
+    intro=`<p>Hoy el jugo está en <b>${mejor.s}</b>: el mercado ${mejor.vrp>0
+      ?`cobra <b class="num">${mejor.vrp.toFixed(1)} puntos de más</b> respecto a lo que dice su histórico. Vender prima ahí paga bien.`
+      :`cobra <b class="num">${Math.abs(mejor.vrp).toFixed(1)} puntos de menos</b>. Sus opciones están de oferta: mejor comprarlas que venderlas.`}</p>`;
+  } else if(conVrp.length){
+    intro=`<p>Hoy no hay chollos gordos: en tus ${conVrp.length} favoritos con datos, el mercado y la historia andan bastante de acuerdo. Los días así, la mejor operación suele ser <b>ninguna</b>.</p>`;
+  } else {
+    intro=`<p>No pude estimar la volatilidad histórica de ningún favorito (faltan velas). Los precios sí llegaron: pincha cualquier tarjeta para analizarlo a fondo.</p>`;
+  }
+  $('tdIntro').innerHTML=intro;
+
+  $('tdCards').innerHTML=list.map(d=>{
+    const verd=!isFinite(d.vrp)?['nada','sin datos suficientes']
+      :d.vrp>4?['vender','vender prima']
+      :d.vrp<-2?['comprar','comprar opciones']
+      :['nada','sin ventaja clara'];
+    const pos=posDe(d.s);
+    return `<div class="opp" onclick="tapeGo('${d.s}')">
+      <div class="opp-head">
+        <span class="opp-sym">${d.s}</span>
+        <span class="opp-px">${isFinite(d.spot)?d.spot.toFixed(2)+(d.esCierre?' <small style="color:var(--ink3)">cierre</small>':''):'—'}
+          ${isFinite(d.chgPct)?`<span class="tk-chg ${d.chgPct>=0?'up':'dn'}" style="font-size:12px"> ${d.chgPct>=0?'▲':'▼'}${Math.abs(d.chgPct).toFixed(1)}%</span>`:''}</span>
+        ${pos?`<span class="opp-badge pos">tienes posición</span>`:''}
+        <span class="opp-badge ${verd[0]}"${pos?'':' style="margin-left:auto"'}>${verd[1]}</span>
+      </div>
+      <div class="opp-figs">
+        <span class="opp-f"><span class="k">susto del mercado</span><span class="v mdl">${isFinite(d.ivIdx)?(d.ivIdx*100).toFixed(1)+'%':'—'}</span></span>
+        <span class="opp-f"><span class="k">susto real (histórico)</span><span class="v">${isFinite(d.garch)?(d.garch*100).toFixed(1)+'%':'—'}</span></span>
+        <span class="opp-f"><span class="k">te pagan de más</span><span class="v ${d.vrp>2?'up':d.vrp<-2?'dn':''}">${isFinite(d.vrp)?(d.vrp>=0?'+':'')+d.vrp.toFixed(1)+' pts':'—'}</span></span>
+        <span class="opp-f"><span class="k">IV vs su año</span><span class="v ${d.ivRank>0.7?'mk':''}">${isFinite(d.ivRank)?'percentil '+(d.ivRank*100).toFixed(0):'—'}</span></span>
+      </div>
+      ${d.earn?`<div class="opp-warn">⚠ Earnings ${d.earn.dias===0?'HOY':'en '+d.earn.dias+' días'} (${d.earn.fecha}). La IV está inflada por el evento y se desplomará justo después (el "IV crush"). Vender prima antes de earnings es apostar al resultado, no cobrar el seguro.</div>`:''}
+      ${!isFinite(d.vrp)&&isFinite(d.spot)?`<div class="opp-line">Llegó el precio pero no suficiente histórico (${d.nVelas||0} velas) para el GARCH.</div>`:''}
+      <div class="opp-line">Pulsa para escanear su cadena completa y ver qué strikes vender.</div>
+    </div>`;
+  }).join('');
+
+  renderTodayPort();
+}
+
+/* posición abierta en un subyacente, si el book está cargado */
+function posDe(sym){
+  if(!BK.pos||!BK.pos.length)return null;
+  return BK.pos.filter(p=>p.und===sym);
+}
+function renderTodayPort(){
+  const sec=$('tdPortSec');
+  if(!BK.pos||!BK.pos.length){sec.style.display='none';return;}
+  sec.style.display='block';
+  // delta neto por subyacente (con lo que haya llegado del feed)
+  const por={};
+  BK.pos.forEach(p=>{
+    const d=p.live&&p.live.delta!=null?p.live.delta*p.qty*p.mult:null;
+    por[p.und]=por[p.und]||{n:0,delta:0,hayDelta:true};
+    por[p.und].n++;
+    if(d==null)por[p.und].hayDelta=false;else por[p.und].delta+=d;
+  });
+  const unds=Object.keys(por);
+  let t=`<p>Tienes posiciones en <b>${unds.join(', ')}</b>.</p>`;
+  const favs=getFavs();
+  unds.forEach(u=>{
+    const x=por[u];const d=TD.data[u];
+    if(x.hayDelta&&Math.abs(x.delta)>=20){
+      t+=`<p>En <b>${u}</b> tu exposición equivale a <b class="num">${(x.delta/100).toFixed(0)} acciones ${x.delta>0?'compradas':'vendidas'}</b>.`;
+      if(d&&isFinite(d.vrp)&&d.vrp>4){
+        t+=x.delta>0
+          ?` Con su prima cara, podrías <b>vender calls cubiertas</b>: cobras el seguro caro sobre lo que ya tienes.`
+          :` Con su prima cara, vender puts te pagaría bien, pero ojo: añadiría exposición al mismo lado.`;
+      }
+      t+=`</p>`;
+    }
+    if(!favs.includes(u))t+=`<p class="tip">${u} no está en tus favoritos: añádelo y el radar lo vigilará también.</p>`;
+  });
+  $('tdPort').innerHTML=t;
+}
+
 /* arranque */
 tpl('Iron condor');
+renderFavs();tapeRender();
 gloss();
 calc();
 led(CN.url&&CN.key?'Listo':'Sin conectar');
