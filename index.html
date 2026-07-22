@@ -274,6 +274,18 @@ details.explica summary:hover{color:var(--ink)}
 
 
 /* ── veredicto direccional ── */
+/* ── dos termómetros: sesgo y cola ── */
+.dir-dual{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:6px}
+@media(max-width:560px){.dir-dual{grid-template-columns:1fr;gap:14px}}
+.dir-lab{font-size:11px;color:var(--ink3);letter-spacing:.04em;text-transform:uppercase;margin-bottom:4px}
+.dir-alert{background:rgba(217,164,65,.1);border:1px solid rgba(217,164,65,.4);border-radius:8px;
+  padding:12px 14px;font-size:13.5px;line-height:1.55;color:var(--ink);margin:12px 0}
+.dir-alert b{color:var(--mark)}
+.dir-cols{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:14px}
+@media(max-width:560px){.dir-cols{grid-template-columns:1fr}}
+.dir-blk-t{font-family:var(--disp);font-size:14px;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--ink2);margin-bottom:8px;border-bottom:1px solid var(--rule);padding-bottom:4px}
+
 .dir-head{display:flex;align-items:baseline;gap:14px;margin-bottom:8px}
 .dir-verdict{font-family:var(--disp);font-size:26px;font-weight:700;letter-spacing:.05em}
 .dir-score{font-size:15px;color:var(--ink2)}
@@ -660,7 +672,7 @@ summary:hover{color:var(--ink)}
 
       <div class="cols c2">
         <section class="blk">
-          <h2>¿Hacia dónde apunta este vencimiento?<span class="sub">todas las señales direccionales, juntas</span></h2>
+          <h2>¿Hacia dónde apunta este vencimiento?<span class="sub">dirección y riesgo de cola, por separado</span></h2>
           <div id="dirBox"></div>
         </section>
         <section class="blk">
@@ -3177,95 +3189,247 @@ function pick(K,type){
    El score va de −100 (muy bajista) a +100 (muy alcista).
    ═══════════════════════════════════════════════════════════════════ */
 function direccion(){
-  const S=[];const add=(pts,nombre,detalle)=>{if(pts)S.push({pts,nombre,detalle});};
+  // ═══════════════════════════════════════════════════════════════════
+  // MODELO DE Z-SCORES · sin pesos inventados
+  //
+  // El problema del sistema anterior: los puntos (35, 18, -24...) me los
+  // inventaba yo. Aquí cada señal se convierte a un Z-SCORE: cuántas
+  // desviaciones típicas se aleja de su NEUTRAL TEÓRICO. La escala ya no
+  // la pongo a ojo — sale de la propia magnitud del fenómeno.
+  //
+  // Lo honesto de este enfoque: NO afirma pesos óptimos (eso exigiría años
+  // de histórico de cadenas que no tenemos). Lo que hace es poner todas las
+  // señales en la MISMA unidad (desviaciones), para poder compararlas y
+  // combinarlas sin que una domine solo por estar medida en números grandes.
+  //
+  // Cada señal aporta un z ∈ [-3, 3]. El sesgo y el riesgo de cola son medias
+  // de sus z (no sumas), así que el resultado sigue en unidades de desviación
+  // y es interpretable: |z|<0.5 ruido, 0.5-1 leve, 1-2 claro, >2 extremo.
+  // ═══════════════════════════════════════════════════════════════════
+  const clip=(x,a=3)=>Math.max(-a,Math.min(a,x));
+  const sesgoZ=[], colaZ=[];
+  const addS=(z,nombre,detalle)=>{if(Number.isFinite(z)&&Math.abs(z)>0.15)sesgoZ.push({z:clip(z),nombre,detalle});};
+  const addC=(z,nombre,detalle)=>{if(Number.isFinite(z)&&Math.abs(z)>0.15)colaZ.push({z:clip(z),nombre,detalle});};
 
-  // 1 · Momentum (la señal con más literatura detrás)
-  if(CH.mom){
-    const m=CH.mom;
-    if(m.alcista)add(35,'Tendencia 6 meses',`+${(m.m6*100).toFixed(0)}% y sobre su media de 200 sesiones`);
-    else if(m.bajista)add(-35,'Tendencia 6 meses',`${(m.m6*100).toFixed(0)}% y bajo su media de 200`);
-    else if(m.m6>0.08)add(18,'Tendencia 6 meses',`+${(m.m6*100).toFixed(0)}% (la media de 200 no confirma)`);
-    else if(m.m6<-0.08)add(-18,'Tendencia 6 meses',`${(m.m6*100).toFixed(0)}% (la media de 200 no confirma)`);
-    if(m.m6>0&&m.distMax52>-0.03)add(10,'Pegado a máximos','a menos del 3% del máximo de 52 semanas: los rompimientos de máximo tienen deriva alcista documentada');
+  const gammaNeg = CH.flw&&CH.flw.ok&&CH.flw.gexTotal<0;
+  let momAlcistaCrudo=false, momBajistaCrudo=false;
+
+  // ── 1 · MOMENTUM · z = retorno 6m / (vol realizada · √½año) ──
+  // Neutral teórico: cero (un valor sin tendencia). Escala: su propia
+  // volatilidad al mismo horizonte. Así un +20% en un valor tranquilo pesa
+  // más que en uno que se mueve un 80%. Es un z-score genuino.
+  if(CH.mom && Number.isFinite(CH.mom.volRealizada) && CH.mom.volRealizada>0){
+    const escala = CH.mom.volRealizada*Math.sqrt(0.5);       // σ a 6 meses
+    let z = CH.mom.m6/escala;
+    // la media de 200 confirma o no: si el precio contradice al momentum, se atenúa
+    if((CH.mom.m6>0)!==CH.mom.sobreM200) z*=0.5;
+    momAlcistaCrudo = CH.mom.m6>0.08;
+    momBajistaCrudo = CH.mom.m6<-0.08;
+    // con gamma negativa la tendencia pasada protege menos: se atenúa el sesgo alcista
+    if(z>0 && gammaNeg) z*=0.5;
+    addS(z*0.9,'Tendencia 6 meses',
+      `${CH.mom.m6>=0?'+':''}${(CH.mom.m6*100).toFixed(0)}% en 6 meses, con vol ${(CH.mom.volRealizada*100).toFixed(0)}% → ${z>=0?'+':''}${z.toFixed(2)}σ${((CH.mom.m6>0)!==CH.mom.sobreM200)?' (la media de 200 no confirma, atenuado)':''}${z>0&&gammaNeg?' (gamma negativa, atenuado)':''}`);
   }
 
-  // 2 · Skew tilt: qué lado del seguro paga caro el dinero HOY
-  if(CH.tilt&&Number.isFinite(CH.tilt.rr)){
-    const rr=CH.tilt.rr;
-    if(rr>0)add(22,'Skew invertido',`las calls 25Δ cuestan MÁS que las puts (+${rr.toFixed(1)} pts): demanda alcista agresiva, muy raro`);
-    else if(rr>-0.5)add(14,'Skew plano',`calls y puts 25Δ casi al mismo precio (${rr.toFixed(1)} pts): demanda de subida inusual`);
-    else if(rr<-8)add(-6,'Skew extremo a puts',`el seguro de caída se paga carísimo (${rr.toFixed(1)} pts): miedo fuerte (señal débil)`);
+  // ── 2 · DERIVA IMPLÍCITA · z = deriva / movimiento esperado ──
+  // La distribución de opciones ya centra el precio en algún sitio. Ese
+  // desplazamiento respecto al forward, medido en σ del propio movimiento
+  // esperado (que la RND da), es un z-score puro. Cero = mercado neutral.
+  if(CH.rnd && Number.isFinite(CH.rnd.derivaPct) && CH.an && Number.isFinite(CH.an.atmIv)){
+    const movEsperado = CH.an.atmIv*Math.sqrt((CH.dte||30)/365)*100;   // σ en %
+    if(movEsperado>0){
+      const z = CH.rnd.derivaPct/movEsperado;
+      addS(z,'Deriva que descuenta el mercado',
+        `la distribución centra el precio ${CH.rnd.derivaPct>=0?'+':''}${CH.rnd.derivaPct.toFixed(1)}% vs forward → ${z>=0?'+':''}${z.toFixed(2)}σ del movimiento esperado`);
+    }
   }
 
-  // 3 · Colas de la RND: a qué lado asigna el mercado probabilidad de sobra
-  if(CH.rnd&&Number.isFinite(CH.rnd.excesoUp)&&Number.isFinite(CH.rnd.excesoDn)){
-    const neto=CH.rnd.excesoUp-CH.rnd.excesoDn;
-    const pts=Math.max(-15,Math.min(15,Math.round(neto*5)));
-    if(Math.abs(pts)>=4)add(pts,'Colas de la distribución',
-      neto>0?`el mercado paga por subidas fuertes un ${CH.rnd.excesoUp.toFixed(1)}% más de lo normal`
-            :`el mercado paga por caídas fuertes un ${CH.rnd.excesoDn.toFixed(1)}% más de lo normal`);
+  // ── 3 · SKEW · z respecto al skew NORMAL, no respecto a cero ──
+  // Clave conceptual: en renta variable el skew negativo es lo normal desde
+  // 1987. El neutral NO es cero: es el skew típico para ese plazo. Modelamos
+  // ese típico como ≈ -2·√(t) puntos de RR25 (más plano cuanto más lejano el
+  // vencimiento) con una escala de ~4 pts. Un RR plano o positivo se desvía
+  // hacia arriba (alcista); uno muy cargado a puts que sea NORMAL no puntúa.
+  if(CH.tilt && Number.isFinite(CH.tilt.rr)){
+    const tAny = (CH.dte||30)/365;
+    const rrNormal = -3.5/Math.sqrt(Math.max(tAny,0.02))*0.15;   // típico (negativo) escalado por plazo
+    const escalaRR = 4.0;                                        // pts de RR por σ
+    const z = (CH.tilt.rr - rrNormal)/escalaRR;
+    addS(z*0.7,'Skew vs su normal',
+      `RR25 ${CH.tilt.rr>=0?'+':''}${CH.tilt.rr.toFixed(1)} pts, normal ≈ ${rrNormal.toFixed(1)} → ${z>=0?'+':''}${z.toFixed(2)}σ${z>0.5?' (calls más demandadas de lo habitual: alcista)':z<-0.5?' (miedo por encima de lo normal)':''}`);
   }
 
-  // 4 · Max pain (solo pesa cerca del vencimiento)
-  if(CH.flw&&CH.flw.ok&&Number.isFinite(CH.flw.maxPain)&&CH.dte<=10){
-    const d=(CH.flw.maxPain/CH.spot-1)*100;
-    if(Math.abs(d)>1.5)add(d>0?10:-10,'Imán de vencimiento',
-      `max pain en ${CH.flw.maxPain} (${d>0?'+':''}${d.toFixed(1)}%), con ${CH.dte} días la deriva documentada tira hacia él`);
+  // ── 4 · MAX PAIN · z por cercanía al vencimiento ──
+  if(CH.flw && CH.flw.ok && Number.isFinite(CH.flw.maxPain) && CH.dte<=10){
+    const d=(CH.flw.maxPain/CH.spot-1);
+    const escala=0.03;                                          // 3% ≈ 1σ de tirón típico
+    const z=(d/escala)*(1-CH.dte/10);                          // pesa más cuanto menos falta
+    addS(z*0.5,'Imán de vencimiento',
+      `max pain en ${CH.flw.maxPain} (${d>=0?'+':''}${(d*100).toFixed(1)}%), ${CH.dte}d → ${z>=0?'+':''}${z.toFixed(2)}σ (deriva débil documentada)`);
   }
 
-  const score=Math.max(-100,Math.min(100,S.reduce((a,s)=>a+s.pts,0)));
-  const veredicto = score>=45?'MUY ALCISTA':score>=20?'ALCISTA'
-                  :score<=-45?'MUY BAJISTA':score<=-20?'BAJISTA':'SIN SEÑAL CLARA';
-  return {score,veredicto,señales:S};
+  // ═══ RIESGO DE COLA (en las mismas unidades σ) ═══
+
+  // ── 5 · GAMMA · z = GEX normalizado por la escala de la cadena ──
+  // No usamos el GEX en dólares (depende del tamaño del subyacente). Lo
+  // medimos como fracción del gamma total absoluto: cuán dominante es el
+  // signo negativo. Neutral = 0 (gamma equilibrada).
+  if(CH.flw && CH.flw.ok && Number.isFinite(CH.flw.gexTotal)){
+    const perfil=CH.flw.perfil||[];
+    const brutoAbs=perfil.reduce((a,x)=>a+Math.abs(x.neto),0)||1;
+    const frac=CH.flw.gexTotal/brutoAbs;         // -1 (todo negativo) .. +1
+    const z=frac*2.5;                            // fracción alta → ~2σ
+    if(frac<0) addC(z,'Gamma negativa',
+      `los dealers amplifican (${(frac*100).toFixed(0)}% neto negativo) → ${z.toFixed(2)}σ. Régimen de desplomes: si cae, la cobertura acelera`);
+    else addC(z*0.6,'Gamma positiva',
+      `los dealers amortiguan (${(frac*100).toFixed(0)}% neto positivo) → +${(z*0.6).toFixed(2)}σ. Régimen estable`);
+  }
+
+  // ── 6 · ASIMETRÍA DE COLAS · z de la cola izquierda vs la lognormal ──
+  // La RND ya da el exceso de masa en la cola izquierda (>12% de caída)
+  // respecto a lo que una lognormal daría. Lo expresamos en σ con escala ~2%.
+  if(CH.rnd && Number.isFinite(CH.rnd.asimetriaCola)){
+    const z=-(CH.rnd.asimetriaCola*100)/2.0;     // asimetría izquierda (positiva) → z negativo
+    if(z<-0.3) addC(z,'Cola izquierda gorda',
+      `caída fuerte (>12%) con ${CH.rnd.excesoColaDn>=0?'+':''}${CH.rnd.excesoColaDn.toFixed(1)}% más probabilidad que lo normal → ${z.toFixed(2)}σ`);
+    else if(z>0.3) addC(z,'Cola derecha gorda',
+      `el mercado carga la cola alcista → +${z.toFixed(2)}σ (apuesta por un salto arriba)`);
+  }
+
+  // ── COMBINAR: media de z (no suma), sigue en unidades de desviación ──
+  const media=arr=>arr.length?arr.reduce((a,s)=>a+s.z,0)/arr.length:0;
+  // ponderación por magnitud: una señal fuerte pesa más que una tibia, pero
+  // sin coeficientes inventados — el peso es su propio |z| (auto-ponderación).
+  const mediaW=arr=>{if(!arr.length)return 0;
+    const sw=arr.reduce((a,s)=>a+Math.abs(s.z),0)||1;
+    return arr.reduce((a,s)=>a+s.z*Math.abs(s.z),0)/sw;};
+
+  const zSesgo=mediaW(sesgoZ);
+  const zCola=mediaW(colaZ);
+
+  // veredicto por umbrales EN DESVIACIONES (interpretables, no arbitrarios)
+  const vSesgo = zSesgo>=1.2?'ALCISTA':zSesgo>=0.5?'SESGO ALCISTA'
+              : zSesgo<=-1.2?'BAJISTA':zSesgo<=-0.5?'SESGO BAJISTA':'SIN RUMBO CLARO';
+  const vCola = zCola<=-1.2?'ALTO (a la baja)':zCola<=-0.5?'ELEVADO (a la baja)'
+              : zCola>=0.5?'CONTENIDO':'NORMAL';
+
+  // score -100..100 para las barras (escala visual: 2σ = extremo)
+  const scoreSesgo=Math.round(clip(zSesgo/2)*100);
+  const scoreCola=Math.round(clip(zCola/2)*100);
+
+  return {zSesgo,zCola,scoreSesgo,scoreCola,vSesgo,vCola,
+          sesgo:sesgoZ.map(s=>({...s,pts:s.z})),   // compat: pts = z ahora
+          cola:colaZ.map(s=>({...s,pts:s.z})),
+          gammaNeg,momAlcistaCrudo,momBajistaCrudo,
+          score:scoreSesgo, veredicto:vSesgo, señales:sesgoZ};
 }
 
 function renderDir(){
   const el=$('dirBox');if(!el||!CH.an)return;
   const D=direccion();
   const vrp=isFinite(CH.expVol)?(CH.an.atmIv-CH.expVol)*100:NaN;
-  const col=D.score>=20?'var(--bull)':D.score<=-20?'var(--bear)':'var(--ink2)';
-  const pctBar=(D.score+100)/2;   // 0..100 para la barra
 
-  let t=`<div class="dir-head">
-    <span class="dir-verdict" style="color:${col}">${D.veredicto}</span>
-    <span class="dir-score num">${D.score>0?'+':''}${D.score}</span>
-  </div>
-  <div class="dir-bar"><div class="dir-fill" style="left:${Math.min(pctBar,50)}%;width:${Math.abs(pctBar-50)}%;background:${col}"></div><div class="dir-zero"></div></div>`;
+  const colSesgo=D.zSesgo>=0.5?'var(--bull)':D.zSesgo<=-0.5?'var(--bear)':'var(--ink2)';
+  const colCola=D.zCola<=-0.5?'var(--bear)':D.zCola>=0.5?'var(--bull)':'var(--ink2)';
+  const barra=(score,col)=>{const pct=(Math.max(-100,Math.min(100,score))+100)/2;
+    return `<div class="dir-bar"><div class="dir-fill" style="left:${Math.min(pct,50)}%;width:${Math.abs(pct-50)}%;background:${col}"></div><div class="dir-zero"></div></div>`;};
 
-  if(D.señales.length){
-    t+='<div class="dir-señales">'+D.señales.map(s=>
-      `<div class="dir-s"><span class="dir-pts ${s.pts>0?'up':'dn'}">${s.pts>0?'+':''}${s.pts}</span>
-       <span><b>${s.nombre}.</b> ${s.detalle}</span></div>`).join('')+'</div>';
-  } else {
-    t+=`<p class="mute" style="font-size:13px">Ninguna señal direccional activa en ${CH.sym} ahora mismo.
-      Sin datos suficientes de tendencia y con la cadena sin sesgos: no hay dirección que defender.</p>`;
+  // ── DOS termómetros: hacia dónde se inclina, y qué puede salir mal ──
+  let t=`<div class="dir-dual">
+    <div class="dir-col">
+      <div class="dir-lab">Hacia dónde se inclina</div>
+      <div class="dir-head"><span class="dir-verdict" style="color:${colSesgo}">${D.vSesgo}</span>
+        <span class="dir-score num">${D.zSesgo>=0?'+':''}${D.zSesgo.toFixed(2)}σ</span></div>
+      ${barra(D.scoreSesgo,colSesgo)}
+    </div>
+    <div class="dir-col">
+      <div class="dir-lab">Riesgo de cola</div>
+      <div class="dir-head"><span class="dir-verdict" style="color:${colCola};font-size:20px">${D.vCola}</span>
+        <span class="dir-score num">${D.zCola>=0?'+':''}${D.zCola.toFixed(2)}σ</span></div>
+      ${barra(D.scoreCola,colCola)}
+    </div>
+  </div>`;
+
+  // ── El aviso que faltaba: sesgo alcista PERO riesgo de crash ──
+  if((D.zSesgo>=0.5 || D.momAlcistaCrudo) && D.zCola<=-0.5){
+    t+=`<div class="dir-alert"><b>⚠ Ojo, esto es lo importante:</b> ${D.zSesgo>=0.5?'la deriva se inclina al alza':'el valor lleva subida acumulada'},
+      pero el <b>riesgo de caída brusca es ${D.vCola.toLowerCase()}</b>. El mercado sube por las escaleras
+      y baja por el ascensor: puede seguir subiendo despacio y aun así tener un hueco enorme a la izquierda.
+      ${D.gammaNeg?'Con gamma negativa, cualquier caída se amplifica.':''}
+      Comprar calls a pelo aquí es peligroso — si vas al alza, un <b>call spread</b> (con pérdida limitada) respeta ese riesgo.</div>`;
+  } else if(D.zSesgo<=-0.5 && D.zCola<=-0.5){
+    t+=`<div class="dir-alert"><b>Todo apunta abajo:</b> deriva bajista y riesgo de cola a la baja.
+      Coherente para comprar puts o ponerte corto con protección.</div>`;
   }
 
-  /* la traducción a operación concreta, cruzando dirección × precio de la vol */
+  // ── desglose de las dos columnas ──
+  const bloque=(titulo,arr,vacio)=>{
+    if(!arr.length)return `<div class="dir-blk"><div class="dir-blk-t">${titulo}</div><p class="mute" style="font-size:12.5px">${vacio}</p></div>`;
+    return `<div class="dir-blk"><div class="dir-blk-t">${titulo}</div>`+arr.map(s=>
+      `<div class="dir-s"><span class="dir-pts ${s.z>0?'up':'dn'}">${s.z>0?'+':''}${s.z.toFixed(2)}σ</span>
+       <span><b>${s.nombre}.</b> ${s.detalle}</span></div>`).join('')+'</div>';
+  };
+  t+='<div class="dir-cols">'+
+    bloque('Señales de dirección', D.sesgo, 'Sin señales de dirección claras ahora mismo.')+
+    bloque('Señales de riesgo', D.cola, 'Sin datos de gamma ni distribución (hace falta interés abierto).')+
+    '</div>';
+
+  // ── LA OPERACIÓN: ahora sí cruza sesgo × riesgo de cola × precio de la vol ──
+  const alc=D.zSesgo>=0.5 || (D.momAlcistaCrudo && D.zCola<=-0.5);
+  const baj=D.zSesgo<=-0.5 || (D.momBajistaCrudo && D.zCola<=-0.5 && D.zSesgo<0);
+  const colaAlta=D.zCola<=-0.5;
+  const barata=vrp<-2, cara=vrp>2;
   let op='';
-  const alc=D.score>=20,baj=D.score<=-20;
-  if(alc&&vrp<-2)op=`<b>La jugada que casa con todo: COMPRAR CALLS.</b> Dirección a favor y encima las opciones
-    baratas (vol. implícita ${Math.abs(vrp).toFixed(1)} pts bajo la histórica). Abajo, en "Dónde está el dinero",
-    pon el selector en <b>Comprar → Calls</b> y elige el nivel.`;
-  else if(alc&&vrp>2)op=`<b>La jugada que casa con todo: VENDER PUTS.</b> Dirección a favor pero la prima está cara
-    — mejor cobrarla que pagarla: vendes el seguro de caída con el viento a tu espalda.`;
-  else if(alc)op=`<b>La jugada: un CALL SPREAD.</b> Dirección a favor con la vol bien valorada: compras una call
-    y vendes otra más arriba para no pagar de más por la volatilidad.`;
-  else if(baj&&vrp<-2)op=`<b>La jugada que casa con todo: COMPRAR PUTS.</b> Señales bajistas y opciones baratas:
-    la protección (o la apuesta a la caída) está de oferta.`;
-  else if(baj&&vrp>2)op=`<b>La jugada: vender CALLS con protección</b> (un call credit spread). Señales bajistas
-    y prima cara: cobras el seguro de subida, con techo de pérdida por si te equivocas.`;
-  else if(baj)op=`<b>La jugada: un PUT SPREAD.</b> Señales bajistas con la vol bien valorada.`;
-  else if(vrp>3)op=`<b>Sin dirección clara pero la prima está cara:</b> terreno de venta neutral —
-    un iron condor cobra por ambos lados sin apostar dirección.`;
-  else if(vrp<-2)op=`<b>Sin dirección clara pero las opciones están baratas:</b> un straddle compra
-    movimiento a buen precio, gane quien gane.`;
-  else op=`Sin dirección clara y con la vol en su sitio: <b>hoy, en ${CH.sym}, la mejor operación
-    probablemente es ninguna.</b> No pasa nada por no operar.`;
+
+  if(alc && colaAlta){
+    op=`<b>Sesgo al alza, pero con riesgo de cola.</b> La jugada que respeta ambas cosas es un
+      <b>CALL SPREAD alcista</b> (o comprar calls con poco tamaño): apuestas a la subida con la pérdida
+      limitada, porque el hueco a la izquierda es real. ${cara?'Vender puts aquí sería cobrar prima justo antes de un posible desplome — no lo hagas solo porque la prima esté cara.':''}`;
+  } else if(alc && barata){
+    op=`<b>La jugada que casa con todo: COMPRAR CALLS.</b> Sesgo al alza, riesgo de cola contenido y encima
+      las opciones baratas (implícita ${Math.abs(vrp).toFixed(1)} pts bajo la histórica). Pon el selector de abajo
+      en <b>Comprar → Calls</b>.`;
+  } else if(alc && cara){
+    op=`<b>Sesgo al alza con la prima cara y sin riesgo de cola destacable.</b> Aquí sí tiene sentido
+      <b>VENDER PUTS</b> (cobras el seguro con viento a favor) o un <b>call spread</b> si prefieres apostar
+      la dirección sin pagar de más por la volatilidad.`;
+  } else if(alc){
+    op=`<b>Sesgo al alza, volatilidad en su sitio.</b> Un <b>CALL SPREAD</b> es la forma limpia de jugarlo:
+      compras una call y vendes otra más arriba.`;
+  } else if(baj && barata){
+    op=`<b>La jugada que casa: COMPRAR PUTS.</b> Sesgo bajista y opciones baratas — la protección (o la apuesta
+      a la caída) está de oferta. Selector en <b>Comprar → Puts</b>.`;
+  } else if(baj && cara){
+    op=`<b>Sesgo bajista con prima cara.</b> Un <b>call credit spread</b> (vender una call con techo) cobra
+      prima apostando a que no sube, con pérdida limitada.`;
+  } else if(baj){
+    op=`<b>Sesgo bajista, volatilidad normal.</b> Un <b>PUT SPREAD</b> bajista lo juega con riesgo acotado.`;
+  } else if(colaAlta){
+    op=`<b>Sin rumbo claro, pero con riesgo de cola a la baja.</b> No es momento de vender puts desnudos.
+      Si acaso, ${cara?'un iron condor <em>descentrado</em> (más margen abajo)':'comprar un put barato de protección'}.`;
+  } else if(cara){
+    op=`<b>Sin dirección clara y prima cara:</b> venta neutral — un <b>iron condor</b> cobra por ambos lados
+      sin apostar dirección, con riesgo limitado.`;
+  } else if(barata){
+    op=`<b>Sin dirección clara y opciones baratas:</b> un <b>straddle</b> compra movimiento a buen precio,
+      gane quien gane. Solo si esperas un catalizador.`;
+  } else {
+    op=`Sin dirección, sin riesgo de cola destacable y con la volatilidad en su sitio:
+      <b>hoy, en ${CH.sym}, probablemente la mejor operación es ninguna.</b>`;
+  }
+
   t+=`<div class="historia" style="margin-top:12px;font-size:13.5px"><p>${op}</p>
-    <p class="tip">Calibración honesta: estas señales, incluso las buenas, aciertan poco más que una moneda
-    (55-58% en los estudios). Su fuerza no está en una sola, sino en que varias <em>independientes</em>
-    coincidan — y en operar solo cuando además el precio de la volatilidad te da margen de error.</p>
+    <p class="tip"><b>Cómo se calcula esto (importante):</b> cada señal se mide en <b>desviaciones típicas (σ)</b>
+    respecto a su punto normal — no con puntos inventados. El skew se compara con el skew <em>habitual</em>
+    (que en bolsa es negativo, no cero); el momentum se divide por la propia volatilidad del valor; la deriva,
+    por el movimiento que el mercado espera. Así ninguna señal domina solo por estar medida en números grandes.
+    Cada columna es la media de sus señales, ponderada por su propia fuerza: |σ|&lt;0.5 es ruido, 0.5–1 leve,
+    1–2 claro, &gt;2 extremo.</p>
+    <p class="tip"><b>Lo que esto NO es:</b> no son pesos "óptimos" — eso exigiría años de histórico de cadenas
+    de opciones que no tenemos. Es una forma honesta de poner todas las señales en la misma unidad y combinarlas
+    sin arbitrariedad de escala. Siguen siendo señales débiles (aciertan poco más que una moneda); su valor está
+    en que <em>coincidan</em> y en operar solo cuando la volatilidad te da margen. La columna izquierda es
+    <b>hacia dónde</b>, la derecha es <b>qué puede salir mal</b>, y son independientes.</p>
     ${ayuda('momentum')}</div>`;
   el.innerHTML=t;
 }
@@ -3690,7 +3854,24 @@ function rndSignals(an, spot, t, r, q){
   const iv=an.atmIv,sq=iv*Math.sqrt(t);
   const logn=x=>N((Math.log(x)+sq*sq/2)/sq);   // P(S_T/F0 < x) bajo lognormal RN
   const pUpLog=1-logn(spot*1.05/F), pDnLog=logn(spot*0.95/F);
-  return {pUp,pDn,pUpLog,pDnLog,excesoUp:(pUp-pUpLog)*100,excesoDn:(pDn-pDnLog)*100};
+
+  // ── COLAS EXTREMAS (±12%): donde vive el "trozo desmesurado a la izquierda" ──
+  let colaUp=0,colaDn=0;
+  for(const [K,p] of pdf){
+    if(K>spot*1.12)colaUp+=p*dK;
+    if(K<spot*0.88)colaDn+=p*dK;
+  }
+  colaUp/=masa;colaDn/=masa;
+  const colaUpLog=1-logn(spot*1.12/F), colaDnLog=logn(spot*0.88/F);
+
+  // ── DERIVA IMPLÍCITA: dónde cree el mercado que acabará, vs el forward ──
+  // (bajo la medida real, no la neutral; aquí es una lectura cualitativa del sesgo)
+  const derivaPct=(media/F-1)*100;
+
+  return {pUp,pDn,pUpLog,pDnLog,excesoUp:(pUp-pUpLog)*100,excesoDn:(pDn-pDnLog)*100,
+          media,derivaPct,
+          colaUp,colaDn,excesoColaUp:(colaUp-colaUpLog)*100,excesoColaDn:(colaDn-colaDnLog)*100,
+          asimetriaCola:(colaDn-colaDnLog)-(colaUp-colaUpLog)};   // >0 = cola izquierda gorda
 }
 
 /* ── TENDENCIA: las pocas regularidades direccionales que han sobrevivido ──
@@ -3710,8 +3891,16 @@ function momentumDe(cs){
   const m6=hoy/hace126-1;
   const sma200=c.slice(-200).reduce((a,b)=>a+b,0)/200;
   const max252=Math.max(...c.slice(-252));
+  // volatilidad realizada anualizada de los últimos ~6 meses: la escala natural
+  // del momentum. Un +20% pesa distinto en un valor tranquilo que en uno movido.
+  const rets=[];
+  for(let i=Math.max(1,c.length-126);i<c.length;i++){const x=Math.log(c[i]/c[i-1]);if(isFinite(x))rets.push(x);}
+  const mu=rets.reduce((a,b)=>a+b,0)/(rets.length||1);
+  const varr=rets.reduce((a,b)=>a+(b-mu)**2,0)/(rets.length||1);
+  const volRealizada=Math.sqrt(varr*252);
   return {
     m6,                                  // retorno 6 meses
+    volRealizada,                        // vol anualizada del periodo (escala del z)
     sobreM200: hoy>sma200,               // régimen alcista
     distMax52: hoy/max252-1,             // distancia al máximo de 52 semanas
     alcista: m6>0.08 && hoy>sma200,      // señal combinada
