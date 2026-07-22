@@ -476,7 +476,7 @@ summary:hover{color:var(--ink)}
     <div class="empty" id="tdEmpty">
       <strong>Tu radar de oportunidades</strong>
       Añade tus tickers favoritos arriba y pulsa <b>Buscar oportunidades hoy</b>.
-      Para cada uno comparamos el susto que cobra el mercado con lo que dice su histórico real,
+      Para cada uno comparamos la volatilidad implícita que cobra el mercado con la histórica real,
       y te decimos dónde te pagan de más — tengas la cuenta llena o vacía.
     </div>
   </div>
@@ -649,6 +649,12 @@ summary:hover{color:var(--ink)}
           <h2>El movimiento que anticipa el mercado</h2>
           <div class="plot"><canvas id="cone" height="240"></canvas></div>
           <div class="historia" id="coneNote" style="font-size:13.5px"></div>
+        </section>
+        <section class="blk">
+          <h2>Los muros del mercado<span class="sub">dónde aprieta la mecánica de los dealers</span></h2>
+          <div class="figs" id="gexFigs"></div>
+          <div class="plot"><canvas id="gexPlot" height="230"></canvas></div>
+          <div class="historia" id="gexNote" style="font-size:13.5px"></div>
         </section>
         <section class="blk">
           <h2>Cuáles se salen de lo normal</h2>
@@ -1337,7 +1343,7 @@ class DXLink{
   constructor(){this.ws=null;this.token=null;this.url=null;
     this.chQ=3;this.chC=5;            // canal de quotes/greeks y canal de velas
     this.ka=null;this.subs=new Set();this.ready=false;this.candleReady=false;
-    this.onQuote=()=>{};this.onGreeks=()=>{};this.onCandle=()=>{};this.onStatus=()=>{};}
+    this.onQuote=()=>{};this.onGreeks=()=>{};this.onCandle=()=>{};this.onStatus=()=>{};this.onSummary=()=>{};}
   async connect(workerUrl,key){
     this.onStatus('conectando');
     const r=await fetch(`${workerUrl}/stream-token`,{headers:{'X-Proxy-Key':key}});
@@ -1370,7 +1376,8 @@ class DXLink{
         if(m.channel===this.chQ)
           this._s({type:'FEED_SETUP',channel:this.chQ,acceptAggregationPeriod:.1,acceptDataFormat:'COMPACT',
             acceptEventFields:{Quote:['eventType','eventSymbol','bidPrice','askPrice'],
-              Greeks:['eventType','eventSymbol','price','volatility','delta','gamma','theta','rho','vega']}});
+              Greeks:['eventType','eventSymbol','price','volatility','delta','gamma','theta','rho','vega'],
+              Summary:['eventType','eventSymbol','openInterest']}});
         else if(m.channel===this.chC)
           this._s({type:'FEED_SETUP',channel:this.chC,acceptAggregationPeriod:1,acceptDataFormat:'COMPACT',
             acceptEventFields:{Candle:['eventType','eventSymbol','time','open','high','low','close']}});
@@ -1393,6 +1400,8 @@ class DXLink{
       if(ty==='Quote')for(let k=0;k<f.length;k+=4)this.onQuote(f[k+1],{bid:+f[k+2],ask:+f[k+3]});
       else if(ty==='Greeks')for(let k=0;k<f.length;k+=9)this.onGreeks(f[k+1],
         {price:+f[k+2],iv:+f[k+3],delta:+f[k+4],gamma:+f[k+5],theta:+f[k+6],rho:+f[k+7],vega:+f[k+8]});
+      else if(ty==='Summary')for(let k=0;k<f.length;k+=3){
+        const oi=+f[k+2];if(isFinite(oi))this.onSummary(f[k+1],{oi});}
       else if(ty==='Candle')for(let k=0;k<f.length;k+=7){
         const o=f[k+3];if(o==='NaN'||o==null)continue;
         this.onCandle(f[k+1],{time:+f[k+2],open:+o,high:+f[k+4],low:+f[k+5],close:+f[k+6]});}
@@ -1400,7 +1409,8 @@ class DXLink{
   }
   subscribe(syms){syms.forEach(s=>this.subs.add(s));if(this.ready)this._push(syms);}
   _push(syms){const add=[];
-    syms.forEach(s=>{add.push({type:'Quote',symbol:s});if(s.startsWith('.'))add.push({type:'Greeks',symbol:s});});
+    syms.forEach(s=>{add.push({type:'Quote',symbol:s});
+      if(s.startsWith('.')){add.push({type:'Greeks',symbol:s});add.push({type:'Summary',symbol:s});}});
     this._s({type:'FEED_SUBSCRIPTION',channel:this.chQ,add});}
   /* velas diarias históricas: días hacia atrás */
   subscribeCandles(sym,days=400,tf='d'){
@@ -1425,7 +1435,7 @@ const DICC = {
   iv: {
     titulo: 'Lo que el mercado espera que se mueva',
     jerga: 'Volatilidad implícita (IV)',
-    corto: 'El susto que descuentan los precios de las opciones.',
+    corto: 'La volatilidad que descuentan los precios de las opciones.',
     largo: `Cuando compras una opción, estás comprando un seguro. Y como todo seguro, su precio depende de lo probable que sea el siniestro.
 
 Si el mercado cree que <b>{sym}</b> va a dar bandazos, las opciones se encarecen. Si cree que va a estar tranquilo, se abaratan.
@@ -1449,7 +1459,7 @@ El modelo mide la fuerza de esa inercia y predice qué va a pasar en los próxim
   vrp: {
     titulo: 'Quién tiene razón: el mercado o el histórico',
     jerga: 'Prima de riesgo de volatilidad (VRP)',
-    corto: 'La diferencia entre el susto que cobra el mercado y el que dice la historia.',
+    corto: 'La diferencia entre la volatilidad implícita y la histórica.',
     largo: `Aquí está el meollo de todo.
 
 El mercado dice que {sym} se va a mover un <b>{iv}</b>. El histórico dice que se mueve un <b>{modelo}</b>.
@@ -1488,7 +1498,7 @@ Si es <b>cerca de cero</b>, te da igual la dirección. Ganas por otro motivo (el
 
 <b>Vega positiva</b>: te beneficia que suba el miedo. Es lo típico si compraste opciones.
 
-<b>Vega negativa</b>: te perjudica. Es lo típico si vendiste prima. Un susto en el mercado te hace daño aunque aciertes la dirección.`
+<b>Vega negativa</b>: te perjudica. Es lo típico si vendiste prima. Un repunte de volatilidad te hace daño aunque aciertes la dirección.`
   },
   gamma: {
     titulo: 'Lo rápido que cambian las cosas',
@@ -1583,6 +1593,36 @@ En opciones poco negociadas esto se come el edge entero. Cuidado.`
 Esa flexibilidad vale algo, sobre todo en <b>puts muy dentro de dinero</b> cuando los tipos de interés están altos: te conviene ejercer ya y meter el dinero en el banco.
 
 Casi siempre es una cifra pequeña. Si sale cero, es que no compensa ejercer antes.`
+  },
+  gex: {
+    titulo: 'Los muros y la mecánica de los dealers',
+    jerga: 'GEX · Gamma Exposure, gamma flip, call/put walls, max pain',
+    corto: 'Dónde obliga a comprar y vender la cobertura de los creadores de mercado.',
+    largo: `Cuando compras una opción, al otro lado casi siempre hay un <b>creador de mercado</b> (dealer). Él no apuesta: <b>cubre</b>. Y su cobertura consiste en comprar y vender la acción constantemente — un flujo enorme y bastante predecible, porque las matemáticas de la cobertura son públicas.
+
+<b>GEX (Gamma Exposure):</b> suma, strike a strike, cuánta acción tendrán que mover los dealers si el precio se desplaza un 1%. Con GEX <b>positivo</b>, su cobertura va contra el movimiento (compran caídas, venden subidas): el precio queda <em>planchado</em>. Con GEX <b>negativo</b>, va a favor: cada movimiento se <em>amplifica</em> (los famosos gamma squeezes son esto).
+
+<b>Gamma flip:</b> el nivel de precio donde se cambia de un régimen al otro. Cruzar hacia abajo suele traer volatilidad.
+
+<b>Call wall / put wall:</b> los strikes con más gamma concentrada actúan como techo y suelo magnéticos mientras el régimen es positivo.
+
+<b>Max pain:</b> el strike donde más opciones mueren sin valor al vencimiento. Existe una deriva débil pero documentada hacia él en los últimos días (Ni, Pearson y Poteshman 2005).
+
+<b>La fiabilidad, sin adornos:</b> todo esto descansa en UNA asunción — que los dealers están largos de calls y cortos de puts (la convención de SqueezeMetrics/SpotGamma). En índices y valores grandes con mucho interés abierto funciona razonablemente y lo usan desks profesionales a diario. En tickers pequeños, el posicionamiento real puede ser otro y el mapa engaña. Y ojo: describe PRESIONES, no destinos. Un dato macro se lleva por delante cualquier muro.`
+  },
+  momentum: {
+    titulo: 'Los patrones de compra que sí existen',
+    jerga: 'Momentum (Jegadeesh-Titman) y media de 200',
+    corto: 'Lo que ha subido 6-12 meses tiende a seguir. Débil pero real.',
+    largo: `Preguntabas si hay patrones que anticipen subidas. La respuesta honesta: la mayoría de los que se venden por ahí son ruido, pero <b>dos han sobrevivido a décadas de escrutinio académico</b>:
+
+<b>1. El momentum:</b> lo que ha subido con fuerza en los últimos 6-12 meses tiende a seguir subiendo unos meses más. Documentado desde 1993 en casi todos los mercados y épocas. Nadie sabe del todo por qué (¿los inversores reaccionan tarde a las noticias?), pero ahí está.
+
+<b>2. La media de 200 sesiones:</b> cotizar por encima o por debajo separa regímenes. No predice el día a día, pero filtra el terreno de juego.
+
+<b>Los límites, sin adornos:</b> son señales <em>débiles</em>. Aciertan poco más de la mitad de las veces, y cada pocos años tienen una racha horrorosa (los "momentum crashes" de 2009). No son una bola de cristal: son un viento de cola.
+
+<b>Dónde está su valor de verdad:</b> en combinarlas con la volatilidad. Comprar una call es pagar por dirección Y por volatilidad. Si la dirección tiene viento a favor <em>y además</em> la volatilidad está barata (implícita < histórica), pagas poco por un billete con sesgo. Esa combinación —no la señal sola— es la que merece tu atención.`
   },
   skew: {
     titulo: 'Por qué los puts siempre parecen chollo',
@@ -1808,8 +1848,8 @@ function ribbon(){
   $('ribbon').innerHTML=
     `<div class="rq"><span class="l">${st.sym}</span><span class="n">${st.S.toFixed(2)}</span></div>`+
     `<div class="rq"><span class="l">se espera que se mueva</span><span class="n">±${em.toFixed(2)}</span></div>`+
-    `<div class="rq"><span class="l">susto del mercado</span><span class="n">${st.IV.toFixed(1)}%</span></div>`+
-    `<div class="rq"><span class="l">susto real</span><span class="n">${isFinite(st.expVol)?pc(st.expVol):'—'}</span></div>`+
+    `<div class="rq"><span class="l">vol. implícita</span><span class="n">${st.IV.toFixed(1)}%</span></div>`+
+    `<div class="rq"><span class="l">vol. histórica</span><span class="n">${isFinite(st.expVol)?pc(st.expVol):'—'}</span></div>`+
     `<div class="rq"><span class="l">te pagan de más</span><span class="n ${vrp>.02?'up':vrp<-.02?'dn':''}">${isFinite(vrp)?((vrp>=0?'+':'')+(vrp*100).toFixed(1)+' pts'):'—'}</span></div>`+
     `<div class="rq"><span class="l">vence en</span><span class="n">${st.DTE} días</span></div>`;
 }
@@ -2003,7 +2043,7 @@ function grFigs(){
     : g.vega>=0
     ? `<p>Si el mercado se pone nervioso (aunque el precio no se mueva), <b>ganas</b>.</p>`
     : `<p>Si el mercado se pone nervioso, <b>pierdes</b> — aunque el precio no se mueva ni un céntimo.
-       Es el riesgo típico de vender opciones: un susto general te hace daño.</p>`;
+       Es el riesgo típico de vender opciones: un repunte de volatilidad te hace daño.</p>`;
   const gammaTxt = g.gamma<-0.001
     ? `<p class="clave dn"><b>Cuidado con esto:</b> tu posición <em>empeora sola</em> cuando el mercado
        se mueve en tu contra. Cuanto más se aleja, más rápido pierdes. Es lo peligroso de vender opciones,
@@ -2117,9 +2157,9 @@ function volScen(){
   const g=sGrk(S,t,vMkt);
   txt+=`<div class="historia" style="margin-top:12px">
     ${g.vega<0
-      ? `<p class="tip">Estás <b>corto de miedo</b>: un susto general del mercado te hace daño,
+      ? `<p class="tip">Estás <b>corto de volatilidad</b>: un repunte general te hace daño,
          aunque aciertes la dirección. Es la letra pequeña de vender opciones.</p>`
-      : `<p class="tip">Estás <b>largo de miedo</b>: un susto general del mercado te beneficia.</p>`}
+      : `<p class="tip">Estás <b>largo de volatilidad</b>: un repunte general te beneficia.</p>`}
     ${ayuda('vrp',{sym:st.sym,iv:pc(vMkt),modelo:pc(vMdl)})}
   </div>`;
 
@@ -2286,7 +2326,7 @@ function showMC(){
       <p>Si el histórico tiene razón, esta estrategia te da <b class="num">${money(real.ev)}</b> de media,
       no ${money(rn.ev)}. Ganas en <b>${(real.pop*100).toFixed(0)} de cada 100</b> en vez de ${(rn.pop*100).toFixed(0)}.
       <b>Ahí está tu ventaja</b>, y no viene de la estrategia: viene de que crees que el mercado
-      está exagerando el susto.</p>`;
+      está exagerando la volatilidad.</p>`;
   } else if(contrario){
     txt+=`<p class="clave dn"><b>Y aquí viene el aviso.</b> El histórico dice que ${st.sym} se mueve un
       ${pc(st.expVol)}, más de lo que el mercado descuenta (${pc(VV())}).</p>
@@ -2649,9 +2689,9 @@ function bkAgg(){
   // Vega
   if(Math.abs(nv)>=200){
     t+= nv>0
-      ? `<p>Si el mercado se pone nervioso (un susto general, aunque no se mueva tu acción),
+      ? `<p>Si sube la volatilidad general (aunque no se mueva tu acción),
          <b>ganas</b> unos ${money(nv)} por cada punto de miedo que suba.</p>`
-      : `<p><b>Cuidado con los sustos:</b> si sube el miedo general del mercado,
+      : `<p><b>Cuidado con la volatilidad:</b> si sube la volatilidad general del mercado,
          pierdes unos <b class="num">${money(-nv)}</b> por punto — aunque tus acciones no se muevan.
          Es el riesgo típico de vender opciones.</p>`;
   }
@@ -2711,6 +2751,7 @@ async function scanChain(){
     const quotes={},candles=[];
     const dx=new DXLink();
     dx.onQuote=(s,q)=>{quotes[s]=Object.assign(quotes[s]||{},q);};
+    const ois={};dx.onSummary=(s,d)=>{ois[s]=d.oi;};
     dx.onGreeks=(s,g)=>{quotes[s]=Object.assign(quotes[s]||{},g);};
     dx.onCandle=(s,c)=>candles.push(c);
     await dx.connect(CN.url,CN.key);
@@ -2724,16 +2765,20 @@ async function scanChain(){
     // volatilidad esperada con GARCH real
     let expVol=st.expVol,pack=null;
     if(candles.length>=80){pack=volForecast(candles,dte);if(pack.ok)expVol=pack.expected;}
+    const mom=momentumDe(candles.slice().sort((a,b)=>a.time-b.time));
     const rows=[];
     for(const s in meta){const q=quotes[s];
       if(!q||q.bid==null||q.ask==null||q.ask<=0)continue;
-      rows.push({K:meta[s].K,type:meta[s].type,bid:q.bid,ask:q.ask,streamer:s});}
+      rows.push({K:meta[s].K,type:meta[s].type,bid:q.bid,ask:q.ask,streamer:s,oi:ois[s]});}
     if(rows.length<6)throw new Error(`Solo ${rows.length} contratos con cotización. ¿Está el mercado cerrado?`);
     const an=analyzeChain(rows,spot,t,RR(),QQ(),expVol);
     const cmp=priceVsMarket(an.rows,spot,t,RR(),QQ(),expVol,an.svi,an.atmIv);
     an.rows=cmp;
     const rk=rankChain(an);
-    Object.assign(CH,{an,rk,spot,t,dte,expVol,pack,sym,sortKey:'K',desc:false,atmIvRef:an.atmIv});
+    const flw=dealerFlows(an.rows,spot,t,RR(),QQ());
+    const tilt=skewTilt(an,spot,t,RR(),QQ());
+    const rnd=rndSignals(an,spot,t,RR(),QQ());
+    Object.assign(CH,{an,rk,spot,t,dte,expVol,pack,sym,mom,flw,tilt,rnd,sortKey:'K',desc:false,atmIvRef:an.atmIv});
     st.S=spot;$('S').value=spot.toFixed(2);
     st.DTE=dte;$('DTE').value=dte;
     if(isFinite(an.atmIv)){st.IV=an.atmIv*100;$('IV').value=st.IV.toFixed(1);}
@@ -2760,7 +2805,7 @@ function renderChain(){
   historia += `<p>El mercado está poniendo precios como si esperara que ${sym} se moviera
     <b class="num">±${mov1m.toFixed(2)}</b> (arriba o abajo) de aquí al vencimiento.
     Eso es lo que significa esa "volatilidad implícita del ${pc(atm)}" que verás por ahí:
-    es el susto que llevan incorporado los precios.</p>`;
+    es la volatilidad implícita que llevan incorporada los precios.</p>`;
 
   if(hayModelo){
     historia += `<p>Ahora bien: hemos mirado <b>cómo se ha movido ${sym} de verdad</b>
@@ -2768,21 +2813,43 @@ function renderChain(){
       normal es del <b class="num">${pc(expVol)}</b>.</p>`;
 
     if(vrp>0.04){
-      historia += `<p class="clave up">Aquí está lo interesante: <b>el mercado está pidiendo más susto del que la historia justifica</b>.
+      historia += `<p class="clave up">Aquí está lo interesante: <b>la volatilidad implícita supera a la histórica</b>.
         Cobra como si ${sym} fuera a moverse un ${pc(atm)}, cuando normalmente se mueve un ${pc(expVol)}.
         Te está pagando <b class="num">${(vrp*100).toFixed(1)} puntos de más</b> por asegurarle.</p>
         <p><b>Traducción:</b> vender opciones sobre ${sym} parece pagar por encima de lo que vale el riesgo.
         Pero ojo, eso no es dinero gratis — luego te lo explico.</p>`;
     } else if(vrp<-0.02){
-      historia += `<p class="clave dn">Y aquí hay algo raro: <b>el mercado está pidiendo menos de lo que la historia justifica</b>.
+      historia += `<p class="clave dn">Y aquí hay algo raro: <b>la volatilidad implícita está por debajo de la histórica</b>.
         Las opciones están baratas: cobran como si ${sym} fuera a estar tranquilo (${pc(atm)}),
-        cuando normalmente se mueve un ${pc(expVol)}.</p>
-        <p><b>Traducción:</b> comprar opciones sobre ${sym} sale a buen precio. El seguro está de oferta.</p>`;
+        cuando normalmente se mueve un ${pc(expVol)}.</p>`;
+      if(CH.mom&&CH.mom.alcista){
+        historia += `<p class="clave up"><b>Y además la tendencia acompaña:</b> ${sym} lleva
+          <b class="num">${(CH.mom.m6*100).toFixed(0)}%</b> en 6 meses y cotiza sobre su media de 200 sesiones.
+          Dirección a favor + opciones baratas es <b>la combinación clásica para COMPRAR CALLS</b>:
+          pagas poco por el billete y el viento sopla hacia donde apuestas.
+          Mira en "Baratas vs vecinas" cuáles están además de oferta frente a su curva.</p>`;
+      } else if(CH.mom&&CH.mom.bajista){
+        historia += `<p class="clave dn"><b>Y la tendencia es bajista:</b> ${sym} pierde
+          <b class="num">${Math.abs(CH.mom.m6*100).toFixed(0)}%</b> en 6 meses bajo su media de 200.
+          Con las opciones baratas, <b>comprar PUTS</b> es protección (o apuesta) a buen precio.</p>`;
+      } else {
+        historia += `<p><b>Traducción:</b> comprar opciones sobre ${sym} sale a buen precio, pero sin
+          tendencia clara la compra sensata es <b>a ambos lados</b> (un straddle): pagas poco y ganas
+          si se mueve fuerte hacia cualquier lado.</p>`;
+      }
     } else {
       historia += `<p class="clave mk">Y coinciden bastante: el mercado pide ${pc(atm)}, la historia dice ${pc(expVol)}.
-        <b>No hay chollo por ninguna parte.</b></p>
-        <p><b>Traducción:</b> si operas aquí, que sea porque tienes una opinión sobre la <em>dirección</em>,
-        no porque las opciones estén mal valoradas. No lo están.</p>`;
+        <b>No hay chollo de volatilidad por ninguna parte.</b></p>`;
+      if(CH.mom&&CH.mom.alcista){
+        historia += `<p>Ahora bien, <b>la tendencia sí dice algo</b>: ${sym} lleva
+          <b class="num">+${(CH.mom.m6*100).toFixed(0)}%</b> en 6 meses sobre su media de 200.
+          Con la volatilidad bien valorada, la forma barata de jugar esa dirección es un
+          <b>call spread</b> (compras una call y vendes otra más arriba): pagas menos y no dependes
+          tanto de acertar la volatilidad.</p>`;
+      } else {
+        historia += `<p><b>Traducción:</b> si operas aquí, que sea porque tienes una opinión sobre la <em>dirección</em>,
+          no porque las opciones estén mal valoradas. No lo están.</p>`;
+      }
     }
   } else {
     historia += `<p class="clave mk">Falta un dato importante: <b>no sabemos si ese precio es caro o barato</b>,
@@ -2798,7 +2865,7 @@ function renderChain(){
       const dias=Math.round((new Date(eDate)-Date.now())/86400000);
       if(dias>=0&&dias<=dte){
         historia+=`<p class="clave mk"><b>⚠ Earnings ${dias===0?'HOY':'en '+dias+' días'} (${eDate}), antes de este vencimiento.</b>
-          La volatilidad implícita está inflada por el evento: parte del "susto" que ves no es miedo normal,
+          La volatilidad implícita está inflada por el evento: parte de esa volatilidad implícita no es miedo normal,
           es la apuesta al resultado. Justo después de publicar, esa parte se evapora de golpe — el <em>IV crush</em>.
           Vender prima ahora es apostar al earnings, no cobrar el seguro tranquilamente.</p>`;
       }
@@ -2817,8 +2884,8 @@ function renderChain(){
   /* ── Las cifras, con etiqueta doble ── */
   $('cFigs').innerHTML =
     fig2('Precio de '+sym, spot.toFixed(2), '', 'Lo que vale ahora mismo')+
-    fig2('Susto que cobra el mercado', pc(atm), 'mdl', 'Volatilidad implícita')+
-    fig2('Susto real (histórico)', hayModelo?pc(expVol):'—', 'mk', 'Volatilidad GARCH')+
+    fig2('Volatilidad implícita', pc(atm), 'mdl', 'Lo que el mercado espera que se mueva')+
+    fig2('Volatilidad histórica', hayModelo?pc(expVol):'—', 'mk', 'Lo que se ha movido de verdad (GARCH)')+
     fig2('Te pagan de más', hayModelo?((vrp*100>=0?'+':'')+(vrp*100).toFixed(1)+' pts'):'—',
          vrp>.02?'up':vrp<-.02?'dn':'', 'Prima de riesgo de volatilidad')+
     fig2('Movimiento esperado', '±'+mov1m.toFixed(2), '', 'A '+dte+' días');
@@ -2861,7 +2928,7 @@ function renderChain(){
   // La clave del ranking a mostrar
   st.rkView = st.rkTipo + st.rkNivel;   // ej: 'putsMedio'
 
-  renderRank();renderTable();drawCone();drawSmile();drawRND();
+  renderRank();renderTable();drawCone();renderGex();drawSmile();drawRND();
 }
 
 /* Cambia tipo (puts/calls) y nivel de riesgo */
@@ -2988,6 +3055,129 @@ function pick(K,type){
 }
 
 /* ── EL CONO: rango que el mercado anticipa hasta el vencimiento ── */
+/* ── LOS MUROS: cifras, perfil por strike y lectura ── */
+function fmtM(x){
+  const a=Math.abs(x);
+  if(a>=1e9)return (x/1e9).toFixed(1)+' MM$';
+  if(a>=1e6)return (x/1e6).toFixed(0)+' M$';
+  if(a>=1e3)return (x/1e3).toFixed(0)+' mil $';
+  return x.toFixed(0)+' $';
+}
+function renderGex(){
+  const F=$('gexFigs'),Nt=$('gexNote'),cnv=$('gexPlot');
+  if(!F)return;
+  const flw=CH.flw;
+  if(!flw||!flw.ok){
+    F.innerHTML='';
+    if(cnv){const[x,W,H]=cvs('gexPlot',40);x.clearRect(0,0,W,H);}
+    Nt.innerHTML=`<p>${flw&&flw.reason?flw.reason.charAt(0).toUpperCase()+flw.reason.slice(1):'Sin datos de interés abierto.'}
+      El interés abierto llega con la sesión del mercado; fuera de horario o en símbolos muy ilíquidos no está.
+      Sin él, los muros no se pueden dibujar — y antes que inventarlos, te lo digo.</p>`;
+    return;
+  }
+  const amort=flw.regimen==='amortiguado';
+  F.innerHTML=
+    fig2('Los dealers ahora', amort?'PLANCHAN el precio':'AMPLIFICAN el precio',
+         amort?'up':'dn', 'GEX '+fmtM(flw.gexTotal)+' por 1% de movimiento')+
+    (isFinite(flw.flip)?fig2('El precio se destapa bajo', flw.flip.toFixed(1), 'mk', 'Gamma flip'):'')+
+    (flw.callWall?fig2('Techo de gamma', flw.callWall.K, 'mdl', 'Call wall'):'')+
+    (flw.putWall?fig2('Suelo de gamma', flw.putWall.K, 'mdl', 'Put wall'):'')+
+    (flw.maxPain?fig2('Imán de vencimiento', flw.maxPain, '', 'Max pain'):'');
+
+  /* perfil por strike: barras netas, calls arriba puts abajo */
+  const per=flw.perfil.filter(x=>Math.abs(x.neto)>0);
+  if(per.length&&cnv){
+    const[x,W,H]=cvs('gexPlot',230);x.clearRect(0,0,W,H);
+    const pad={l:8,r:8,t:16,b:24};
+    const Ks=per.map(p=>p.K);
+    const k0=Math.min(...Ks),k1=Math.max(...Ks);
+    const mx=Math.max(...per.map(p=>Math.abs(p.neto)))||1;
+    const X=K=>pad.l+(W-pad.l-pad.r)*(K-k0)/((k1-k0)||1);
+    const Y0=(H-pad.b+pad.t)/2;
+    const bw=Math.max(3,(W-pad.l-pad.r)/per.length*0.55);
+    x.strokeStyle=C.rule2;x.beginPath();x.moveTo(pad.l,Y0);x.lineTo(W-pad.r,Y0);x.stroke();
+    per.forEach(p=>{
+      const hgt=(Y0-pad.t)*Math.abs(p.neto)/mx;
+      x.fillStyle=p.neto>=0?C.bullA:C.bearA;
+      x.fillRect(X(p.K)-bw/2, p.neto>=0?Y0-hgt:Y0, bw, hgt);
+    });
+    // spot, flip, walls
+    const marca=(K,col,txt,arriba)=>{if(!isFinite(K)||K<k0||K>k1)return;
+      x.strokeStyle=col;x.setLineDash([4,3]);x.beginPath();
+      x.moveTo(X(K),pad.t);x.lineTo(X(K),H-pad.b);x.stroke();x.setLineDash([]);
+      x.fillStyle=col;x.font=C.mono;x.textAlign='center';
+      x.fillText(txt,X(K),arriba?pad.t-4:H-8);};
+    marca(CH.spot,C.ink,'precio',true);
+    if(isFinite(flw.flip))marca(flw.flip,C.mark,'flip',false);
+    if(flw.callWall)marca(flw.callWall.K,C.model,'techo',true);
+    if(flw.putWall)marca(flw.putWall.K,C.model,'suelo',true);
+  }
+
+  /* la lectura, en cristiano y con las cartas boca arriba */
+  let n=`<p><b>Qué es esto:</b> los creadores de mercado (dealers) están al otro lado de casi todas las
+    opciones. Para no perder, <b>cubren</b> sus posiciones comprando y vendiendo la acción — y esa
+    cobertura mueve el precio. Con el interés abierto de cada strike se puede estimar
+    <b>hacia dónde les obliga a operar la mecánica</b>.</p>`;
+  n+=`<p class="tip"><b>La letra pequeña primero:</b> esto asume el posicionamiento típico
+    (dealers largos de calls, cortos de puts). En índices y valores grandes suele cumplirse;
+    en tickers pequeños, tómalo con pinzas. Es un mapa de presiones, no un oráculo.</p>`;
+  if(amort){
+    n+=`<p class="clave up"><b>Ahora mismo los dealers PLANCHAN:</b> con gamma positiva
+      (${fmtM(flw.gexTotal)} por cada 1%), compran cuando cae y venden cuando sube. El precio tiende
+      a quedarse pegado entre los muros${flw.putWall&&flw.callWall?` (${flw.putWall.K} y ${flw.callWall.K})`:''}.
+      Terreno cómodo para <b>vender prima</b>: la mecánica juega a favor de que no se mueva.</p>`;
+  } else {
+    n+=`<p class="clave dn"><b>Ahora mismo los dealers AMPLIFICAN:</b> con gamma negativa
+      (${fmtM(flw.gexTotal)}), venden cuando cae y compran cuando sube — echan gasolina al movimiento.
+      Los desplazamientos pueden ser más violentos de lo que la volatilidad sugiere.
+      Terreno de <b>comprador de opciones</b>, y peligroso para vender prima desnuda.</p>`;
+  }
+  if(isFinite(flw.flip)){
+    n+= CH.spot>flw.flip
+      ?`<p>El <b>gamma flip</b> está en <b class="num">${flw.flip.toFixed(1)}</b>. Por encima (donde está ahora),
+        régimen estable; <b>si cae por debajo, el mercado cambia de carácter</b> y los movimientos se amplifican.
+        Es el nivel a vigilar.</p>`
+      :`<p class="clave mk">El precio está <b>por debajo del gamma flip</b> (${flw.flip.toFixed(1)}): zona
+        inestable donde la cobertura de los dealers amplifica cada movimiento. Los rebotes y las caídas
+        aquí son más violentos.</p>`;
+  }
+  if(flw.maxPain&&CH.dte<=10){
+    const d=(flw.maxPain/CH.spot-1)*100;
+    if(Math.abs(d)>1.5)
+      n+=`<p><b>Max pain</b> en <b class="num">${flw.maxPain}</b> (${d>0?'+':''}${d.toFixed(1)}% desde aquí).
+        Con ${CH.dte} días al vencimiento, existe una deriva documentada —débil— hacia el strike donde más
+        opciones mueren sin valor. No es magia: es la cobertura deshaciéndose. Señal menor, pero con viento ${d>0?'alcista':'bajista'}.</p>`;
+  }
+  if(CH.tilt&&isFinite(CH.tilt.rr)){
+    n+= CH.tilt.rr>-0.5
+      ?`<p class="clave up"><b>El skew está ${CH.tilt.rr>0?'INVERTIDO':'plano'}:</b> las calls a 25Δ cuestan
+        ${CH.tilt.rr>0?'MÁS':'casi lo mismo'} que las puts (${CH.tilt.rr>=0?'+':''}${CH.tilt.rr.toFixed(1)} pts).
+        Eso es raro — lo normal es pagar más por el seguro de caída — e indica <b>demanda agresiva de subida</b>.
+        Es una de las huellas que deja el dinero posicionándose al alza.</p>`
+      :CH.tilt.rr<-6
+      ?`<p><b>Skew muy cargado a las puts</b> (${CH.tilt.rr.toFixed(1)} pts): el miedo a la caída se paga caro.
+        Para el comprador de calls es una ventaja lateral: <b>tu lado de la apuesta está barato</b> en términos relativos.</p>`
+      :``;
+  }
+  if(CH.rnd&&isFinite(CH.rnd.excesoUp)&&CH.rnd.excesoUp>1.5){
+    n+=`<p><b>La distribución implícita carga la cola alcista:</b> el mercado asigna un
+      <b class="num">${CH.rnd.excesoUp.toFixed(1)}%</b> más de probabilidad a subidas fuertes (>5%) de lo que
+      una campana normal justificaría. Alguien está pagando por billetes de subida.</p>`;
+  }
+  /* veredicto combinado con lo que ya sabemos (VRP + tendencia) */
+  const vrpPts=isFinite(CH.expVol)&&CH.an?(CH.an.atmIv-CH.expVol)*100:NaN;
+  if(!amort&&isFinite(vrpPts)&&vrpPts<-2&&CH.mom&&CH.mom.alcista){
+    n+=`<p class="clave up"><b>La foto completa, y es de compra:</b> mecánica amplificadora (los movimientos
+      corren), opciones baratas (vol. implícita bajo la histórica) y tendencia alcista. Las tres cosas a la vez
+      es la configuración de manual para <b>COMPRAR CALLS</b>. Mira "Baratas vs vecinas" para elegir el strike.</p>`;
+  } else if(amort&&isFinite(vrpPts)&&vrpPts>2){
+    n+=`<p class="clave up"><b>La foto completa favorece vender:</b> los dealers planchan el precio Y la prima
+      está cara. Cobras de más por un riesgo que la propia mecánica del mercado está conteniendo.</p>`;
+  }
+  n+=ayuda('gex');
+  Nt.innerHTML=n;
+}
+
 function drawCone(){
   const el=$('cone');if(!el||!CH.an)return;
   const {spot,dte,expVol}=CH;const atm=CH.an.atmIv;
@@ -3132,6 +3322,188 @@ function renderFavs(){
       onkeydown="if(event.key==='Enter')addFav()"><button onclick="addFav()">+ Añadir</button></span>`;
 }
 
+
+/* ═══════════════════════════════════════════════════════════════════
+   LOS MUROS · exposición de los creadores de mercado (GEX/VEX/CEX)
+
+   LA ASUNCIÓN (importante, y discutible): los dealers están LARGOS de
+   las calls (que los clientes venden cubiertas) y CORTOS de las puts
+   (que los clientes compran como seguro). Es la convención estándar
+   (SqueezeMetrics, SpotGamma) y funciona razonablemente en índices y
+   valores grandes; en tickers pequeños el posicionamiento real puede
+   ser otro. Por eso esto es un MAPA de dónde aprieta la mecánica, no
+   un oráculo.
+
+   Con esa asunción:
+   · GEX > 0 → los dealers amortiguan: compran caídas y venden subidas.
+     El precio tiende a quedarse pegado (bueno para VENDER prima).
+   · GEX < 0 → los dealers amplifican: venden caídas y compran subidas.
+     Movimientos más violentos (bueno para COMPRAR opciones).
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* gamma BSM de un contrato a un spot S dado (reutiliza la del motor) */
+function gammaEn(S, K, t, r, q, iv){
+  if(!(iv>0)||!(t>0)||!(S>0)||!(K>0))return 0;
+  const d1=(Math.log(S/K)+(r-q+iv*iv/2)*t)/(iv*Math.sqrt(t));
+  return Math.exp(-q*t)*Math.exp(-d1*d1/2)/Math.sqrt(2*Math.PI)/(S*iv*Math.sqrt(t));
+}
+/* vanna BSM: cuánto cambia la delta si la vol sube 1 punto */
+function vannaEn(S, K, t, r, q, iv){
+  if(!(iv>0)||!(t>0))return 0;
+  const sq=iv*Math.sqrt(t);
+  const d1=(Math.log(S/K)+(r-q+iv*iv/2)*t)/sq;
+  const d2=d1-sq;
+  return -Math.exp(-q*t)*Math.exp(-d1*d1/2)/Math.sqrt(2*Math.PI)*d2/iv;
+}
+/* charm BSM (call): deriva diaria de la delta por puro paso del tiempo */
+function charmEn(ty, S, K, t, r, q, iv){
+  if(!(iv>0)||!(t>0))return 0;
+  const sq=iv*Math.sqrt(t);
+  const d1=(Math.log(S/K)+(r-q+iv*iv/2)*t)/sq;
+  const d2=d1-sq;
+  const phi=Math.exp(-d1*d1/2)/Math.sqrt(2*Math.PI);
+  let ch=q*Math.exp(-q*t)*N(d1)-Math.exp(-q*t)*phi*(2*(r-q)*t-d2*sq)/(2*t*sq);
+  if(ty==='P')ch=ch-q*Math.exp(-q*t);      // paridad: charm_put = charm_call − q·e^{−qt}
+  return ch/365;                            // por día natural
+}
+
+function dealerFlows(rows, spot, t, r, q){
+  const conOI=rows.filter(o=>isFinite(o.oi)&&o.oi>0&&isFinite(o.iv));
+  if(conOI.length<6)return {ok:false,reason:'sin interés abierto en la cadena (fuera de sesión o símbolos sin OI)'};
+
+  const signo=o=>o.type==='C'?1:-1;   // LA asunción del posicionamiento dealer
+
+  /* GEX por strike a spot actual, en $ de gamma por movimiento del 1% */
+  const porStrike={};
+  let gexTotal=0, vexTotal=0, cexTotal=0, oiCalls=0, oiPuts=0;
+  for(const o of conOI){
+    const g=gammaEn(spot,o.K,t,r,q,o.iv);
+    const gexD=signo(o)*g*o.oi*100*spot*spot*0.01;     // $ por 1% de movimiento
+    porStrike[o.K]=porStrike[o.K]||{K:o.K,call:0,put:0,neto:0};
+    if(o.type==='C'){porStrike[o.K].call+=gexD;oiCalls+=o.oi;}
+    else{porStrike[o.K].put+=gexD;oiPuts+=o.oi;}
+    porStrike[o.K].neto+=gexD;
+    gexTotal+=gexD;
+    vexTotal+=signo(o)*vannaEn(spot,o.K,t,r,q,o.iv)*o.oi*100;   // acciones por punto de vol
+    cexTotal+=signo(o)*charmEn(o.type,spot,o.K,t,r,q,o.iv)*o.oi*100; // acciones al día
+  }
+  const perfil=Object.values(porStrike).sort((a,b)=>a.K-b.K);
+
+  /* Muros: máxima concentración de gamma de calls (techo) y de puts (suelo) */
+  const callWall=perfil.reduce((m,x)=>x.call>((m&&m.call)||0)?x:m,null);
+  const putWall=perfil.reduce((m,x)=>Math.abs(x.put)>Math.abs((m&&m.put)||0)?x:m,null);
+
+  /* Gamma Flip: el spot al que el GEX agregado cambia de signo.
+     Recalculamos el GEX neto en una malla de spots hipotéticos. */
+  let flip=null;
+  {
+    const S0=spot*0.82,S1=spot*1.18,NPTS=72;
+    let prev=null,prevS=null;
+    for(let i=0;i<=NPTS;i++){
+      const S=S0+(S1-S0)*i/NPTS;
+      let gx=0;
+      for(const o of conOI)gx+=signo(o)*gammaEn(S,o.K,t,r,q,o.iv)*o.oi*100*S*S*0.01;
+      if(prev!==null&&((prev<0&&gx>=0)||(prev>0&&gx<=0)))
+        flip=prevS+(S-prevS)*(0-prev)/(gx-prev);
+      prev=gx;prevS=S;
+    }
+  }
+
+  /* Max Pain: strike de expiración que menos paga al conjunto de compradores */
+  let maxPain=null;
+  {
+    let best=Infinity;
+    const Ks=[...new Set(conOI.map(o=>o.K))].sort((a,b)=>a-b);
+    for(const Kx of Ks){
+      let pago=0;
+      for(const o of conOI)
+        pago+=o.oi*100*(o.type==='C'?Math.max(Kx-o.K,0):Math.max(o.K-Kx,0));
+      if(pago<best){best=pago;maxPain=Kx;}
+    }
+  }
+
+  return {ok:true,gexTotal,vexTotal,cexTotal,perfil,callWall,putWall,flip,maxPain,
+          nOI:conOI.length,oiCalls,oiPuts,
+          regimen:gexTotal>0?'amortiguado':'amplificador'};
+}
+
+/* Risk reversal 25Δ sobre la curva SVI: ¿qué lado del seguro está caro? */
+function skewTilt(an, spot, t, r, q){
+  if(!an||!an.svi||!an.rows||!an.rows.length)return null;
+  const F=spot*Math.exp((r-q)*t);
+  const ivDe=K=>sviIV(an.svi.params,Math.log(K/F),t);
+  // buscar strikes con |delta|≈0.25 por bisección sencilla sobre la malla
+  const buscar=(ty)=>{
+    let mejor=null,mejorDist=1;
+    for(let m=0.80;m<=1.20;m+=0.005){
+      const K=spot*m;const iv=ivDe(K);
+      if(!isFinite(iv)||iv<=0)continue;
+      const g=greeks(ty,spot,K,t,r,q,iv);
+      const d=Math.abs(Math.abs(g.delta)-0.25);
+      if(d<mejorDist){mejorDist=d;mejor={K,iv};}
+    }
+    return mejor;
+  };
+  const c25=buscar('C'),p25=buscar('P');
+  if(!c25||!p25)return null;
+  return {rr:(c25.iv-p25.iv)*100, callIv:c25.iv, putIv:p25.iv, callK:c25.K, putK:p25.K};
+}
+
+/* Señales de la distribución implícita (Breeden-Litzenberger sobre la SVI):
+   qué probabilidad asigna el MERCADO a cada cola, frente a una lognormal. */
+function rndSignals(an, spot, t, r, q){
+  if(!an||!an.svi||!isFinite(an.atmIv))return null;
+  const F=spot*Math.exp((r-q)*t);
+  const priceC=K=>{const iv=sviIV(an.svi.params,Math.log(K/F),t);
+    return isFinite(iv)&&iv>0?bsm('C',spot,K,t,r,q,iv):NaN;};
+  // pdf ∝ ∂²C/∂K² (positiva salvo ruido); integrar colas
+  const S0=spot*0.6,S1=spot*1.5,NPTS=180,dK=(S1-S0)/NPTS;
+  let masa=0,masaUp=0,masaDn=0,media=0;
+  const pdf=[];
+  for(let i=1;i<NPTS;i++){
+    const K=S0+i*dK;
+    const d2=(priceC(K+dK)-2*priceC(K)+priceC(K-dK))/(dK*dK);
+    const p=Math.max(d2,0);
+    pdf.push([K,p]);masa+=p*dK;media+=K*p*dK;
+    if(K>spot*1.05)masaUp+=p*dK;
+    if(K<spot*0.95)masaDn+=p*dK;
+  }
+  if(!(masa>0))return null;
+  media/=masa;
+  const pUp=masaUp/masa,pDn=masaDn/masa;
+  // comparación con lognormal ATM (lo que sería "sin skew")
+  const iv=an.atmIv,sq=iv*Math.sqrt(t);
+  const logn=x=>N((Math.log(x)+sq*sq/2)/sq);   // P(S_T/F0 < x) bajo lognormal RN
+  const pUpLog=1-logn(spot*1.05/F), pDnLog=logn(spot*0.95/F);
+  return {pUp,pDn,pUpLog,pDnLog,excesoUp:(pUp-pUpLog)*100,excesoDn:(pDn-pDnLog)*100};
+}
+
+/* ── TENDENCIA: las pocas regularidades direccionales que han sobrevivido ──
+   No hay "patrones ocultos" mágicos, pero sí dos regularidades documentadas
+   durante décadas (Jegadeesh-Titman 1993 y la literatura de momentum):
+   1) lo que ha subido en 6-12 meses tiende a seguir subiendo unos meses más;
+   2) cotizar sobre la media de 200 sesiones separa regímenes alcistas/bajistas.
+   Son señales DÉBILES y con rachas malas — un sesgo, no una bola de cristal.
+   Su valor real aparece al COMBINARLAS con la volatilidad: dirección a favor
+   + opciones baratas = el momento de comprar calls en vez de vender puts. */
+function momentumDe(cs){
+  if(!cs||cs.length<210)return null;
+  const c=cs.map(x=>x.close).filter(x=>isFinite(x)&&x>0);
+  if(c.length<210)return null;
+  const hoy=c[c.length-1];
+  const hace126=c[Math.max(0,c.length-127)];          // ~6 meses de sesiones
+  const m6=hoy/hace126-1;
+  const sma200=c.slice(-200).reduce((a,b)=>a+b,0)/200;
+  const max252=Math.max(...c.slice(-252));
+  return {
+    m6,                                  // retorno 6 meses
+    sobreM200: hoy>sma200,               // régimen alcista
+    distMax52: hoy/max252-1,             // distancia al máximo de 52 semanas
+    alcista: m6>0.08 && hoy>sma200,      // señal combinada
+    bajista: m6<-0.08 && hoy<sma200,
+  };
+}
+
 /* ── LA CINTA: teletipo de favoritos en la cabecera ── */
 function tapeRender(){
   const f=getFavs();
@@ -3209,6 +3581,7 @@ async function scanFavs(){
       if(isFinite(ivRank)&&ivRank>1.5)ivRank/=100;     // 81 → 0.81
       let garch=NaN,nVelas=cs.length,chgPct=NaN;
       if(cs.length>=80){const pk=volForecast(cs,30);if(pk.ok)garch=pk.expected;}
+      const mom=momentumDe(cs);
       if(cs.length>=2){const prev=cs[cs.length-2].close;if(prev>0)chgPct=(cs[cs.length-1].close/prev-1)*100;}
       const vrp=(isFinite(ivIdx)&&isFinite(garch))?(ivIdx-garch)*100:NaN;
       // earnings: tastytrade lo da dentro de m.earnings
@@ -3217,7 +3590,7 @@ async function scanFavs(){
       const eDate=eRaw['expected-report-date']||eRaw['actual-eps-date']||null;
       if(eDate){const d=new Date(eDate);const dias=Math.round((d-Date.now())/86400000);
         if(dias>=0&&dias<=45)earn={fecha:eDate,dias};}
-      TD.data[s]={spot,ivIdx,ivRank,garch,vrp,nVelas,chgPct,earn,esCierre};
+      TD.data[s]={spot,ivIdx,ivRank,garch,vrp,nVelas,chgPct,earn,esCierre,mom};
       if(isFinite(spot))ok++;
     }
     if(!ok)throw new Error('No llegó ningún dato (ni precios ni velas). Revisa la conexión con Diagnosticar en Mi cuenta.');
@@ -3242,16 +3615,26 @@ function renderToday(){
       ?`cobra <b class="num">${mejor.vrp.toFixed(1)} puntos de más</b> respecto a lo que dice su histórico. Vender prima ahí paga bien.`
       :`cobra <b class="num">${Math.abs(mejor.vrp).toFixed(1)} puntos de menos</b>. Sus opciones están de oferta: mejor comprarlas que venderlas.`}</p>`;
   } else if(conVrp.length){
-    intro=`<p>Hoy no hay chollos gordos: en tus ${conVrp.length} favoritos con datos, el mercado y la historia andan bastante de acuerdo. Los días así, la mejor operación suele ser <b>ninguna</b>.</p>`;
+    const conTend=list.filter(d=>d.mom&&(d.mom.alcista||d.mom.bajista));
+    intro=`<p>Hoy no hay chollos de volatilidad: en tus ${conVrp.length} favoritos con datos, la implícita y la histórica andan de acuerdo.</p>`;
+    intro+=conTend.length
+      ?`<p>Pero la <b>tendencia</b> sí marca terreno en ${conTend.map(d=>d.s).join(', ')} — mira sus tarjetas.</p>`
+      :`<p>Y sin tendencias claras tampoco. Los días así, la mejor operación suele ser <b>ninguna</b>.</p>`;
   } else {
     intro=`<p>No pude estimar la volatilidad histórica de ningún favorito (faltan velas). Los precios sí llegaron: pincha cualquier tarjeta para analizarlo a fondo.</p>`;
   }
-  $('tdIntro').innerHTML=intro;
+  $('tdIntro').innerHTML=intro+ayuda('momentum');
 
   $('tdCards').innerHTML=list.map(d=>{
+    const alc=d.mom&&d.mom.alcista, baj=d.mom&&d.mom.bajista;
     const verd=!isFinite(d.vrp)?['nada','sin datos suficientes']
+      :(d.vrp<-2&&alc)?['comprar','COMPRAR CALLS']       // la joya: dirección + vol barata
+      :(d.vrp<-2&&baj)?['comprar','COMPRAR PUTS']
+      :d.vrp<-2?['comprar','comprar opciones']            // vol barata sin dirección → straddle
+      :(d.vrp>4&&alc)?['vender','vender puts']            // prima cara + viento a favor
       :d.vrp>4?['vender','vender prima']
-      :d.vrp<-2?['comprar','comprar opciones']
+      :alc?['comprar','sesgo alcista']                    // dirección sin ventaja de vol
+      :baj?['vender','sesgo bajista']
       :['nada','sin ventaja clara'];
     const pos=posDe(d.s);
     return `<div class="opp" onclick="tapeGo('${d.s}')">
@@ -3263,11 +3646,16 @@ function renderToday(){
         <span class="opp-badge ${verd[0]}"${pos?'':' style="margin-left:auto"'}>${verd[1]}</span>
       </div>
       <div class="opp-figs">
-        <span class="opp-f"><span class="k">susto del mercado</span><span class="v mdl">${isFinite(d.ivIdx)?(d.ivIdx*100).toFixed(1)+'%':'—'}</span></span>
-        <span class="opp-f"><span class="k">susto real (histórico)</span><span class="v">${isFinite(d.garch)?(d.garch*100).toFixed(1)+'%':'—'}</span></span>
+        <span class="opp-f"><span class="k">vol. implícita</span><span class="v mdl">${isFinite(d.ivIdx)?(d.ivIdx*100).toFixed(1)+'%':'—'}</span></span>
+        <span class="opp-f"><span class="k">vol. histórica</span><span class="v">${isFinite(d.garch)?(d.garch*100).toFixed(1)+'%':'—'}</span></span>
         <span class="opp-f"><span class="k">te pagan de más</span><span class="v ${d.vrp>2?'up':d.vrp<-2?'dn':''}">${isFinite(d.vrp)?(d.vrp>=0?'+':'')+d.vrp.toFixed(1)+' pts':'—'}</span></span>
         <span class="opp-f"><span class="k">IV vs su año</span><span class="v ${d.ivRank>0.7?'mk':''}">${isFinite(d.ivRank)?'percentil '+(d.ivRank*100).toFixed(0):'—'}</span></span>
       </div>
+      ${d.mom?`<div class="opp-line" style="margin-top:6px">Tendencia:
+        <b class="${d.mom.m6>=0?'':''}" style="color:var(--${d.mom.m6>=0.08?'bull':d.mom.m6<=-0.08?'bear':'ink2'})">${d.mom.m6>=0?'+':''}${(d.mom.m6*100).toFixed(0)}% en 6 meses</b>,
+        ${d.mom.sobreM200?'sobre':'bajo'} su media de 200 sesiones${d.mom.distMax52>-0.03?', pegado a máximos de 52 semanas':''}.
+        ${d.mom.alcista&&d.vrp<-2?'<b>Dirección a favor y opciones baratas: la combinación para comprar calls.</b>':''}
+        ${d.mom.alcista&&d.vrp>4?'Con la prima cara, mejor cobrarla: vender puts aprovecha el mismo viento.':''}</div>`:''}
       ${d.earn?`<div class="opp-warn">⚠ Earnings ${d.earn.dias===0?'HOY':'en '+d.earn.dias+' días'} (${d.earn.fecha}). La IV está inflada por el evento y se desplomará justo después (el "IV crush"). Vender prima antes de earnings es apostar al resultado, no cobrar el seguro.</div>`:''}
       ${!isFinite(d.vrp)&&isFinite(d.spot)?`<div class="opp-line">Llegó el precio pero no suficiente histórico (${d.nVelas||0} velas) para el GARCH.</div>`:''}
       <div class="opp-line">Pulsa para escanear su cadena completa y ver qué strikes vender.</div>
