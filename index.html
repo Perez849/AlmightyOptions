@@ -552,7 +552,7 @@ summary:hover{color:var(--ink)}
         </div>
         <div class="btns" style="margin-bottom:14px">
           <button class="btn sm" onclick="pullMarket()">Traer datos reales</button>
-          <button class="btn quiet sm" onclick="pullGarch()">Ver cuánto se mueve de verdad</button>
+          <button class="btn quiet sm" onclick="pullGarch()">Estimar volatilidad</button>
         </div>
         <div class="rw">
           <div class="fld"><label>Precio</label><input id="S" type="number" value="100" step="0.5"></div>
@@ -2574,7 +2574,8 @@ async function pullMarket(){
       if(isFinite(iv)){st.IV=iv*100;$('IV').value=st.IV.toFixed(1);}}
     calc();
     e.innerHTML=`<span class="eyebrow">Mercado</span>${st.exps.length} vencimientos disponibles para ${sym}.
-      Pulsa <b>Estimar volatilidad</b> para ajustar el GARCH sobre su histórico.`;
+      Pulsa <b>Estimar volatilidad</b> (el botón gris de aquí arriba) para ajustar el GARCH sobre su histórico
+      y saber si las opciones están caras o baratas.`;
   }catch(err){e.className='note dn';e.innerHTML=`<span class="eyebrow">No se pudo cargar</span>${err.message}`;}
 }
 $('expSel').addEventListener('change',e=>{
@@ -3246,17 +3247,19 @@ function direccion(){
 
   // ── 3 · SKEW · z respecto al skew NORMAL, no respecto a cero ──
   // Clave conceptual: en renta variable el skew negativo es lo normal desde
-  // 1987. El neutral NO es cero: es el skew típico para ese plazo. Modelamos
-  // ese típico como ≈ -2·√(t) puntos de RR25 (más plano cuanto más lejano el
-  // vencimiento) con una escala de ~4 pts. Un RR plano o positivo se desvía
-  // hacia arriba (alcista); uno muy cargado a puts que sea NORMAL no puntúa.
-  if(CH.tilt && Number.isFinite(CH.tilt.rr)){
-    const tAny = (CH.dte||30)/365;
-    const rrNormal = -3.5/Math.sqrt(Math.max(tAny,0.02))*0.15;   // típico (negativo) escalado por plazo
-    const escalaRR = 4.0;                                        // pts de RR por σ
+  // 1987. El neutral NO es cero. Pero tampoco es una constante: el skew ESCALA
+  // con la volatilidad del subyacente (un valor que se mueve el 60% tiene un
+  // RR25 mucho más negativo que uno que se mueve el 15%). Así que el "normal"
+  // lo anclamos al nivel de IV: RR normal ≈ -0.28 · IV_ATM (en puntos), una
+  // relación empírica razonable (a IV 25% → ~-7 pts; a IV 15% → ~-4 pts).
+  // La escala también proporcional a IV: skews más anchos en valores volátiles.
+  if(CH.tilt && Number.isFinite(CH.tilt.rr) && CH.an && Number.isFinite(CH.an.atmIv)){
+    const ivPct = CH.an.atmIv*100;
+    const rrNormal = -0.28*ivPct;                    // normal proporcional a la IV
+    const escalaRR = Math.max(0.15*ivPct, 2.5);      // 1σ ≈ 15% de la IV, mínimo 2.5 pts
     const z = (CH.tilt.rr - rrNormal)/escalaRR;
     addS(z*0.7,'Skew vs su normal',
-      `RR25 ${CH.tilt.rr>=0?'+':''}${CH.tilt.rr.toFixed(1)} pts, normal ≈ ${rrNormal.toFixed(1)} → ${z>=0?'+':''}${z.toFixed(2)}σ${z>0.5?' (calls más demandadas de lo habitual: alcista)':z<-0.5?' (miedo por encima de lo normal)':''}`);
+      `RR25 ${CH.tilt.rr>=0?'+':''}${CH.tilt.rr.toFixed(1)} pts; lo normal para IV ${ivPct.toFixed(0)}% es ≈ ${rrNormal.toFixed(1)} → ${z>=0?'+':''}${z.toFixed(2)}σ${z>0.5?' (calls más demandadas de lo habitual: alcista)':z<-0.5?' (miedo por encima de lo normal)':''}`);
   }
 
   // ── 4 · MAX PAIN · z por cercanía al vencimiento ──
@@ -4006,23 +4009,29 @@ async function scanFavs(){
 function renderToday(){
   const favs=getFavs();
   const list=favs.map(s=>({s,...TD.data[s]})).filter(d=>isFinite(d.spot)||isFinite(d.ivIdx));
-  // orden: primero los de más |VRP| (donde está el jugo), los sin datos al final
-  list.sort((a,b)=>(isFinite(b.vrp)?Math.abs(b.vrp):-1)-(isFinite(a.vrp)?Math.abs(a.vrp):-1));
+  // "Jugo" = la vol está lejos de su normal EN SU PROPIO AÑO (IV rank lejos de 0.5),
+  // sea cara (vender) o barata (comprar). Los sin dato al final.
+  const jugo=d=>isFinite(d.ivRank)?Math.abs(d.ivRank-0.5):(isFinite(d.vrp)?Math.min(Math.abs(d.vrp)/20,0.49):-1);
+  list.sort((a,b)=>jugo(b)-jugo(a));
   $('tdOut').style.display='block';
   $('tdSub').textContent=new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'});
 
-  const conVrp=list.filter(d=>isFinite(d.vrp));
-  const mejor=conVrp[0];
+  const conDato=list.filter(d=>isFinite(d.ivRank)||isFinite(d.vrp));
+  const mejor=conDato[0];
   let intro='';
-  if(mejor&&Math.abs(mejor.vrp)>4){
-    intro=`<p>Hoy el jugo está en <b>${mejor.s}</b>: el mercado ${mejor.vrp>0
-      ?`cobra <b class="num">${mejor.vrp.toFixed(1)} puntos de más</b> respecto a lo que dice su histórico. Vender prima ahí paga bien.`
-      :`cobra <b class="num">${Math.abs(mejor.vrp).toFixed(1)} puntos de menos</b>. Sus opciones están de oferta: mejor comprarlas que venderlas.`}</p>`;
-  } else if(conVrp.length){
+  if(mejor&&isFinite(mejor.ivRank)&&mejor.ivRank>0.70){
+    intro=`<p>Hoy lo más accionable es <b>${mejor.s}</b>: su volatilidad implícita está más alta que el
+      <b class="num">${(mejor.ivRank*100).toFixed(0)}%</b> de su último año. Los seguros están caros para ese valor —
+      terreno de vendedor, si la tendencia acompaña.</p>`;
+  } else if(mejor&&isFinite(mejor.ivRank)&&mejor.ivRank<0.30){
+    intro=`<p>Hoy lo más accionable es <b>${mejor.s}</b>: su volatilidad implícita está más baja que el
+      <b class="num">${(100-mejor.ivRank*100).toFixed(0)}%</b> de su último año. Las opciones están de oferta para ese valor —
+      terreno de comprador.</p>`;
+  } else if(conDato.length){
     const conTend=list.filter(d=>d.mom&&(d.mom.alcista||d.mom.bajista));
-    intro=`<p>Hoy no hay chollos de volatilidad: en tus ${conVrp.length} favoritos con datos, la implícita y la histórica andan de acuerdo.</p>`;
+    intro=`<p>Hoy la volatilidad de tus favoritos está en su rango normal: ni cara ni barata en su propio contexto.</p>`;
     intro+=conTend.length
-      ?`<p>Pero la <b>tendencia</b> sí marca terreno en ${conTend.map(d=>d.s).join(', ')} — mira sus tarjetas.</p>`
+      ?`<p>Pero la <b>tendencia</b> marca terreno en ${conTend.map(d=>d.s).join(', ')} — mira sus tarjetas.</p>`
       :`<p>Y sin tendencias claras tampoco. Los días así, la mejor operación suele ser <b>ninguna</b>.</p>`;
   } else {
     intro=`<p>No pude estimar la volatilidad histórica de ningún favorito (faltan velas). Los precios sí llegaron: pincha cualquier tarjeta para analizarlo a fondo.</p>`;
@@ -4030,14 +4039,27 @@ function renderToday(){
   $('tdIntro').innerHTML=intro+ayuda('momentum');
 
   $('tdCards').innerHTML=list.map(d=>{
+    // ── VEREDICTO ──
+    // El error viejo: "vender si VRP>4". Pero el VRP casi siempre es positivo
+    // (la implícita supera a la histórica por estructura: es la prima de riesgo
+    // de volatilidad, existe SIEMPRE). Así casi todo salía "vender".
+    //
+    // Ahora medimos si la vol está cara/barata EN SU PROPIO CONTEXTO con el
+    // IV rank (percentil de la IV en su último año). >70% = históricamente
+    // cara (terreno de venta). <30% = barata (terreno de compra). Y lo
+    // cruzamos con la tendencia. El VRP se usa solo como confirmación.
     const alc=d.mom&&d.mom.alcista, baj=d.mom&&d.mom.bajista;
-    const verd=!isFinite(d.vrp)?['nada','sin datos suficientes']
-      :(d.vrp<-2&&alc)?['comprar','COMPRAR CALLS']       // la joya: dirección + vol barata
-      :(d.vrp<-2&&baj)?['comprar','COMPRAR PUTS']
-      :d.vrp<-2?['comprar','comprar opciones']            // vol barata sin dirección → straddle
-      :(d.vrp>4&&alc)?['vender','vender puts']            // prima cara + viento a favor
-      :d.vrp>4?['vender','vender prima']
-      :alc?['comprar','sesgo alcista']                    // dirección sin ventaja de vol
+    const ivCara = isFinite(d.ivRank) ? d.ivRank>0.70 : (isFinite(d.vrp)&&d.vrp>6);
+    const ivBarata = isFinite(d.ivRank) ? d.ivRank<0.30 : (isFinite(d.vrp)&&d.vrp<0);
+    const vrpConfirmaVenta = !isFinite(d.vrp) || d.vrp>0;   // no vendas si la histórica supera a la implícita
+    const verd=(!isFinite(d.vrp)&&!isFinite(d.ivRank))?['nada','sin datos suficientes']
+      :(ivBarata&&alc)?['comprar','COMPRAR CALLS']          // barata + tendencia arriba
+      :(ivBarata&&baj)?['comprar','COMPRAR PUTS']
+      :ivBarata?['comprar','comprar opciones']              // barata sin dirección → straddle
+      :(ivCara&&vrpConfirmaVenta&&alc)?['vender','vender puts']   // cara + viento a favor
+      :(ivCara&&vrpConfirmaVenta&&baj)?['vender','vender calls']
+      :(ivCara&&vrpConfirmaVenta)?['vender','vender prima']       // cara, sin dirección → condor
+      :alc?['comprar','sesgo alcista']                     // tendencia sin ventaja de vol
       :baj?['vender','sesgo bajista']
       :['nada','sin ventaja clara'];
     const pos=posDe(d.s);
