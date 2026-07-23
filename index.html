@@ -700,10 +700,8 @@ summary:hover{color:var(--ink)}
         <section class="blk">
           <h2>Dónde cree el mercado que acabará</h2>
           <div class="plot"><canvas id="rnd" height="220"></canvas></div>
-          <div class="historia" style="font-size:13.5px">
+          <div class="historia" id="rndTexto" style="font-size:13.5px">
             <p>Esta es la apuesta colectiva: dónde cree el mercado que estará el precio el día del vencimiento.</p>
-            <p>Fíjate en que <b>la cola de la izquierda es más gorda</b>. El mercado teme más una caída
-               fuerte que una subida fuerte. Siempre es así.</p>
           </div>
         </section>
       </div>
@@ -755,7 +753,10 @@ function greeks(type,S,K,t,r,q,v){
   const rho=sgn*K*t*df*(type==='C'?N(d2):N(-d2))/100;
   // segundo orden
   const vanna=(-dq*nd1*d2/v)/100;                   // dDelta/dVol(1pt)
-  const volga=(S*dq*nd1*sq*d1*d2/v)/100;            // dVega/dVol(1pt)
+  // BUG CORREGIDO: doble division por 100. `vega` ya esta en "por punto de IV"
+  // (lleva su /100). Volga = dVega/dVol tambien en puntos => una sola division
+  // mas, no dos. La version anterior devolvia un volga 100x inflado.
+  const volga=(S*dq*nd1*sq*d1*d2/v)/1e4;            // dVega(1pt)/dVol(1pt)
   const charm=(sgn*q*dq*(type==='C'?N(d1):N(-d1))
     -dq*nd1*(2*(r-q)*t-d2*vt)/(2*t*vt))/365;        // dDelta/dt (por día)
   const speed=-gamma/S*(d1/vt+1);
@@ -958,7 +959,20 @@ function fitGARCH(returns) {
     }
     return ll;
   };
-  const { p, err } = nelderMead(negLL, [uncond * 0.05, 0.08, 0.90], 1200);
+  // BUG CORREGIDO: una sola semilla en Nelder-Mead cae en minimos locales.
+  // Medido sobre series GARCH simuladas, la semilla vieja [.,0.08,0.90] daba
+  // peor verosimilitud que otras y algunas semillas recuperaban alpha=0.03
+  // cuando el verdadero era 0.09. Multiarranque: nos quedamos con la mejor.
+  const semillas=[[uncond*0.05,0.08,0.90],[uncond*0.10,0.05,0.90],
+                  [uncond*0.20,0.15,0.75],[uncond*0.02,0.03,0.95],
+                  [uncond*0.50,0.20,0.60]];
+  let mejor=null;
+  for(const s of semillas){
+    const cand=nelderMead(negLL,s,1200);
+    if(cand.err<1e8&&(!mejor||cand.err<mejor.err))mejor=cand;
+  }
+  if(!mejor) return null;
+  const { p, err } = mejor;
   if (err > 1e8) return null;
   const [om, al, be] = p;
   // varianza condicional actual
@@ -997,7 +1011,12 @@ function riskNeutralDensity(sviP, F, t, r, kGrid) {
     const K = F * Math.exp(k);
     const iv = sviIV(sviP, k, t);
     if (!isFinite(iv) || iv <= 0) return NaN;
-    return bsm('C', F * Math.exp(-r * t) * Math.exp(r * t), K, t, r, 0, iv);
+    // BUG CORREGIDO: pasaba F como SPOT con q=0, asi que el modelo hacia
+    // crecer el subyacente a tasa r cuando F YA es el precio a futuro.
+    // Doble conteo del carry: la RND salia desplazada exp(r*t) (~+0.75% a 3m
+    // con r=3%), y eso se colaba entero en derivaPct como sesgo alcista falso.
+    // Black-76: q=r anula la deriva y deja la densidad centrada en F.
+    return bsm('C', F, K, t, r, r, iv);
   };
   for (let i = 1; i < kGrid.length - 1; i++) {
     const K = F * Math.exp(kGrid[i]);
@@ -3292,11 +3311,14 @@ function direccion(){
   // La RND ya da el exceso de masa en la cola izquierda (>12% de caída)
   // respecto a lo que una lognormal daría. Lo expresamos en σ con escala ~2%.
   if(CH.rnd && Number.isFinite(CH.rnd.asimetriaCola)){
-    const z=-(CH.rnd.asimetriaCola*100)/2.0;     // asimetría izquierda (positiva) → z negativo
+    // ESCALA REVISADA: asimetriaCola ya no son puntos de probabilidad sino
+    // diferencia de skewness (lognormal - RND). Rango observado ~0 a 1.2.
+    // 0.5 de diferencia ≈ 1σ de cola izquierda gorda.
+    const z=-(CH.rnd.asimetriaCola)/0.5;         // asimetría izquierda (positiva) → z negativo
     if(z<-0.3) addC(z,'Cola izquierda gorda',
-      `caída fuerte (>12%) con ${CH.rnd.excesoColaDn>=0?'+':''}${CH.rnd.excesoColaDn.toFixed(1)}% más probabilidad que lo normal → ${z.toFixed(2)}σ`);
+      `la distribución está ${CH.rnd.asimetriaCola.toFixed(2)} de skewness por debajo de una lognormal normal → ${z.toFixed(2)}σ (más masa en la caída fuerte)`);
     else if(z>0.3) addC(z,'Cola derecha gorda',
-      `el mercado carga la cola alcista → +${z.toFixed(2)}σ (apuesta por un salto arriba)`);
+      `la distribución está ${(-CH.rnd.asimetriaCola).toFixed(2)} de skewness por encima de lo normal → +${z.toFixed(2)}σ (el mercado carga el salto al alza)`);
   }
 
   // ── COMBINAR: media de z (no suma), sigue en unidades de desviación ──
@@ -3325,6 +3347,206 @@ function direccion(){
           cola:colaZ.map(s=>({...s,pts:s.z})),
           gammaNeg,momAlcistaCrudo,momBajistaCrudo,
           score:scoreSesgo, veredicto:vSesgo, señales:sesgoZ};
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   ESTRUCTURA DE VOLATILIDAD · tres medidas que el motor no usaba
+   ═══════════════════════════════════════════════════════════════════
+   El fallo que corrige: el veredicto llamaba "opciones baratas" a la IV
+   ATM baja y de ahí saltaba a "comprar puts" — sin mirar que la pata que
+   ibas a comprar (put OTM) puede estar carísima en relativo. Nivel y
+   pendiente son dos cosas distintas y hay que medirlas por separado.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Precio RELATIVO del ala izquierda: no cuánto vale la vol, sino cuánto
+   te cobran de más por el put OTM frente al ATM. Es la señal que faltaba. */
+function precioAla(){
+  if(!(CH.tilt&&Number.isFinite(CH.tilt.rr))||!(CH.an&&Number.isFinite(CH.an.atmIv)))return null;
+  const ivPct=CH.an.atmIv*100;
+  if(ivPct<=0)return null;
+  const ratio=CH.tilt.rr/ivPct;              // RR25 como fracción de la IV ATM
+  const normal=-0.28;                        // mismo ancla que usa el sesgo
+  const escala=0.15;                          // 1σ ≈ 15% de la IV
+  const z=(ratio-normal)/escala;             // z<0 → ala izquierda cara
+  return {ratio,z,
+    caro:z<=-1.0,                            // puts OTM caros vs su normal
+    barato:z>=1.0,                           // puts OTM baratos (raro)
+    txt:`RR25 ${CH.tilt.rr.toFixed(1)} pts = ${(ratio*100).toFixed(0)}% de la IV ATM (lo normal ≈ -28%) → ${z>=0?'+':''}${z.toFixed(2)}σ`};
+}
+
+/* Pendiente temporal de la IV: separa miedo puntual de miedo estructural.
+   Usa la cadena que ya está cargada, sin llamadas nuevas. */
+function termStructure(){
+  if(!Array.isArray(CH.exps)||CH.exps.length<2)return null;
+  const pts=[];
+  for(const e of CH.exps){
+    const dte=e['days-to-expiration']??e.dte;
+    const iv=e.ivAtm??e.atmIv;               // si la cadena lo trae cacheado
+    if(Number.isFinite(dte)&&Number.isFinite(iv)&&dte>0)pts.push({dte,iv});
+  }
+  if(pts.length<2)return null;
+  pts.sort((a,b)=>a.dte-b.dte);
+  const cerca=pts[0], lejos=pts[pts.length-1];
+  const pend=(lejos.iv-cerca.iv)/Math.log(lejos.dte/cerca.dte);
+  return {pend, invertida:pend<-0.02, plana:Math.abs(pend)<=0.02,
+    txt:`IV ${(cerca.iv*100).toFixed(0)}% a ${cerca.dte}d vs ${(lejos.iv*100).toFixed(0)}% a ${lejos.dte}d → ${pend<-0.02?'invertida (miedo inmediato)':pend>0.02?'normal ascendente':'plana'}`};
+}
+
+/* Nivel de la vol: IV ATM contra la realizada. Esto es lo que el código
+   ya llamaba "barata/cara" — se mantiene, pero ahora solo decide NIVEL,
+   nunca la estructura. */
+function ivRv(){
+  if(!(CH.an&&Number.isFinite(CH.an.atmIv))||!Number.isFinite(CH.expVol))return null;
+  const vrp=(CH.an.atmIv-CH.expVol)*100;
+  return {vrp, barata:vrp<-2, cara:vrp>2,
+    txt:`IV ${(CH.an.atmIv*100).toFixed(0)}% vs histórica ${(CH.expVol*100).toFixed(0)}% → ${vrp>=0?'+':''}${vrp.toFixed(1)} pts`};
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   DECIDE · cuatro cuadrantes (dirección × estructura)
+   ═══════════════════════════════════════════════════════════════════
+   Dirección débil ya NO significa "no hay trade". Si la estructura de vol
+   está distorsionada, la operación es sobre la estructura, no sobre la
+   dirección — y esa señal es más fiable porque no exige acertar el rumbo.
+   ═══════════════════════════════════════════════════════════════════ */
+function decide(D){
+  const ala=precioAla(), term=termStructure(), niv=ivRv();
+  const vrp=niv?niv.vrp:NaN;
+
+  const dirClara=Math.abs(D.zSesgo)>=1.2;
+  const dirLeve=Math.abs(D.zSesgo)>=0.5&&!dirClara;
+  const alc=D.zSesgo>0, baj=D.zSesgo<0;
+  const colaAlta=D.zCola<=-0.5;
+  const distors=!!(ala&&(ala.caro||ala.barato))||!!(term&&term.invertida);
+
+  let est,por,conf,avisos=[];
+
+  // aviso permanente cuando el ala está cara y el sesgo es bajista:
+  // es exactamente el caso que producía "comprar puts" mal.
+  if(ala&&ala.caro&&baj)avisos.push(
+    `Comprar puts a pelo aquí es pagar el ala más cara de la cadena. ${ala.txt}. La IV ATM esté baja o no, esa pata concreta no está de oferta.`);
+  if(ala&&ala.caro&&niv&&niv.barata)avisos.push(
+    `Ojo a la aparente contradicción: la vol ATM está barata (${niv.txt}) pero el ala izquierda cara. Son medidas distintas — nivel vs pendiente.`);
+
+  if(dirClara&&!distors){
+    est=alc?'COMPRAR CALLS':'COMPRAR PUTS';
+    por=`Dirección clara (${D.zSesgo.toFixed(2)}σ) y estructura de vol en su sitio: la pata direccional simple es la más limpia.`;
+    conf='alta';
+  }else if(dirClara&&distors){
+    est=alc?'CALL SPREAD alcista':'PUT SPREAD bajista';
+    por=`Dirección clara (${D.zSesgo.toFixed(2)}σ) pero la estructura está distorsionada${ala&&ala.caro?' (ala izquierda cara)':''}: el spread expresa el rumbo y encima vende la pata cara en vez de comprarla.`;
+    conf='alta';
+  }else if(!dirClara&&distors){
+    // EL CUADRANTE QUE ANTES ERA "SIN SEÑAL" — aquí sí hay operación
+    if(ala&&ala.caro){
+      est=baj?'PUT SPREAD bajista (vender el skew)':'RISK REVERSAL alcista';
+      por=baj
+        ?`La dirección es débil (${D.zSesgo.toFixed(2)}σ, no da para jugársela a una pata), pero el skew SÍ es señal fuerte: ${ala.txt}. Compras el put cercano y vendes el lejano carísimo — cobras la distorsión en vez de pagarla, manteniendo el sesgo bajista.`
+        :`Dirección débil, pero el ala izquierda está cara (${ala.txt}): vendes el put OTM sobrevalorado y compras la call. Cobras el miedo ajeno.`;
+      conf='alta';
+    }else if(term&&term.invertida){
+      est='CALENDAR SPREAD';
+      por=`Dirección débil, pero la curva temporal está invertida: ${term.txt}. Vendes el vencimiento cercano inflado y compras el lejano barato.`;
+      conf='media';
+    }else{
+      est=baj?'PUT SPREAD bajista':'CALL SPREAD alcista';
+      por=`Dirección débil pero estructura aprovechable: spread en el sentido de la inclinación, con riesgo acotado.`;
+      conf='media';
+    }
+  }else{
+    // único cuadrante sin trade
+    if(colaAlta){
+      est='SIN OPERACIÓN DIRECCIONAL · solo protección';
+      por=`Ni dirección ni distorsión aprovechable, pero el riesgo de cola es ${D.vCola.toLowerCase()}. No vendas puts desnudos. Si acaso, un put barato de cobertura.`;
+      conf='—';
+    }else if(niv&&niv.cara){
+      est='IRON CONDOR';
+      por=`Sin dirección (${D.zSesgo.toFixed(2)}σ) y sin distorsión de estructura, pero la prima está cara (${niv.txt}): cobras por ambos lados sin apostar rumbo.`;
+      conf='media';
+    }else if(niv&&niv.barata){
+      est='STRADDLE';
+      por=`Sin dirección ni distorsión, pero la vol está barata en absoluto (${niv.txt}): compras movimiento. Solo si esperas catalizador.`;
+      conf='media';
+    }else{
+      est='NINGUNA';
+      por=`Dirección débil (${D.zSesgo.toFixed(2)}σ), estructura de vol normal y prima en su sitio. Hoy en ${CH.sym} no hay nada que valga la pena.`;
+      conf='—';
+    }
+  }
+
+  if(colaAlta&&/COMPRAR CALLS/.test(est)){
+    est='CALL SPREAD alcista';
+    por+=` Ajustado: con riesgo de cola ${D.vCola.toLowerCase()}, calls a pelo no respetan el hueco a la izquierda.`;
+  }
+
+  return {est,por,conf,avisos,ala,term,niv,dirClara,dirLeve,distors,
+    cuadrante:`${dirClara?'dirección clara':'dirección débil'} × ${distors?'estructura distorsionada':'estructura normal'}`};
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   LOGGING · sin esto no hay calibración posible dentro de tres meses
+   ═══════════════════════════════════════════════════════════════════
+   Guarda cada señal emitida con todos sus σ. El resultado a vencimiento
+   se rellena después. Con 100-200 observaciones sabrás qué |σ| tiene hit
+   rate real por encima del 50% — y podrás fijar umbrales medidos en vez
+   de intuidos. Almacén: localStorage (el Worker es un proxy sin estado).
+   Para migrar a KV solo hay que cambiar STORE.
+   ═══════════════════════════════════════════════════════════════════ */
+const STORE={
+  leer(){try{return JSON.parse(localStorage.getItem('ao_signals')||'[]')}catch{return[]}},
+  escribir(a){try{localStorage.setItem('ao_signals',JSON.stringify(a.slice(-2000)))}catch{}}
+};
+
+function logSignal(D,R){
+  if(!CH.an||!CH.sym)return;
+  const reg={
+    ts:Date.now(), sym:CH.sym, spot:CH.spot, dte:CH.dte,
+    zSesgo:+D.zSesgo.toFixed(3), zCola:+D.zCola.toFixed(3),
+    vSesgo:D.vSesgo, vCola:D.vCola,
+    atmIv:CH.an.atmIv, rv:CH.expVol,
+    rr25:CH.tilt?CH.tilt.rr:null,
+    alaZ:R.ala?+R.ala.z.toFixed(3):null,
+    termPend:R.term?+R.term.pend.toFixed(4):null,
+    vrp:R.niv?+R.niv.vrp.toFixed(2):null,
+    cuadrante:R.cuadrante, estructura:R.est, confianza:R.conf,
+    señales:D.sesgo.map(s=>({n:s.nombre,z:+s.z.toFixed(2)})),
+    resultado:null, spotVenc:null       // se rellena a vencimiento
+  };
+  const a=STORE.leer();
+  // no duplicar: una señal por símbolo+vencimiento+día
+  const hoy=new Date().toDateString();
+  const dup=a.findIndex(x=>x.sym===reg.sym&&x.dte===reg.dte&&new Date(x.ts).toDateString()===hoy);
+  if(dup>=0)a[dup]=reg; else a.push(reg);
+  STORE.escribir(a);
+  return a.length;
+}
+
+/* Resumen de calibración: qué está haciendo el sistema y con cuánta muestra */
+function statsCalib(){
+  const a=STORE.leer();
+  if(!a.length)return null;
+  const cerradas=a.filter(x=>x.resultado!==null);
+  const porCuad={};
+  for(const x of a){porCuad[x.cuadrante]=(porCuad[x.cuadrante]||0)+1;}
+  return {total:a.length, cerradas:cerradas.length, porCuad,
+    desde:new Date(Math.min(...a.map(x=>x.ts))).toLocaleDateString('es-ES')};
+}
+
+/* Exportar el histórico para analizarlo fuera (CSV) */
+function exportarSenales(){
+  const a=STORE.leer();
+  if(!a.length){alert('Todavía no hay señales guardadas.');return;}
+  const cols=['ts','sym','spot','dte','zSesgo','zCola','atmIv','rv','rr25','alaZ','termPend','vrp','cuadrante','estructura','confianza','resultado','spotVenc'];
+  const csv=[cols.join(',')].concat(a.map(r=>cols.map(c=>{
+    const v=r[c]; if(c==='ts')return new Date(v).toISOString();
+    return v===null||v===undefined?'':String(v).replace(/,/g,';');
+  }).join(','))).join('\n');
+  const b=new Blob([csv],{type:'text/csv'});
+  const u=URL.createObjectURL(b);
+  const l=document.createElement('a');
+  l.href=u; l.download=`almighty_senales_${new Date().toISOString().slice(0,10)}.csv`;
+  l.click(); URL.revokeObjectURL(u);
 }
 
 function renderDir(){
@@ -3377,49 +3599,28 @@ function renderDir(){
     bloque('Señales de riesgo', D.cola, 'Sin datos de gamma ni distribución (hace falta interés abierto).')+
     '</div>';
 
-  // ── LA OPERACIÓN: ahora sí cruza sesgo × riesgo de cola × precio de la vol ──
-  const alc=D.zSesgo>=0.5 || (D.momAlcistaCrudo && D.zCola<=-0.5);
-  const baj=D.zSesgo<=-0.5 || (D.momBajistaCrudo && D.zCola<=-0.5 && D.zSesgo<0);
-  const colaAlta=D.zCola<=-0.5;
-  const barata=vrp<-2, cara=vrp>2;
-  let op='';
+  // ── LA OPERACIÓN: cuatro cuadrantes (dirección × estructura de vol) ──
+  const R=decide(D);
+  logSignal(D,R);
 
-  if(alc && colaAlta){
-    op=`<b>Sesgo al alza, pero con riesgo de cola.</b> La jugada que respeta ambas cosas es un
-      <b>CALL SPREAD alcista</b> (o comprar calls con poco tamaño): apuestas a la subida con la pérdida
-      limitada, porque el hueco a la izquierda es real. ${cara?'Vender puts aquí sería cobrar prima justo antes de un posible desplome — no lo hagas solo porque la prima esté cara.':''}`;
-  } else if(alc && barata){
-    op=`<b>La jugada que casa con todo: COMPRAR CALLS.</b> Sesgo al alza, riesgo de cola contenido y encima
-      las opciones baratas (implícita ${Math.abs(vrp).toFixed(1)} pts bajo la histórica). Pon el selector de abajo
-      en <b>Comprar → Calls</b>.`;
-  } else if(alc && cara){
-    op=`<b>Sesgo al alza con la prima cara y sin riesgo de cola destacable.</b> Aquí sí tiene sentido
-      <b>VENDER PUTS</b> (cobras el seguro con viento a favor) o un <b>call spread</b> si prefieres apostar
-      la dirección sin pagar de más por la volatilidad.`;
-  } else if(alc){
-    op=`<b>Sesgo al alza, volatilidad en su sitio.</b> Un <b>CALL SPREAD</b> es la forma limpia de jugarlo:
-      compras una call y vendes otra más arriba.`;
-  } else if(baj && barata){
-    op=`<b>La jugada que casa: COMPRAR PUTS.</b> Sesgo bajista y opciones baratas — la protección (o la apuesta
-      a la caída) está de oferta. Selector en <b>Comprar → Puts</b>.`;
-  } else if(baj && cara){
-    op=`<b>Sesgo bajista con prima cara.</b> Un <b>call credit spread</b> (vender una call con techo) cobra
-      prima apostando a que no sube, con pérdida limitada.`;
-  } else if(baj){
-    op=`<b>Sesgo bajista, volatilidad normal.</b> Un <b>PUT SPREAD</b> bajista lo juega con riesgo acotado.`;
-  } else if(colaAlta){
-    op=`<b>Sin rumbo claro, pero con riesgo de cola a la baja.</b> No es momento de vender puts desnudos.
-      Si acaso, ${cara?'un iron condor <em>descentrado</em> (más margen abajo)':'comprar un put barato de protección'}.`;
-  } else if(cara){
-    op=`<b>Sin dirección clara y prima cara:</b> venta neutral — un <b>iron condor</b> cobra por ambos lados
-      sin apostar dirección, con riesgo limitado.`;
-  } else if(barata){
-    op=`<b>Sin dirección clara y opciones baratas:</b> un <b>straddle</b> compra movimiento a buen precio,
-      gane quien gane. Solo si esperas un catalizador.`;
-  } else {
-    op=`Sin dirección, sin riesgo de cola destacable y con la volatilidad en su sitio:
-      <b>hoy, en ${CH.sym}, probablemente la mejor operación es ninguna.</b>`;
+  const colConf=R.conf==='alta'?'var(--bull)':R.conf==='media'?'var(--ink2)':'var(--ink3)';
+  let op=`<div class="dir-cuad" style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);margin-bottom:6px">${R.cuadrante}</div>
+    <b style="font-size:16px">${R.est}</b>
+    <span class="num" style="font-size:11px;color:${colConf};margin-left:8px">confianza ${R.conf}</span>
+    <p style="margin-top:6px">${R.por}</p>`;
+  for(const av of R.avisos){
+    op+=`<div class="dir-alert" style="margin-top:8px"><b>⚠</b> ${av}</div>`;
   }
+  // desglose de estructura: las tres medidas por separado, que es el fondo del asunto
+  const filas=[];
+  if(R.niv)filas.push(`<b>Nivel de vol.</b> ${R.niv.txt} — ${R.niv.barata?'barata en absoluto':R.niv.cara?'cara en absoluto':'en su sitio'}`);
+  if(R.ala)filas.push(`<b>Precio del ala izquierda.</b> ${R.ala.txt} — ${R.ala.caro?'<b style="color:var(--bear)">puts OTM caros</b>':R.ala.barato?'puts OTM baratos':'normal'}`);
+  if(R.term)filas.push(`<b>Curva temporal.</b> ${R.term.txt}`);
+  if(filas.length)op+=`<div class="dir-blk" style="margin-top:10px"><div class="dir-blk-t">Estructura de volatilidad</div>`+
+    filas.map(f=>`<div class="dir-s"><span>${f}</span></div>`).join('')+`</div>`;
+
+  const SC=statsCalib();
+  if(SC)op+=`<p class="tip" style="margin-top:8px">Registro de calibración: <b>${SC.total}</b> señales guardadas desde ${SC.desde}, ${SC.cerradas} con resultado. Con 100-200 cerradas podrás medir qué |σ| acierta de verdad y fijar umbrales con datos. <a href="#" onclick="exportarSenales();return false" style="color:var(--acc)">Exportar CSV</a></p>`;
 
   t+=`<div class="historia" style="margin-top:12px;font-size:13.5px"><p>${op}</p>
     <p class="tip"><b>Cómo se calcula esto (importante):</b> cada señal se mide en <b>desviaciones típicas (σ)</b>
@@ -3659,9 +3860,52 @@ function drawRND(){
   d.forEach(([K,v],i)=>i?x.lineTo(PX(K),PY(v)):x.moveTo(PX(K),PY(v)));x.stroke();
   x.strokeStyle=C.ink2;x.setLineDash([3,3]);x.beginPath();
   x.moveTo(PX(spot),6);x.lineTo(PX(spot),H-18);x.stroke();x.setLineDash([]);
+  // MODA: donde la distribucion tiene su pico (el "mas probable")
+  let iMax=0;for(let i=1;i<d.length;i++)if(d[i][1]>d[iMax][1])iMax=i;
+  const moda=d[iMax][0];
+  // MEDIA: centro de masa (se desplaza hacia la cola gorda)
+  let sw=0,sx=0;for(const[K,v]of d){sw+=v;sx+=K*v;}
+  const mediaK=sw>0?sx/sw:moda;
+  if(Math.abs(moda-spot)/spot>0.002){
+    x.strokeStyle=C.bull;x.lineWidth=1.2;x.beginPath();
+    x.moveTo(PX(moda),18);x.lineTo(PX(moda),H-18);x.stroke();
+    x.fillStyle=C.bull;x.font=C.mono;x.fillText('mas probable',PX(moda)-24,24);
+  }
+  if(Math.abs(mediaK-moda)/spot>0.004){
+    x.strokeStyle=C.ink3;x.lineWidth=1;x.setLineDash([1,4]);x.beginPath();
+    x.moveTo(PX(mediaK),30);x.lineTo(PX(mediaK),H-18);x.stroke();x.setLineDash([]);
+    x.fillStyle=C.ink3;x.fillText('media',PX(mediaK)-12,36);
+  }
   x.fillStyle=C.ink3;x.font=C.mono;
   x.fillText(k0.toFixed(0),28,H-4);x.fillText(k1.toFixed(0),W-30,H-4);
   x.fillText('precio hoy',PX(spot)-22,12);
+  CH.rndVis={moda,mediaK,spot};
+  renderRndTexto();
+}
+
+/* El texto del grafico era FIJO ("la cola izquierda es mas gorda... siempre
+   es asi") y contradecia al propio dato cuando la asimetria salia positiva.
+   Ahora describe lo que la curva realmente muestra. */
+function renderRndTexto(){
+  const el=document.getElementById('rndTexto');if(!el||!CH.rndVis)return;
+  const{moda,mediaK,spot}=CH.rndVis;
+  const asim=CH.rnd&&Number.isFinite(CH.rnd.asimetriaCola)?CH.rnd.asimetriaCola*100:NaN;
+  const dModa=(moda/spot-1)*100;
+  let t='<p>Esta es la apuesta colectiva: donde cree el mercado que estara el precio el dia del vencimiento.</p>';
+  if(Math.abs(dModa)>0.3){
+    t+=`<p>El <b>pico</b> (lo mas probable) esta <b>${dModa>0?'por encima':'por debajo'}</b> del precio de hoy, en ${moda.toFixed(1)} (${dModa>=0?'+':''}${dModa.toFixed(1)}%).</p>`;
+  }else{
+    t+='<p>El <b>pico</b> esta practicamente en el precio de hoy.</p>';
+  }
+  if(Number.isFinite(asim)&&Math.abs(asim)>0.5){
+    const izq=asim>0;
+    t+=`<p>Y la <b>cola de la ${izq?'izquierda':'derecha'} es mas gorda</b>: el mercado carga mas probabilidad en ${izq?'una caida fuerte':'una subida fuerte'} de lo que corresponderia a una campana normal.</p>`;
+    if(mediaK<moda&&izq)t+='<p class="tip">Por eso la <b>media</b> queda a la izquierda del pico: la cola gorda tira del centro de masa hacia abajo. <b>No es contradictorio</b> que el pico este arriba y el riesgo abajo — son dos cosas distintas: lo mas probable y lo que puede doler.</p>';
+    if(mediaK>moda&&!izq)t+='<p class="tip">Por eso la <b>media</b> queda a la derecha del pico: la cola gorda tira del centro de masa hacia arriba.</p>';
+  }else{
+    t+='<p>Las dos colas estan bastante equilibradas: no hay un miedo asimetrico marcado en este vencimiento.</p>';
+  }
+  el.innerHTML=t;
 }
 
 /* ══════════════ NAVEGACIÓN ══════════════ */
@@ -3836,10 +4080,16 @@ function skewTilt(an, spot, t, r, q){
 function rndSignals(an, spot, t, r, q){
   if(!an||!an.svi||!isFinite(an.atmIv))return null;
   const F=spot*Math.exp((r-q)*t);
-  const priceC=K=>{const iv=sviIV(an.svi.params,Math.log(K/F),t);
-    return isFinite(iv)&&iv>0?bsm('C',spot,K,t,r,q,iv):NaN;};
-  // pdf ∝ ∂²C/∂K² (positiva salvo ruido); integrar colas
-  const S0=spot*0.6,S1=spot*1.5,NPTS=180,dK=(S1-S0)/NPTS;
+  const priceC=(K)=>{
+    const k=Math.log(K/F);
+    const iv=sviIV(an.svi.params,k,t);
+    // Black-76: la densidad debe quedar centrada en F, que es contra lo que se
+    // compara. Antes usaba bsm('C',spot,...) y quedaba centrada en spot*exp(rt):
+    // ese desajuste se colaba entero en derivaPct como sesgo alcista falso.
+    return isFinite(iv)&&iv>0?bsm('C',F,K,t,r,r,iv):NaN;};
+
+  // rango amplio: con 0.6-1.5 x spot la masa se quedaba en ~0.984
+  const S0=spot*0.30,S1=spot*2.5,NPTS=500,dK=(S1-S0)/NPTS;
   let masa=0,masaUp=0,masaDn=0,media=0;
   const pdf=[];
   for(let i=1;i<NPTS;i++){
@@ -3853,12 +4103,71 @@ function rndSignals(an, spot, t, r, q){
   if(!(masa>0))return null;
   media/=masa;
   const pUp=masaUp/masa,pDn=masaDn/masa;
-  // comparación con lognormal ATM (lo que sería "sin skew")
-  const iv=an.atmIv,sq=iv*Math.sqrt(t);
-  const logn=x=>N((Math.log(x)+sq*sq/2)/sq);   // P(S_T/F0 < x) bajo lognormal RN
-  const pUpLog=1-logn(spot*1.05/F), pDnLog=logn(spot*0.95/F);
 
-  // ── COLAS EXTREMAS (±12%): donde vive el "trozo desmesurado a la izquierda" ──
+  // ── DERIVA IMPLÍCITA: dónde centra el mercado, vs el forward ──
+  const derivaPct=(media/F-1)*100;
+
+  // ═══════════════════════════════════════════════════════════════
+  // ASIMETRÍA · REESCRITA
+  // ═══════════════════════════════════════════════════════════════
+  // La versión anterior comparaba P(caída>12%) de la RND contra una lognormal
+  // construida con la IV ATM. Eso mezcla DOS cosas: la forma de la distribución
+  // y su nivel de varianza. Como el skew añade varianza total, la referencia
+  // salía sistemáticamente más ancha y AMBAS colas daban exceso negativo — con
+  // skew cero ya salían -1.3 y -1.7. Peor aún: el signo se invertía, y un skew
+  // negativo (miedo genuino) producía asimetría NEGATIVA, o sea el sistema leía
+  // "cola derecha gorda" justo cuando el mercado tenía miedo.
+  //
+  // Ahora se usa la SKEWNESS (tercer momento estandarizado) de la propia RND,
+  // que no necesita referencia externa, y se compara con la skewness de la
+  // lognormal de la misma volatilidad — que es positiva por construcción.
+  // Skewness por DEBAJO de esa referencia = cola izquierda más gorda de lo normal.
+  let mu=0;
+  for(const [K,p] of pdf){mu+=(K/F-1)*p*dK/masa;}
+  let v2=0,v3=0;
+  for(const [K,p] of pdf){const x=K/F-1-mu,w=p*dK/masa;v2+=x*x*w;v3+=x*x*x*w;}
+  const sd=Math.sqrt(Math.max(v2,1e-16));
+  const skewRND=sd>1e-9?v3/(sd*sd*sd):NaN;
+  const sg=an.atmIv*Math.sqrt(t);
+  const skewLognTeorica=(Math.exp(sg*sg)+2)*Math.sqrt(Math.max(Math.exp(sg*sg)-1,0));
+  // CALIBRACION DE LINEA BASE: la RND se calcula por diferencias finitas sobre
+  // una malla, y esa discretizacion introduce un sesgo constante (~0.25 de
+  // skewness) que aparecia incluso con skew EXACTAMENTE cero. Se mide aqui
+  // mismo, con la misma malla, sobre una superficie plana de la misma IV ATM,
+  // y se resta. Asi "sin skew" da cero de verdad.
+  let skewBase=NaN;
+  {
+    // IV ATM EFECTIVA de la propia superficie (no la reportada, que puede
+    // venir de otra fuente): asi la superficie plana de referencia tiene
+    // exactamente la misma varianza y el unico cambio es la asimetria.
+    const ivEf=sviIV(an.svi.params,0,t);
+    const ivBase=(isFinite(ivEf)&&ivEf>0)?ivEf:an.atmIv;
+    const planos=[ivBase*ivBase*t,0,0,0,1];
+    const pc=(K)=>{const kk=Math.log(K/F);const vv=sviIV(planos,kk,t);
+      return isFinite(vv)&&vv>0?bsm('C',F,K,t,r,r,vv):NaN;};
+    let mb=0;const pb=[];
+    for(let i=1;i<NPTS;i++){const K=S0+i*dK;
+      const dd=(pc(K+dK)-2*pc(K)+pc(K-dK))/(dK*dK);
+      const p=Math.max(dd,0);pb.push([K,p]);mb+=p*dK;}
+    if(mb>0){
+      let u=0;for(const[K,p]of pb)u+=(K/F-1)*p*dK/mb;
+      let a2=0,a3=0;
+      for(const[K,p]of pb){const x=K/F-1-u,w=p*dK/mb;a2+=x*x*w;a3+=x*x*x*w;}
+      const s0=Math.sqrt(Math.max(a2,1e-16));
+      if(s0>1e-9)skewBase=a3/(s0*s0*s0);
+    }
+  }
+  // referencia efectiva: la lognormal teorica corregida por el sesgo de malla
+  const skewLogn=isFinite(skewBase)?skewBase:skewLognTeorica;
+  // >0 = cola izquierda más gorda de lo que corresponde (mantiene el convenio)
+  const masaOk=Math.abs(masa-1)<0.03;
+  const asimetriaCola=(isFinite(skewRND)&&masaOk)?(skewLogn-skewRND):NaN;
+
+  // colas informativas (para el texto), medidas contra la lognormal ATM.
+  // Se conservan solo como DESCRIPCIÓN: ya no alimentan el z de riesgo de cola.
+  const iv=an.atmIv,sq=iv*Math.sqrt(t);
+  const logn=x=>N((Math.log(x)+sq*sq/2)/sq);
+  const pUpLog=1-logn(spot*1.05/F), pDnLog=logn(spot*0.95/F);
   let colaUp=0,colaDn=0;
   for(const [K,p] of pdf){
     if(K>spot*1.12)colaUp+=p*dK;
@@ -3867,14 +4176,10 @@ function rndSignals(an, spot, t, r, q){
   colaUp/=masa;colaDn/=masa;
   const colaUpLog=1-logn(spot*1.12/F), colaDnLog=logn(spot*0.88/F);
 
-  // ── DERIVA IMPLÍCITA: dónde cree el mercado que acabará, vs el forward ──
-  // (bajo la medida real, no la neutral; aquí es una lectura cualitativa del sesgo)
-  const derivaPct=(media/F-1)*100;
-
   return {pUp,pDn,pUpLog,pDnLog,excesoUp:(pUp-pUpLog)*100,excesoDn:(pDn-pDnLog)*100,
-          media,derivaPct,
+          media,derivaPct,masa,masaOk,skewRND,skewLogn,
           colaUp,colaDn,excesoColaUp:(colaUp-colaUpLog)*100,excesoColaDn:(colaDn-colaDnLog)*100,
-          asimetriaCola:(colaDn-colaDnLog)-(colaUp-colaUpLog)};   // >0 = cola izquierda gorda
+          asimetriaCola};   // >0 = cola izquierda gorda
 }
 
 /* ── TENDENCIA: las pocas regularidades direccionales que han sobrevivido ──
@@ -4053,8 +4358,14 @@ function renderToday(){
     const ivBarata = isFinite(d.ivRank) ? d.ivRank<0.30 : (isFinite(d.vrp)&&d.vrp<0);
     const vrpConfirmaVenta = !isFinite(d.vrp) || d.vrp>0;   // no vendas si la histórica supera a la implícita
     const verd=(!isFinite(d.vrp)&&!isFinite(d.ivRank))?['nada','sin datos suficientes']
-      :(ivBarata&&alc)?['comprar','COMPRAR CALLS']          // barata + tendencia arriba
-      :(ivBarata&&baj)?['comprar','COMPRAR PUTS']
+      :(ivBarata&&alc)?['comprar','COMPRAR CALLS']          // barata + tendencia arriba (el ala derecha rara vez esta cara)
+      // MISMO FALLO QUE EN LA CADENA: "IV barata" es el NIVEL de la vol ATM.
+      // No dice nada del precio del put OTM, que con skew cargado puede estar
+      // carisimo. Esta pestaña NO carga cadenas (solo metricas del subyacente),
+      // asi que aqui no se puede medir el skew: por eso la recomendacion baja
+      // a PUT SPREAD, que es robusta tanto si el ala esta cara como si no.
+      // Para el veredicto fino hay que abrir la cadena del valor.
+      :(ivBarata&&baj)?['comprar','PUT SPREAD bajista']
       :ivBarata?['comprar','comprar opciones']              // barata sin dirección → straddle
       :(ivCara&&vrpConfirmaVenta&&alc)?['vender','vender puts']   // cara + viento a favor
       :(ivCara&&vrpConfirmaVenta&&baj)?['vender','vender calls']
