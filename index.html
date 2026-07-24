@@ -298,6 +298,17 @@ details.explica summary:hover{color:var(--ink)}
 .dir-pts{font-family:var(--num);font-weight:700;font-size:13px;min-width:34px;text-align:right}
 .dir-pts.up{color:var(--bull)}.dir-pts.dn{color:var(--bear)}
 
+/* ── trade rápido ── */
+.quick-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--rule)}
+.qh-tag{font-family:var(--body);font-size:11px;font-weight:700;letter-spacing:.05em;padding:3px 9px;border-radius:4px;background:var(--brand-soft);color:var(--brand);border:1px solid var(--brand)}
+.qh-name{font-family:var(--disp);font-size:20px;font-weight:700;letter-spacing:.04em;color:var(--ink)}
+.qh-px{font-family:var(--num);font-size:13px;color:var(--ink2);margin-left:auto}
+.quick-ctrls{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px}
+@media(max-width:560px){.quick-ctrls{grid-template-columns:1fr;gap:12px}}
+.qc label{display:block;font-size:11px;color:var(--ink3);letter-spacing:.03em;text-transform:uppercase;margin-bottom:6px}
+.qc-row{display:flex;align-items:center;gap:10px}
+.qc-row input[type=range]{flex:1;accent-color:var(--brand)}
+.qc-val{font-size:14px;font-weight:600;color:var(--ink);min-width:56px;text-align:right}
 /* ── favoritos ── */
 .fav-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .fav{display:inline-flex;align-items:center;gap:7px;padding:7px 12px;border:1px solid var(--rule2);
@@ -580,6 +591,36 @@ summary:hover{color:var(--ink)}
         <div id="legs"></div>
       </section>
     </div>
+
+    <section class="blk" id="quickBlk" style="display:none">
+      <h2>Trade rápido<span class="sub">compro ahora, cierro en un rato: ¿cuánto gano y qué me come el tiempo?</span></h2>
+      <div id="quickHead"></div>
+      <div class="quick-ctrls">
+        <div class="qc">
+          <label>El subyacente se mueve</label>
+          <div class="qc-row">
+            <input type="range" id="qMove" min="-8" max="8" step="0.1" value="3" oninput="renderQuick()">
+            <span class="qc-val num" id="qMoveV">+3.0%</span>
+          </div>
+        </div>
+        <div class="qc">
+          <label>En un plazo de</label>
+          <div class="qc-row">
+            <input type="range" id="qTime" min="0" max="72" step="0.5" value="2" oninput="renderQuick()">
+            <span class="qc-val num" id="qTimeV">2 h</span>
+          </div>
+        </div>
+        <div class="qc">
+          <label>La IV cambia</label>
+          <div class="qc-row">
+            <input type="range" id="qIV" min="-15" max="15" step="0.5" value="0" oninput="renderQuick()">
+            <span class="qc-val num" id="qIVV">0 pts</span>
+          </div>
+        </div>
+      </div>
+      <div class="figs" id="quickFigs"></div>
+      <div class="historia" id="quickNote" style="font-size:13.5px"></div>
+    </section>
 
     <section class="blk">
       <h2>Qué pasa en cada escenario<span class="sub" id="mdlTag">Black-Scholes</span></h2>
@@ -1876,8 +1917,8 @@ function stats(){
   };
 }
 let lid=0;
-const addLeg=(sd='S',ty='P',K=null,q=1)=>{st.legs.push({id:++lid,side:sd,type:ty,K:K??Math.round(st.S),qty:q});legs();calc();};
-const clearLegs=()=>{st.legs=[];legs();calc();};
+const addLeg=(sd='S',ty='P',K=null,q=1)=>{st.legs.push({id:++lid,side:sd,type:ty,K:K??Math.round(st.S),qty:q});CH.picked=null;if(typeof renderQuick==='function')renderQuick();legs();calc();};
+const clearLegs=()=>{st.legs=[];CH.picked=null;if(typeof renderQuick==='function')renderQuick();legs();calc();};
 const delLeg=i=>{st.legs=st.legs.filter(l=>l.id!==i);legs();calc();};
 const setLeg=(i,k,v)=>{const l=st.legs.find(x=>x.id===i);if(l){l[k]=v;legs();calc();}};
 function legs(){
@@ -1898,7 +1939,7 @@ const TPL={'Iron condor':[['S','P',-5],['B','P',-12],['S','C',5],['B','C',12]],
  'Butterfly':[['B','C',-8],['S','C',0],['S','C',0],['B','C',8]],
  'Jade lizard':[['S','P',-8],['S','C',6],['B','C',12]],
  'Long call':[['B','C',0]],'Long put':[['B','P',0]]};
-const tpl=n=>{const a=Math.round(st.S);st.legs=[];lid=0;
+const tpl=n=>{const a=Math.round(st.S);st.legs=[];lid=0;CH.picked=null;if(typeof renderQuick==='function')renderQuick();
   TPL[n].forEach(([s,t,o,q])=>st.legs.push({id:++lid,side:s,type:t,K:a+o,qty:q||1}));legs();calc();};
 
 /* ══════════════ RENDER · ESTUDIAR ══════════════ */
@@ -3175,19 +3216,146 @@ function renderTable(){
       <td class="mute">${isFinite(o.eep)&&o.eep>0.001?o.eep.toFixed(3):'—'}</td></tr>`;}).join('')+'</tbody>';
 }
 const sortCh=k=>{if(CH.sortKey===k)CH.desc=!CH.desc;else{CH.sortKey=k;CH.desc=false;}renderTable();};
-function pick(K,type){
-  st.legs=[{id:++lid,side:'S',type,K,qty:1}];
+function pick(K,type,side){
+  // side opcional: 'B' comprar, 'S' vender. Por defecto, comprar (el caso de
+  // trade rápido direccional que es lo que más se pincha desde la cadena).
+  const o = CH.an.rows.find(x=>x.K===K && x.type===type);
+  side = side || 'B';
+  st.legs=[{id:++lid,side,type,K,qty:1}];
   st.S=CH.spot;$('S').value=CH.spot.toFixed(2);
   st.DTE=CH.dte;$('DTE').value=CH.dte;
   $('sym').value=CH.sym;st.sym=CH.sym;
-  // La IV de ESTE strike, no la ATM. Por el skew pueden diferir varios puntos,
-  // y valorar un put lejano con la IV ATM da un precio que no existe en el mercado.
-  const o = CH.an.rows.find(x=>x.K===K && x.type===type);
+  // La IV de ESTE strike, no la ATM. Por el skew pueden diferir varios puntos.
   if(o && isFinite(o.iv)){
     st.IV = o.iv*100;
     $('IV').value = st.IV.toFixed(1);
   }
+  // Guardamos el SNAPSHOT real del contrato: precio de mercado (mid/bid/ask),
+  // spread y griegas tal y como cotizan AHORA. Así el simulador parte de datos
+  // reales, no de un teórico recalculado que puede no existir en el mercado.
+  CH.picked = o ? {
+    K, type, side,
+    mid:o.mid, bid:o.bid, ask:o.ask, spread:o.spread, spreadPct:o.spreadPct,
+    iv:o.iv, delta:o.delta, gamma:o.gamma, theta:o.theta, vega:o.vega,
+    vanna:o.vanna, volga:o.volga, charm:o.charm, speed:o.speed,
+    oi:o.oi, spot:CH.spot, dte:CH.dte, sym:CH.sym
+  } : null;
   legs();go('desk');calc();
+  // tras pintar la vista Estudiar, rellenamos el panel de trade rápido
+  setTimeout(()=>{ if(typeof renderQuick==='function') renderQuick(); },30);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   TRADE RÁPIDO · comprar ahora y cerrar en un rato
+
+   El caso: "el subyacente sube +50 en 2 horas, ¿cuánto gano con esta call
+   y cuánto me come el theta?". Revalorizamos la opción con Black-Scholes
+   COMPLETO (no aproximación por griegas, que se rompe con saltos grandes),
+   y descomponemos el P&L en sus causas para que veas de dónde sale cada euro.
+   ═══════════════════════════════════════════════════════════════════ */
+function renderQuick(){
+  const blk=$('quickBlk');
+  const p=CH.picked;
+  // Solo aparece si vienes de pinchar un contrato en la cadena (hay snapshot).
+  if(!p || !st.legs.length){ if(blk)blk.style.display='none'; return; }
+  blk.style.display='';
+
+  const mv=parseFloat($('qMove').value);         // % de movimiento del subyacente
+  const hrs=parseFloat($('qTime').value);        // horas hasta cerrar
+  const dIV=parseFloat($('qIV').value);          // cambio de IV en puntos
+  $('qMoveV').textContent=(mv>=0?'+':'')+mv.toFixed(1)+'%';
+  $('qTimeV').textContent=hrs<1?Math.round(hrs*60)+' min':hrs.toFixed(hrs%1?1:0)+' h';
+  $('qIVV').textContent=(dIV>=0?'+':'')+dIV+' pts';
+
+  const side=p.side==='B'?1:-1;                   // +1 comprado, -1 vendido
+  const r=RR(), q=QQ();
+  const S0=p.spot, S1=S0*(1+mv/100);
+  const t0=p.dte/365;
+  const t1=Math.max(t0 - hrs/24/365, 1e-6);      // resta el tiempo transcurrido
+  const iv0=p.iv, iv1=Math.max(iv0 + dIV/100, 0.01);
+
+  // Precio de entrada REAL: pagas el ask si compras, cobras el bid si vendes.
+  const entrada = p.side==='B' ? p.ask : p.bid;
+  // Precio de salida: al cerrar haces lo contrario, cruzando el spread otra vez.
+  // Revalorizamos el MID teórico en el nuevo escenario y le aplicamos medio spread
+  // de coste de salida (aprox: el spread se mantiene proporcional).
+  const midNuevo = bsm(p.type, S1, p.K, t1, r, q, iv1);
+  const spreadNuevo = p.spreadPct>0 ? midNuevo*p.spreadPct : p.spread;
+  const salida = p.side==='B' ? midNuevo - spreadNuevo/2 : midNuevo + spreadNuevo/2;
+
+  // P&L por contrato (×100). Comprado: ganas si sube el precio de la opción.
+  const pnl = side * (salida - entrada) * 100;
+
+  // ── DESCOMPOSICIÓN: de dónde viene el P&L ──
+  // Revalorizamos cambiando UNA cosa cada vez, para aislar cada efecto.
+  const midBase = bsm(p.type,S0,p.K,t0,r,q,iv0);
+  const soloPrecio = bsm(p.type,S1,p.K,t0,r,q,iv0) - midBase;         // efecto del movimiento (delta+gamma)
+  const soloTiempo = bsm(p.type,S0,p.K,t1,r,q,iv0) - midBase;         // efecto del theta
+  const soloIV     = bsm(p.type,S0,p.K,t0,r,q,iv1) - midBase;         // efecto del cambio de IV (vega)
+  // delta puro vs gamma (la parte no lineal del movimiento)
+  const efDelta = p.delta * (S1-S0);
+  const efGamma = soloPrecio - efDelta;
+
+  const g=side>0?1:1; // signo ya aplicado abajo
+  const money=x=>(x>=0?'+':'−')+'$'+Math.abs(x).toFixed(0);
+  const pct=x=>(x>=0?'+':'')+x.toFixed(1)+'%';
+
+  // Griegas AL CERRAR (para ver cómo cambian): recalculamos en el escenario nuevo
+  const gAhora=greeks(p.type,S0,p.K,t0,r,q,iv0);
+  const gLuego=greeks(p.type,S1,p.K,t1,r,q,iv1);
+
+  $('quickHead').innerHTML=`<div class="quick-head">
+    <span class="qh-tag">${p.side==='B'?'COMPRAS':'VENDES'}</span>
+    <span class="qh-name">${p.type==='C'?'Call':'Put'} ${p.K} · ${p.sym}</span>
+    <span class="qh-px">entras a $${entrada.toFixed(2)} <span class="mute">(${p.side==='B'?'ask':'bid'})</span> · spread $${(p.spread||0).toFixed(2)}</span>
+  </div>`;
+
+  const roi = entrada>0 ? pnl/(entrada*100)*100 : 0;
+  $('quickFigs').innerHTML=
+    fig2(pnl>=0?'Ganarías':'Perderías', money(pnl), pnl>=0?'up':'dn', `${pct(roi)} sobre lo que pones`)+
+    fig2('Por el movimiento', money(side*soloPrecio*100), side*soloPrecio>=0?'up':'dn', 'delta + gamma')+
+    fig2('Te come el tiempo', money(side*soloTiempo*100), side*soloTiempo>=0?'up':'dn', `theta de ${hrs<1?Math.round(hrs*60)+' min':hrs+' h'}`)+
+    (dIV!==0?fig2('Por la IV', money(side*soloIV*100), side*soloIV>=0?'up':'dn', `vega · ${dIV>0?'+':''}${dIV} pts`):'')+
+    fig2('Coste de entrar y salir', '−$'+((p.side==='B'?(p.ask-p.mid):(p.mid-p.bid))*100 + spreadNuevo/2*100).toFixed(0), 'dn', 'el spread, ida y vuelta');
+
+  // ── narrativa ──
+  let n=`<p>Compras la ${p.type==='C'?'call':'put'} ${p.K} pagando <b class="num">$${(entrada*100).toFixed(0)}</b> por contrato
+    (el ask, porque compras). Si ${p.sym} ${mv>=0?'sube':'baja'} un <b>${Math.abs(mv).toFixed(1)}%</b>
+    (a <b class="num">${S1.toFixed(2)}</b>) en <b>${hrs<1?Math.round(hrs*60)+' minutos':hrs+' horas'}</b>
+    y cierras, ${pnl>=0?'te llevas':'pierdes'} <b class="num ${pnl>=0?'up':'dn'}">${money(pnl)}</b>.</p>`;
+
+  n+=`<p><b>De dónde sale ese número:</b></p>
+    <table class="quotes" style="margin:8px 0">
+      <tbody>
+      <tr><td>El subyacente se mueve a tu favor</td><td class="num ${side*soloPrecio>=0?'up':'dn'}">${money(side*soloPrecio*100)}</td></tr>
+      <tr><td class="mute" style="padding-left:20px">· de eso, por delta (lineal)</td><td class="num mute">${money(side*efDelta*100)}</td></tr>
+      <tr><td class="mute" style="padding-left:20px">· de eso, por gamma (la delta crece según sube)</td><td class="num ${side*efGamma>=0?'up':'dn'}">${money(side*efGamma*100)}</td></tr>
+      <tr><td>El tiempo que pasa (theta)</td><td class="num ${side*soloTiempo>=0?'up':'dn'}">${money(side*soloTiempo*100)}</td></tr>
+      ${dIV!==0?`<tr><td>El cambio de IV (vega)</td><td class="num ${side*soloIV>=0?'up':'dn'}">${money(side*soloIV*100)}</td></tr>`:''}
+      <tr><td>Cruzar el spread (entrar y salir)</td><td class="num dn">−$${(((p.side==='B'?(p.ask-p.mid):(p.mid-p.bid))+spreadNuevo/2)*100).toFixed(0)}</td></tr>
+      </tbody>
+    </table>`;
+
+  // el punto sobre el theta, que es lo que te preocupa
+  const thetaHora = side*soloTiempo*100/Math.max(hrs,0.01);
+  if(hrs>0){
+    n+=`<p class="tip"><b>El theta, en concreto:</b> mantener esta opción te cuesta del orden de
+      <b class="num">$${Math.abs(thetaHora).toFixed(0)}/hora</b> en este escenario. Cuanto más cerca del dinero
+      y más corto el vencimiento, más muerde. Por eso un trade rápido direccional quiere que el movimiento
+      llegue <em>ya</em>: cada hora que tardas, el reloj te resta.</p>`;
+  }
+
+  // cómo cambian delta y gamma (tu intuición era correcta)
+  n+=`<p><b>Cómo cambian las griegas si el trade sale:</b> la delta pasaría de
+    <b class="num">${gAhora.delta.toFixed(2)}</b> a <b class="num">${gLuego.delta.toFixed(2)}</b>
+    ${Math.abs(gLuego.delta)>Math.abs(gAhora.delta)?'(ganas exposición según sube — la gamma trabajando a tu favor)':'(pierdes exposición)'},
+    y la gamma de <b class="num">${gAhora.gamma.toFixed(3)}</b> a <b class="num">${gLuego.gamma.toFixed(3)}</b>.
+    ${gLuego.gamma<gAhora.gamma?'La gamma baja porque te alejas del dinero: el impulso extra se va agotando.':''}</p>`;
+
+  n+=`<p class="tip">Mueve los tres controles para ver el equilibrio entre lo que ganas por el movimiento
+    y lo que pierdes por el tiempo. El punto dulce de un trade rápido es movimiento grande + poco tiempo.</p>`;
+
+  $('quickNote').innerHTML=n;
 }
 
 /* ── EL CONO: rango que el mercado anticipa hasta el vencimiento ── */
