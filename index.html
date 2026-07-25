@@ -298,6 +298,14 @@ details.explica summary:hover{color:var(--ink)}
 .dir-pts{font-family:var(--num);font-weight:700;font-size:13px;min-width:34px;text-align:right}
 .dir-pts.up{color:var(--bull)}.dir-pts.dn{color:var(--bear)}
 
+
+/* ── análisis avanzado colapsable ── */
+.adv-summary{font-family:var(--disp);font-size:16px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;
+  color:var(--ink2);cursor:pointer;padding:10px 0;border-bottom:1px solid var(--rule);margin-bottom:14px;list-style:none}
+.adv-summary::-webkit-details-marker{display:none}
+.adv-summary::before{content:"▸ ";color:var(--brand)}
+details[open]>.adv-summary::before{content:"▾ "}
+#deskAdv[open]{margin-top:4px}
 /* ── trade rápido ── */
 .quick-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--rule)}
 .qh-tag{font-family:var(--body);font-size:11px;font-weight:700;letter-spacing:.05em;padding:3px 9px;border-radius:4px;background:var(--brand-soft);color:var(--brand);border:1px solid var(--brand)}
@@ -622,6 +630,8 @@ summary:hover{color:var(--ink)}
       <div class="historia" id="quickNote" style="font-size:13.5px"></div>
     </section>
 
+    <details id="deskAdv" open>
+      <summary class="adv-summary">Análisis completo de la estrategia<span class="mute" style="font-weight:400"> — escenarios, griegas, valoración, probabilidades</span></summary>
     <section class="blk">
       <h2>Qué pasa en cada escenario<span class="sub" id="mdlTag">Black-Scholes</span></h2>
       <div class="figs" id="payFigs"></div>
@@ -666,6 +676,7 @@ summary:hover{color:var(--ink)}
       <div id="mcNote"></div>
       <div class="plot"><canvas id="mcHist" height="140"></canvas></div>
     </section>
+    </details>
 
     <details><summary>Diccionario: qué significa cada cosa</summary><dl class="gloss" id="gloss"></dl></details>
   </div>
@@ -1939,7 +1950,7 @@ const TPL={'Iron condor':[['S','P',-5],['B','P',-12],['S','C',5],['B','C',12]],
  'Butterfly':[['B','C',-8],['S','C',0],['S','C',0],['B','C',8]],
  'Jade lizard':[['S','P',-8],['S','C',6],['B','C',12]],
  'Long call':[['B','C',0]],'Long put':[['B','P',0]]};
-const tpl=n=>{const a=Math.round(st.S);st.legs=[];lid=0;CH.picked=null;if(typeof renderQuick==='function')renderQuick();
+const tpl=n=>{const a=Math.round(st.S);st.legs=[];lid=0;CH.picked=null;{const adv=$('deskAdv');if(adv)adv.open=true;}if(typeof renderQuick==='function')renderQuick();
   TPL[n].forEach(([s,t,o,q])=>st.legs.push({id:++lid,side:s,type:t,K:a+o,qty:q||1}));legs();calc();};
 
 /* ══════════════ RENDER · ESTUDIAR ══════════════ */
@@ -3241,7 +3252,10 @@ function pick(K,type,side){
     oi:o.oi, spot:CH.spot, dte:CH.dte, sym:CH.sym
   } : null;
   legs();go('desk');calc();
-  // tras pintar la vista Estudiar, rellenamos el panel de trade rápido
+  // Vienes de la cadena a mirar UN contrato: colapsa el diseñador de estrategias
+  // (escenarios, griegas, probabilidades) para que veas el trade rápido sin ruido.
+  // Sigue ahí, a un clic, si lo quieres.
+  const adv=$('deskAdv'); if(adv) adv.open=false;
   setTimeout(()=>{ if(typeof renderQuick==='function') renderQuick(); },30);
 }
 
@@ -3311,12 +3325,17 @@ function renderQuick(){
   </div>`;
 
   const roi = entrada>0 ? pnl/(entrada*100)*100 : 0;
+  // El coste de SALIR: al cerrar, cruzas medio spread una vez. La entrada NO
+  // se cuenta aquí: el precio de entrada ya ES el ask (comprando) o el bid
+  // (vendiendo), así que ese coste ya está dentro del P&L. Contarlo otra vez
+  // sería duplicarlo. Lo único que resta aparte es la salida.
+  const costeSalida = spreadNuevo/2*100;
   $('quickFigs').innerHTML=
     fig2(pnl>=0?'Ganarías':'Perderías', money(pnl), pnl>=0?'up':'dn', `${pct(roi)} sobre lo que pones`)+
     fig2('Por el movimiento', money(side*soloPrecio*100), side*soloPrecio>=0?'up':'dn', 'delta + gamma')+
     fig2('Te come el tiempo', money(side*soloTiempo*100), side*soloTiempo>=0?'up':'dn', `theta de ${hrs<1?Math.round(hrs*60)+' min':hrs+' h'}`)+
     (dIV!==0?fig2('Por la IV', money(side*soloIV*100), side*soloIV>=0?'up':'dn', `vega · ${dIV>0?'+':''}${dIV} pts`):'')+
-    fig2('Coste de entrar y salir', '−$'+((p.side==='B'?(p.ask-p.mid):(p.mid-p.bid))*100 + spreadNuevo/2*100).toFixed(0), 'dn', 'el spread, ida y vuelta');
+    fig2('Coste de salir', '−$'+costeSalida.toFixed(0), 'dn', 'medio spread al cerrar');
 
   // ── narrativa ──
   let n=`<p>Compras la ${p.type==='C'?'call':'put'} ${p.K} pagando <b class="num">$${(entrada*100).toFixed(0)}</b> por contrato
@@ -3332,7 +3351,7 @@ function renderQuick(){
       <tr><td class="mute" style="padding-left:20px">· de eso, por gamma (la delta crece según sube)</td><td class="num ${side*efGamma>=0?'up':'dn'}">${money(side*efGamma*100)}</td></tr>
       <tr><td>El tiempo que pasa (theta)</td><td class="num ${side*soloTiempo>=0?'up':'dn'}">${money(side*soloTiempo*100)}</td></tr>
       ${dIV!==0?`<tr><td>El cambio de IV (vega)</td><td class="num ${side*soloIV>=0?'up':'dn'}">${money(side*soloIV*100)}</td></tr>`:''}
-      <tr><td>Cruzar el spread (entrar y salir)</td><td class="num dn">−$${(((p.side==='B'?(p.ask-p.mid):(p.mid-p.bid))+spreadNuevo/2)*100).toFixed(0)}</td></tr>
+      <tr><td>Cruzar el spread al salir (vender al bid)</td><td class="num dn">−$${costeSalida.toFixed(0)}</td></tr>
       </tbody>
     </table>`;
 
