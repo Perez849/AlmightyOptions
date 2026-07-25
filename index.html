@@ -646,16 +646,7 @@ summary:hover{color:var(--ink)}
       </div>
     </section>
 
-    <div class="cols c2">
-      <section class="blk">
-        <h2>Juega con el mercado</h2>
-        <div class="sldr"><div class="top"><label style="margin:0">¿Y si el precio se mueve?</label><span class="val" id="uS">0</span></div><input type="range" id="rS" min="-40" max="40" value="0" step="0.5"></div>
-        <div class="sldr"><div class="top"><label style="margin:0">¿Y si pasan días?</label><span class="val" id="uD">0</span></div><input type="range" id="rD" min="0" max="120" value="0" step="1"></div>
-        <div class="sldr"><div class="top"><label style="margin:0">¿Y si sube el miedo?</label><span class="val" id="uV">0</span></div><input type="range" id="rV" min="-30" max="30" value="0" step="0.5"></div>
-        <div class="figs" id="simFigs"></div>
-      </section>
-
-      <section class="blk">
+    <section class="blk">
         <h2>Qué te hace ganar y perder</h2>
         <div class="figs" id="grFigs"></div>
         <div id="grNote"></div>
@@ -663,7 +654,6 @@ summary:hover{color:var(--ink)}
           <table class="quotes" id="grFull" style="margin-top:8px"></table>
         </details>
       </section>
-    </div>
 
     <section class="blk">
       <h2>¿Te están pagando bien?<span class="sub">el mercado contra la historia</span></h2>
@@ -1851,6 +1841,10 @@ const px=(ty,S,K,t,r,q,v)=>st.model==='crr'?crr(ty,S,K,t,r,q,v,200):bsm(ty,S,K,t
    el NIVEL; la curva pone la forma.
    ───────────────────────────────────────────────────────────── */
 function ivDePata(l, S, t, vNivel){
+  // Si la pata trae la IV real de su contrato (viene de la cadena), úsala:
+  // reproduce el precio de mercado exacto. Es lo que de verdad cotiza, no un
+  // teórico con la IV ATM que para strikes lejanos se desvía muchísimo.
+  if(isFinite(l.ivReal) && l.ivReal>0) return l.ivReal;
   // Sin curva de la cadena: vol plana (es lo único que tenemos)
   if(!CH.an || !CH.an.svi || !isFinite(CH.atmIvRef)) return vNivel;
   // ⚠ La SVI se ajustó con el t DE LA CADENA. Evaluarla con otra t (si cambias
@@ -1966,7 +1960,7 @@ function read(){
   st.q=num($('q').value,0,0,50);
   st.model=$('model').value==='crr'?'crr':'bsm';
 }
-function calc(){read();ribbon();payFigs();drawPay();sim();grFigs();volScen();
+function calc(){read();ribbon();payFigs();drawPay();grFigs();volScen();
   $('mdlTag').textContent=st.model==='crr'?'Binomial americana':'Black-Scholes';}
 function ribbon(){
   const vrp=isFinite(st.expVol)?VV()-st.expVol:NaN;
@@ -2129,18 +2123,6 @@ function drawPay(){
   x.fillText(st.S.toFixed(0),PX(st.S)-8,H-6);
   x.fillText(money(mxv),3,14);x.fillText(money(mn),3,H-26);
 }
-['rS','rD','rV'].forEach(i=>$(i).addEventListener('input',sim));
-function sim(){
-  if(!st.legs.length){$('simFigs').innerHTML='';return;}
-  const dS=+$('rS').value,dD=+$('rD').value,dV=+$('rV').value;
-  $('uS').textContent=(dS>=0?'+':'')+dS.toFixed(1);
-  $('uD').textContent=dD;$('uV').textContent=(dV>=0?'+':'')+dV;
-  const S2=st.S+dS,t2=Math.max((st.DTE-dD)/365,1e-6),v2=Math.max((st.IV+dV)/100,.01);
-  const p=pnl(S2,t2,v2),g=sGrk(S2,t2,v2);
-  $('simFigs').innerHTML=fg('Resultado',money(p),p>=0?'up':'dn')+
-    fg('Precio',S2.toFixed(2))+fg('Delta',g.delta.toFixed(2))+
-    fg('Theta/día',money(g.theta*100),g.theta>=0?'up':'dn');
-}
 function grFigs(){
   if(!st.legs.length){$('grFigs').innerHTML='';$('grNote').innerHTML='';$('grFull').innerHTML='';return;}
   const g=sGrk(st.S,T(),VV());
@@ -2216,7 +2198,12 @@ function volScen(){
     return;}
 
   const t=T(),S=st.S;
-  const vMkt=VV(), vMdl=st.expVol;
+  // La IV "del mercado" para comparar con el histórico: si la posición es un
+  // único contrato pinchado en la cadena, su IV REAL (la que casa con su precio),
+  // no la del campo ATM — que para un OTM cargado por el skew engaña.
+  const unicaPata = st.legs.length===1 && isFinite(st.legs[0].ivReal) && st.legs[0].ivReal>0;
+  const vMkt = unicaPata ? st.legs[0].ivReal : VV();
+  const vMdl=st.expVol;
   const valMkt=sVal(S,t,vMkt)*100, valMdl=sVal(S,t,vMdl)*100;
   const gap=valMkt-valMdl;
   const cobra=stats().net<0;
@@ -3232,13 +3219,22 @@ function pick(K,type,side){
   // trade rápido direccional que es lo que más se pincha desde la cadena).
   const o = CH.an.rows.find(x=>x.K===K && x.type===type);
   side = side || 'B';
-  st.legs=[{id:++lid,side,type,K,qty:1}];
+  // IV que reproduce el PRECIO DE MERCADO real de este contrato. Para strikes
+  // lejanos (muy OTM), la IV del skew y la que despeja el mid pueden diferir;
+  // usamos la que casa con el precio que de verdad pagas, para que la sección
+  // "Qué pasa en cada escenario" cueste lo mismo que el Trade rápido.
+  let ivReal = o && isFinite(o.iv) ? o.iv : NaN;
+  if(o && isFinite(o.mid) && o.mid>0){
+    const ivMkt = impliedVol(type, o.mid, CH.spot, K, CH.t, RR(), QQ());
+    if(isFinite(ivMkt) && ivMkt>0) ivReal = ivMkt;
+  }
+  st.legs=[{id:++lid,side,type,K,qty:1,ivReal}];
   st.S=CH.spot;$('S').value=CH.spot.toFixed(2);
   st.DTE=CH.dte;$('DTE').value=CH.dte;
   $('sym').value=CH.sym;st.sym=CH.sym;
-  // La IV de ESTE strike, no la ATM. Por el skew pueden diferir varios puntos.
-  if(o && isFinite(o.iv)){
-    st.IV = o.iv*100;
+  // El campo IV muestra la IV real del contrato (la que casa con su precio).
+  if(isFinite(ivReal)){
+    st.IV = ivReal*100;
     $('IV').value = st.IV.toFixed(1);
   }
   // Guardamos el SNAPSHOT real del contrato: precio de mercado (mid/bid/ask),
@@ -3247,7 +3243,7 @@ function pick(K,type,side){
   CH.picked = o ? {
     K, type, side,
     mid:o.mid, bid:o.bid, ask:o.ask, spread:o.spread, spreadPct:o.spreadPct,
-    iv:o.iv, delta:o.delta, gamma:o.gamma, theta:o.theta, vega:o.vega,
+    iv:ivReal, delta:o.delta, gamma:o.gamma, theta:o.theta, vega:o.vega,
     vanna:o.vanna, volga:o.volga, charm:o.charm, speed:o.speed,
     oi:o.oi, spot:CH.spot, dte:CH.dte, sym:CH.sym
   } : null;
