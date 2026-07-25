@@ -2939,7 +2939,17 @@ async function scanChain(){
     if(!CH.exps)await loadExps();
     const ex=CH.exps[+$('cExp').value||0];
     if(!ex)throw new Error('Elige un vencimiento');
-    const dte=+ex['days-to-expiration'],t=Math.max(dte/365,1/365);
+    // Tiempo al vencimiento: en vez del 'days-to-expiration' redondeado (que
+    // puede diferir 1 día de lo que ves en tastytrade por cómo cuenta el día en
+    // curso), usamos la FECHA real de expiración y contamos hasta el cierre del
+    // mercado (16:00 ET ≈ 20:00 UTC) de ese día. Da un t más fiel al precio real.
+    const dteApi=+ex['days-to-expiration'];
+    let dte=dteApi, t=Math.max(dteApi/365,1/365);
+    if(ex['expiration-date']){
+      const venc=new Date(ex['expiration-date']+'T20:00:00Z');   // cierre ET aprox en UTC
+      const ms=venc-Date.now();
+      if(ms>0){ t=Math.max(ms/1000/86400/365, 1/365); dte=Math.max(Math.round(ms/86400000),0); }
+    }
     const strikes=ex.strikes||[];
     if(!strikes.length)throw new Error('El vencimiento no trae strikes');
     const syms=[],meta={};
@@ -3369,14 +3379,17 @@ function renderQuick(){
   const t1=Math.max(t0 - hrs/24/365, 1e-6);      // resta el tiempo transcurrido
   const iv0=p.iv, iv1=Math.max(iv0 + dIV/100, 0.01);
 
-  // Precio de entrada REAL: pagas el ask si compras, cobras el bid si vendes.
+  // Precio de ENTRADA real: pagas el ask si compras, cobras el bid si vendes.
   const entrada = p.side==='B' ? p.ask : p.bid;
-  // Precio de salida: al cerrar haces lo contrario, cruzando el spread otra vez.
-  // Revalorizamos el MID teórico en el nuevo escenario y le aplicamos medio spread
-  // de coste de salida (aprox: el spread se mantiene proporcional).
+  // Precio de SALIDA real: al cerrar cruzas el spread ENTERO, no medio. Si
+  // compraste, al salir VENDES y te clavan el bid; si vendiste, COMPRAS al ask.
+  // Nadie cierra al mid. Estimamos el bid/ask futuro aplicando al mid teórico
+  // el mismo spread relativo que cotiza el contrato ahora (se mantiene ~igual).
   const midNuevo = bsm(p.type, S1, p.K, t1, r, q, iv1);
-  const spreadNuevo = p.spreadPct>0 ? midNuevo*p.spreadPct : p.spread;
-  const salida = p.side==='B' ? midNuevo - spreadNuevo/2 : midNuevo + spreadNuevo/2;
+  const spRel = p.spreadPct>0 ? p.spreadPct : (p.spread/Math.max(p.mid,0.01));
+  const askNuevo = midNuevo*(1+spRel/2);
+  const bidNuevo = Math.max(midNuevo*(1-spRel/2), 0);
+  const salida = p.side==='B' ? bidNuevo : askNuevo;   // sales por el lado malo
 
   // P&L por contrato (×100). Comprado: ganas si sube el precio de la opción.
   const pnl = side * (salida - entrada) * 100;
@@ -3410,7 +3423,9 @@ function renderQuick(){
   // se cuenta aquí: el precio de entrada ya ES el ask (comprando) o el bid
   // (vendiendo), así que ese coste ya está dentro del P&L. Contarlo otra vez
   // sería duplicarlo. Lo único que resta aparte es la salida.
-  const costeSalida = spreadNuevo/2*100;
+  // El coste de salir = lo que pierdes por vender al bid en vez del mid (o
+  // comprar al ask). Es la distancia del mid al lado por el que sales.
+  const costeSalida = Math.abs(midNuevo - salida)*100;
   $('quickFigs').innerHTML=
     fig2(pnl>=0?'Ganarías':'Perderías', money(pnl), pnl>=0?'up':'dn', `${pct(roi)} sobre lo que pones`)+
     fig2('Por el movimiento', money(side*soloPrecio*100), side*soloPrecio>=0?'up':'dn', 'delta + gamma')+
@@ -3442,7 +3457,11 @@ function renderQuick(){
     n+=`<p class="tip"><b>El theta, en concreto:</b> mantener esta opción te cuesta del orden de
       <b class="num">$${Math.abs(thetaHora).toFixed(0)}/hora</b> en este escenario. Cuanto más cerca del dinero
       y más corto el vencimiento, más muerde. Por eso un trade rápido direccional quiere que el movimiento
-      llegue <em>ya</em>: cada hora que tardas, el reloj te resta.</p>`;
+      llegue <em>ya</em>: cada hora que tardas, el reloj te resta.</p>
+    <p class="tip"><b>Cómo se cuenta el tiempo:</b> el reloj corre en horas de <b>calendario</b> (24 h/día),
+      no en horas de mercado. Un theta diario de $180 son $180 en 24 h → unos <b class="num">$${(Math.abs(thetaHora)).toFixed(0)}</b>
+      en estas ${hrs<1?Math.round(hrs*60)+' min':hrs+' h'}. Es el estándar (Black-Scholes cuenta días naturales:
+      la opción también pierde valor el fin de semana, porque el vencimiento se acerca igual).</p>`;
   }
 
   // cómo cambian delta y gamma (tu intuición era correcta)
