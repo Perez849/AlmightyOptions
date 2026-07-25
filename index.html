@@ -3340,7 +3340,7 @@ function pick(K,type,side){
     mid:o.mid, bid:o.bid, ask:o.ask, spread:o.spread, spreadPct:o.spreadPct,
     iv:ivReal, delta:o.delta, gamma:o.gamma, theta:o.theta, vega:o.vega,
     vanna:o.vanna, volga:o.volga, charm:o.charm, speed:o.speed,
-    oi:o.oi, spot:CH.spot, dte:CH.dte, sym:CH.sym
+    oi:o.oi, spot:CH.spot, dte:CH.dte, tExact:CH.t, sym:CH.sym
   } : null;
   legs();go('desk');calc();
   // Vienes de la cadena a mirar UN contrato: colapsa el diseñador de estrategias
@@ -3375,7 +3375,10 @@ function renderQuick(){
   const side=p.side==='B'?1:-1;                   // +1 comprado, -1 vendido
   const r=RR(), q=QQ();
   const S0=p.spot, S1=S0*(1+mv/100);
-  const t0=p.dte/365;
+  // Tiempo EXACTO al vencimiento (el mismo con el que se calculó la ivReal),
+  // no el dte redondeado. Si difieren medio día, con IV alta el precio teórico
+  // se desvía y el P&L descuadra con el desglose. Deben ser el mismo t.
+  const t0=isFinite(p.tExact)?p.tExact:p.dte/365;
   const t1=Math.max(t0 - hrs/24/365, 1e-6);      // resta el tiempo transcurrido
   const iv0=p.iv, iv1=Math.max(iv0 + dIV/100, 0.01);
 
@@ -3392,19 +3395,25 @@ function renderQuick(){
   // P&L por contrato (×100). Comprado: ganas si sube el precio de la opción.
   const pnl = side * (salida - entrada) * 100;
 
-  // ── DESCOMPOSICIÓN: de dónde viene el P&L ──
-  // El valor teórico del contrato (mid→mid) cambia por movimiento+tiempo+IV.
-  // El spread es un coste APARTE, de ida y vuelta, contado UNA vez y claro.
+  // ── DESCOMPOSICIÓN EXACTA: los efectos suman el P&L, sin solapes ──
+  // Aplicamos los cambios EN SECUENCIA (cada uno sobre el resultado del anterior)
+  // para que la suma sea exactamente midNuevo − midBase. Medir cada efecto
+  // aislado desde el mid inicial deja fuera los términos cruzados y no cuadra.
   const midBase = bsm(p.type,S0,p.K,t0,r,q,iv0);
-  const soloPrecio = bsm(p.type,S1,p.K,t0,r,q,iv0) - midBase;         // efecto del movimiento (delta+gamma)
-  const soloTiempo = bsm(p.type,S0,p.K,t1,r,q,iv0) - midBase;         // efecto del theta
-  const soloIV     = bsm(p.type,S0,p.K,t0,r,q,iv1) - midBase;         // efecto del cambio de IV (vega)
-  // delta puro vs gamma (la parte no lineal del movimiento)
+  const trasPrecio = bsm(p.type,S1,p.K,t0,r,q,iv0);         // 1º: mueve el spot
+  const trasTiempo = bsm(p.type,S1,p.K,t1,r,q,iv0);         // 2º: + pasa el tiempo
+  const trasIV     = bsm(p.type,S1,p.K,t1,r,q,iv1);         // 3º: + cambia la IV  (= midNuevo)
+  const soloPrecio = trasPrecio - midBase;                 // efecto del movimiento
+  const soloTiempo = trasTiempo - trasPrecio;              // efecto del theta (ya con el spot nuevo)
+  const soloIV     = trasIV - trasTiempo;                  // efecto del cambio de IV
+  // delta puro vs gamma (dentro del efecto del movimiento)
   const efDelta = p.delta * (S1-S0);
   const efGamma = soloPrecio - efDelta;
-  // Coste del spread de IDA Y VUELTA, entero, contado una vez:
-  // al entrar del mid al ask (p.ask-p.mid) + al salir del mid nuevo al bid.
-  const costeSpread = ((p.side==='B'?(p.ask-p.mid):(p.mid-p.bid)) + Math.abs(midNuevo - salida))*100;
+  // Coste del spread de IDA Y VUELTA: la diferencia entre operar a mercado
+  // (entrar al ask, salir al bid) y hacerlo al mid teórico. Es exactamente
+  // lo que falta para que (movimiento+tiempo+IV) − spread = P&L real.
+  const cambioMid = side*(midNuevo - midBase)*100;         // lo que gana el contrato (mid→mid)
+  const costeSpread = cambioMid - pnl;                     // el resto es el spread, por definición
 
   const g=side>0?1:1; // signo ya aplicado abajo
   const money=x=>(x>=0?'+':'−')+'$'+Math.abs(x).toFixed(0);
