@@ -1841,10 +1841,17 @@ const px=(ty,S,K,t,r,q,v)=>st.model==='crr'?crr(ty,S,K,t,r,q,v,200):bsm(ty,S,K,t
    el NIVEL; la curva pone la forma.
    ───────────────────────────────────────────────────────────── */
 function ivDePata(l, S, t, vNivel){
-  // Si la pata trae la IV real de su contrato (viene de la cadena), úsala:
-  // reproduce el precio de mercado exacto. Es lo que de verdad cotiza, no un
-  // teórico con la IV ATM que para strikes lejanos se desvía muchísimo.
-  if(isFinite(l.ivReal) && l.ivReal>0) return l.ivReal;
+  // Si la pata trae la IV real de su contrato (viene de la cadena), es la BASE
+  // que reproduce su precio de mercado. Pero si el usuario mueve la IV en un
+  // simulador, hay que aplicar ESE cambio sobre la base — no ignorarlo, o los
+  // escenarios de "¿y si sube el miedo?" saldrían todos a cero (bug real).
+  if(isFinite(l.ivReal) && l.ivReal>0){
+    // ivBase = la IV del campo en el momento del pick (referencia).
+    // El desplazamiento respecto a esa referencia se traslada a la ivReal.
+    const ref = isFinite(l.ivBase) ? l.ivBase : l.ivReal;
+    const shift = vNivel - ref;               // cuánto ha movido el usuario la IV
+    return Math.max(l.ivReal + shift, 0.01);
+  }
   // Sin curva de la cadena: vol plana (es lo único que tenemos)
   if(!CH.an || !CH.an.svi || !isFinite(CH.atmIvRef)) return vNivel;
   // ⚠ La SVI se ajustó con el t DE LA CADENA. Evaluarla con otra t (si cambias
@@ -1990,6 +1997,50 @@ function payFigs(){
     fig2('La frontera está en', s.be.map(b=>b.toFixed(1)).join('  y  ')||'—', '', 'Puntos de equilibrio');
   payNote(s);
 }
+/* ═══════════════════════════════════════════════════════════════════
+   CLASIFICADOR DE POSICIÓN · qué es realmente lo que has montado
+
+   El error de antes: decidir el tono solo por la delta. Una call OTM
+   comprada tiene delta baja (0.08) pero NO es neutral — es una apuesta
+   direccional apalancada, con el tiempo en contra. Aquí miramos la
+   ESTRUCTURA (qué patas, compradas o vendidas) para que todos los textos
+   digan la verdad: una call comprada necesita que SUBA, no que se quede quieta.
+   ═══════════════════════════════════════════════════════════════════ */
+function clasificaPos(){
+  const L=st.legs;
+  if(!L.length) return {tipo:'vacio'};
+  const compradas=L.filter(l=>l.side==='B');
+  const vendidas=L.filter(l=>l.side==='S');
+  const soloUna=L.length===1;
+  const l0=L[0];
+
+  // Una sola pata: el caso más común desde la cadena
+  if(soloUna){
+    const comprada=l0.side==='B';
+    if(l0.type==='C') return {
+      tipo: comprada?'call_comprada':'call_vendida',
+      direccional:true, alcista:comprada, bajista:!comprada,
+      compraOpciones:comprada,
+      // comprada: el tiempo te come; vendida: el tiempo te paga
+      tiempoEnContra:comprada, tiempoAFavor:!comprada };
+    if(l0.type==='P') return {
+      tipo: comprada?'put_comprada':'put_vendida',
+      direccional:true, alcista:!comprada, bajista:comprada,
+      compraOpciones:comprada,
+      tiempoEnContra:comprada, tiempoAFavor:!comprada };
+  }
+  // Dos patas del mismo tipo → spread vertical
+  if(L.length===2 && L[0].type===L[1].type){
+    const netQty=compradas.reduce((a,l)=>a+l.qty,0)-vendidas.reduce((a,l)=>a+l.qty,0);
+    const debito = entry()>0;   // pagas → spread comprado (débito)
+    return {tipo:'spread', direccional:true,
+      alcista: (L[0].type==='C')===debito ? true : false,   // aproximación; el signo real lo da la delta
+      spread:true, compraOpciones:debito };
+  }
+  // Mezcla compradas+vendidas de tipos distintos → estructura de vol / neutral
+  return {tipo:'compleja', direccional:false};
+}
+
 function payNote(s){
   const g=sGrk(st.S,T(),VV());
   const sig=st.S*VV()*Math.sqrt(T());
@@ -2002,10 +2053,32 @@ function payNote(s){
     ? `te <b>pagan ${money(Math.abs(s.net))}</b> por abrir esta posición. Ese dinero entra en tu cuenta hoy.`
     : `<b>pagas ${money(Math.abs(s.net))}</b> por abrir esta posición.`}</p>`;
 
-  // Qué necesitas que pase
-  if(Math.abs(g.delta)<0.1){
+  // Qué necesitas que pase — según la ESTRUCTURA real, no solo la delta
+  const pos=clasificaPos();
+  if(pos.direccional && pos.compraOpciones){
+    // Call o put COMPRADA: apuesta direccional con el tiempo en contra
+    const sube=pos.alcista;
+    t+=`<p><b>Qué necesitas que pase:</b> que ${st.sym} <b>${sube?'suba':'baje'}</b>, y que lo haga
+      <b>pronto</b>. Por cada euro que ${sube?'suba':'baje'} ahora mismo ganas unos ${money(Math.abs(g.delta)*100)},
+      y esa sensibilidad ${Math.abs(g.delta)<0.2?'<b>crece</b> según el movimiento va a tu favor (la gamma)':'es la que tienes de partida'}.</p>`;
+    t+=`<p class="clave dn"><b>El tiempo juega en tu contra:</b> cada día que ${st.sym} no se mueve,
+      esta opción pierde <b class="num">${money(Math.abs(g.theta)*100)}</b> de valor (theta). Comprar opciones
+      es apostar a un movimiento <em>y</em> a que llegue rápido. No vale con acertar la dirección tarde.</p>`;
+  } else if(pos.direccional && !pos.compraOpciones){
+    // Call o put VENDIDA: cobras prima, el tiempo te paga
+    const noSuba = pos.tipo==='call_vendida';
+    t+=`<p><b>Qué necesitas que pase:</b> que ${st.sym} <b>no ${noSuba?'suba':'baje'}</b> por encima de tu strike.
+      No necesitas que se mueva a tu favor: te basta con que <em>no</em> se mueva en tu contra.</p>`;
+    t+=`<p class="clave up"><b>El tiempo juega a tu favor:</b> cada día que pasa sin que ${st.sym} te alcance,
+      ganas <b class="num">${money(Math.abs(g.theta)*100)}</b> (theta). Cobras por esperar.</p>`;
+  } else if(pos.spread){
+    const sube=g.delta>0;
+    t+=`<p><b>Qué necesitas que pase:</b> que ${st.sym} <b>${sube?'suba':'baje'}</b> hacia tu zona.
+      Es un spread: ganancia y pérdida limitadas, y por cada euro que ${sube?'suba':'baje'} ganas ${money(Math.abs(g.delta)*100)}.</p>`;
+  } else if(Math.abs(g.delta)<0.15){
+    // Solo aquí, con estructura realmente neutral (condor, straddle vendido...)
     t+=`<p><b>Qué necesitas que pase:</b> que ${st.sym} <em>no haga nada raro</em>.
-      No apuestas a que suba ni a que baje: apuestas a que se quede quieto.</p>`;
+      Esta estructura es neutral a la dirección: ganas si el precio se queda en su sitio.</p>`;
   } else if(g.delta>0){
     t+=`<p><b>Qué necesitas que pase:</b> que ${st.sym} <b>suba</b>.
       Por cada euro que suba, ganas unos ${money(g.delta*100)}.</p>`;
@@ -2134,12 +2207,24 @@ function grFigs(){
     fig2('Se acelera con el movimiento', g.gamma>=0?'A tu favor':'En tu contra',
          g.gamma>=0?'up':'dn', 'Gamma '+g.gamma.toFixed(3));
   const e=$('grNote');e.className='historia';
-  const dirTxt = Math.abs(g.delta)<0.1
-    ? `<p>Tu posición es <b>neutral a la dirección</b>: te da bastante igual si ${st.sym} sube o baja.
-       Ganas por otro motivo.</p>`
-    : `<p>Tu posición se comporta como si tuvieras <b class="num">${acc.toFixed(0)} acciones
+  const posGr=clasificaPos();
+  let dirTxt;
+  if(posGr.direccional){
+    // Call/put comprada o vendida, o spread: SIEMPRE direccional, aunque la delta sea baja
+    const sube = posGr.alcista!==undefined ? posGr.alcista : g.delta>0;
+    dirTxt = `<p>Tu posición se comporta como si tuvieras <b class="num">${acc.toFixed(0)} acciones
+       ${g.delta>=0?'compradas':'vendidas'}</b> de ${st.sym}.
+       ${posGr.compraOpciones
+         ? `Necesitas que <b>${sube?'suba':'baje'}</b> — y con el tiempo en contra, que lo haga pronto.`
+         : `Te conviene que ${sube?'suba o al menos no baje':'baje o al menos no suba'}.`}</p>`;
+  } else if(Math.abs(g.delta)<0.15){
+    dirTxt = `<p>Tu posición es <b>neutral a la dirección</b>: te da bastante igual si ${st.sym} sube o baja.
+       Ganas por otro motivo (el tiempo o la volatilidad).</p>`;
+  } else {
+    dirTxt = `<p>Tu posición se comporta como si tuvieras <b class="num">${acc.toFixed(0)} acciones
        ${g.delta>=0?'compradas':'vendidas'}</b> de ${st.sym}.
        ${g.delta>=0?'Si sube, ganas. Si baja, pierdes.':'Si baja, ganas. Si sube, pierdes.'}</p>`;
+  }
   const tiempoTxt = g.theta>=0
     ? `<p><b>El tiempo juega a tu favor.</b> Cada día que pasa sin que se mueva nada,
        te embolsas <b class="num">${money(g.theta*100)}</b>. Es el negocio del que vende seguros:
@@ -3228,7 +3313,7 @@ function pick(K,type,side){
     const ivMkt = impliedVol(type, o.mid, CH.spot, K, CH.t, RR(), QQ());
     if(isFinite(ivMkt) && ivMkt>0) ivReal = ivMkt;
   }
-  st.legs=[{id:++lid,side,type,K,qty:1,ivReal}];
+  st.legs=[{id:++lid,side,type,K,qty:1,ivReal,ivBase:ivReal}];
   st.S=CH.spot;$('S').value=CH.spot.toFixed(2);
   st.DTE=CH.dte;$('DTE').value=CH.dte;
   $('sym').value=CH.sym;st.sym=CH.sym;
