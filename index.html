@@ -3379,23 +3379,22 @@ function renderQuick(){
   const t1=Math.max(t0 - hrs/24/365, 1e-6);      // resta el tiempo transcurrido
   const iv0=p.iv, iv1=Math.max(iv0 + dIV/100, 0.01);
 
-  // Precio de ENTRADA real: pagas el ask si compras, cobras el bid si vendes.
+  // Precio de ENTRADA: cruzas el spread al abrir. Compras al ask, vendes al bid.
   const entrada = p.side==='B' ? p.ask : p.bid;
-  // Precio de SALIDA real: al cerrar cruzas el spread ENTERO, no medio. Si
-  // compraste, al salir VENDES y te clavan el bid; si vendiste, COMPRAS al ask.
-  // Nadie cierra al mid. Estimamos el bid/ask futuro aplicando al mid teórico
-  // el mismo spread relativo que cotiza el contrato ahora (se mantiene ~igual).
+  // Precio de SALIDA: cruzas el spread al cerrar. Si compraste, vendes al bid;
+  // si vendiste, compras al ask. Realista: entras y sales por el lado malo.
   const midNuevo = bsm(p.type, S1, p.K, t1, r, q, iv1);
   const spRel = p.spreadPct>0 ? p.spreadPct : (p.spread/Math.max(p.mid,0.01));
   const askNuevo = midNuevo*(1+spRel/2);
   const bidNuevo = Math.max(midNuevo*(1-spRel/2), 0);
-  const salida = p.side==='B' ? bidNuevo : askNuevo;   // sales por el lado malo
+  const salida = p.side==='B' ? bidNuevo : askNuevo;
 
   // P&L por contrato (×100). Comprado: ganas si sube el precio de la opción.
   const pnl = side * (salida - entrada) * 100;
 
   // ── DESCOMPOSICIÓN: de dónde viene el P&L ──
-  // Revalorizamos cambiando UNA cosa cada vez, para aislar cada efecto.
+  // El valor teórico del contrato (mid→mid) cambia por movimiento+tiempo+IV.
+  // El spread es un coste APARTE, de ida y vuelta, contado UNA vez y claro.
   const midBase = bsm(p.type,S0,p.K,t0,r,q,iv0);
   const soloPrecio = bsm(p.type,S1,p.K,t0,r,q,iv0) - midBase;         // efecto del movimiento (delta+gamma)
   const soloTiempo = bsm(p.type,S0,p.K,t1,r,q,iv0) - midBase;         // efecto del theta
@@ -3403,6 +3402,9 @@ function renderQuick(){
   // delta puro vs gamma (la parte no lineal del movimiento)
   const efDelta = p.delta * (S1-S0);
   const efGamma = soloPrecio - efDelta;
+  // Coste del spread de IDA Y VUELTA, entero, contado una vez:
+  // al entrar del mid al ask (p.ask-p.mid) + al salir del mid nuevo al bid.
+  const costeSpread = ((p.side==='B'?(p.ask-p.mid):(p.mid-p.bid)) + Math.abs(midNuevo - salida))*100;
 
   const g=side>0?1:1; // signo ya aplicado abajo
   const money=x=>(x>=0?'+':'−')+'$'+Math.abs(x).toFixed(0);
@@ -3423,21 +3425,18 @@ function renderQuick(){
   // se cuenta aquí: el precio de entrada ya ES el ask (comprando) o el bid
   // (vendiendo), así que ese coste ya está dentro del P&L. Contarlo otra vez
   // sería duplicarlo. Lo único que resta aparte es la salida.
-  // El coste de salir = lo que pierdes por vender al bid en vez del mid (o
-  // comprar al ask). Es la distancia del mid al lado por el que sales.
-  const costeSalida = Math.abs(midNuevo - salida)*100;
   $('quickFigs').innerHTML=
     fig2(pnl>=0?'Ganarías':'Perderías', money(pnl), pnl>=0?'up':'dn', `${pct(roi)} sobre lo que pones`)+
     fig2('Por el movimiento', money(side*soloPrecio*100), side*soloPrecio>=0?'up':'dn', 'delta + gamma')+
     fig2('Te come el tiempo', money(side*soloTiempo*100), side*soloTiempo>=0?'up':'dn', `theta de ${hrs<1?Math.round(hrs*60)+' min':hrs+' h'}`)+
     (dIV!==0?fig2('Por la IV', money(side*soloIV*100), side*soloIV>=0?'up':'dn', `vega · ${dIV>0?'+':''}${dIV} pts`):'')+
-    fig2('Coste de salir', '−$'+costeSalida.toFixed(0), 'dn', 'medio spread al cerrar');
+    fig2('Spread (ida y vuelta)', '−$'+costeSpread.toFixed(0), 'dn', 'entras al ask, sales al bid');
 
   // ── narrativa ──
-  let n=`<p>Compras la ${p.type==='C'?'call':'put'} ${p.K} pagando <b class="num">$${(entrada*100).toFixed(0)}</b> por contrato
-    (el ask, porque compras). Si ${p.sym} ${mv>=0?'sube':'baja'} un <b>${Math.abs(mv).toFixed(1)}%</b>
+  let n=`<p>${p.side==='B'?'Compras':'Vendes'} la ${p.type==='C'?'call':'put'} ${p.K} ${p.side==='B'?'pagando':'cobrando'} <b class="num">$${(entrada*100).toFixed(0)}</b> por contrato
+    (el ${p.side==='B'?'ask, porque compras':'bid, porque vendes'}). Si ${p.sym} ${mv>=0?'sube':'baja'} un <b>${Math.abs(mv).toFixed(1)}%</b>
     (a <b class="num">${S1.toFixed(2)}</b>) en <b>${hrs<1?Math.round(hrs*60)+' minutos':hrs+' horas'}</b>
-    y cierras, ${pnl>=0?'te llevas':'pierdes'} <b class="num ${pnl>=0?'up':'dn'}">${money(pnl)}</b>.</p>`;
+    y cierras (${p.side==='B'?'vendiendo al bid':'comprando al ask'}), ${pnl>=0?'te llevas':'pierdes'} <b class="num ${pnl>=0?'up':'dn'}">${money(pnl)}</b>.</p>`;
 
   n+=`<p><b>De dónde sale ese número:</b></p>
     <table class="quotes" style="margin:8px 0">
@@ -3447,9 +3446,14 @@ function renderQuick(){
       <tr><td class="mute" style="padding-left:20px">· de eso, por gamma (la delta crece según sube)</td><td class="num ${side*efGamma>=0?'up':'dn'}">${money(side*efGamma*100)}</td></tr>
       <tr><td>El tiempo que pasa (theta)</td><td class="num ${side*soloTiempo>=0?'up':'dn'}">${money(side*soloTiempo*100)}</td></tr>
       ${dIV!==0?`<tr><td>El cambio de IV (vega)</td><td class="num ${side*soloIV>=0?'up':'dn'}">${money(side*soloIV*100)}</td></tr>`:''}
-      <tr><td>Cruzar el spread al salir (vender al bid)</td><td class="num dn">−$${costeSalida.toFixed(0)}</td></tr>
+      <tr><td>Spread de ida y vuelta (entras al ask, sales al bid)</td><td class="num dn">−$${costeSpread.toFixed(0)}</td></tr>
       </tbody>
-    </table>`;
+    </table>
+    <p class="tip"><b>Sobre el spread:</b> es el coste real de operar, y va <b>una sola vez</b>: cruzas
+      la horquilla al entrar (${p.side==='B'?'pagas el ask':'cobras el bid'}) y otra vez al salir
+      (${p.side==='B'?'vendes al bid':'compras al ask'}). Juntas, es el spread entero
+      (~$${((p.ask-p.bid)*100).toFixed(0)} por contrato ahora). Las filas de arriba (movimiento, tiempo, IV)
+      son el valor del contrato en sí, medido de mitad a mitad — sin spread. Así no hay nada contado dos veces.</p>`;
 
   // el punto sobre el theta, que es lo que te preocupa
   const thetaHora = side*soloTiempo*100/Math.max(hrs,0.01);
