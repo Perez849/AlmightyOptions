@@ -310,6 +310,9 @@ details[open]>.adv-summary::before{content:"▾ "}
 .quick-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--rule)}
 .qh-tmp{font-family:var(--body);font-size:11px;font-weight:700;letter-spacing:.05em;padding:3px 9px;border-radius:4px;background:var(--brand-soft);color:var(--brand);border:1px solid var(--brand)}
 
+.ferrari-tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.fbtn{font-family:var(--body);font-size:12px;font-weight:600;padding:6px 12px;border-radius:6px;background:transparent;color:var(--ink3);border:1px solid var(--rule2);cursor:pointer}
+.fbtn.on{background:var(--brand);color:#0C0E12;border-color:var(--brand)}
 .qh-toggle{display:inline-flex;gap:0;border:1px solid var(--rule2);border-radius:6px;overflow:hidden}
 .qh-side{font-family:var(--body);font-size:11px;font-weight:700;letter-spacing:.05em;padding:5px 12px;background:transparent;color:var(--ink3);border:0;cursor:pointer}
 .qh-side.on{background:var(--brand);color:#0C0E12}
@@ -706,6 +709,23 @@ summary:hover{color:var(--ink)}
         <div id="cRankIntro"></div>
         <div class="scrollx"><table class="quotes" id="cRank"></table></div>
         <div class="historia" id="cRankNote" style="margin-top:16px"></div>
+      </section>
+
+      <section class="blk">
+        <h2>🏎️ Opciones "ferrari"<span class="sub">mucha aceleración, sin suicidarse</span></h2>
+        <div class="historia" style="font-size:13.5px;margin-bottom:12px">
+          <p>Opciones con <b>mucha gamma por dólar</b> — las que multiplican si el movimiento
+          llega — pero filtrando las trampas: que no estén ya <b>caras por IV inflada</b>, que
+          tengan <b>liquidez</b>, y con <b>probabilidad razonable</b> de acertar. Perfil equilibrado
+          para swing de pocos días. No es una recomendación: es un filtro de convexidad, y comprar
+          opciones sigue pudiendo perder el 100%.</p>
+        </div>
+        <div class="ferrari-tabs">
+          <button class="fbtn on" id="ferBtnC" onclick="setFer('C')">Calls (si esperas subida)</button>
+          <button class="fbtn" id="ferBtnP" onclick="setFer('P')">Puts (si esperas bajada)</button>
+        </div>
+        <div class="scrollx"><table class="quotes" id="ferTable"></table></div>
+        <div class="historia" id="ferNote" style="margin-top:14px"></div>
       </section>
 
       <section class="blk">
@@ -1370,6 +1390,100 @@ function rankChain(analyzed, opts = {}) {
   };
 }
 
+/* ═══════════════════════════════════════════════════════
+   FERRARI SCAN · opciones con potencial de multiplicar
+   Perfil: EQUILIBRADO para swing corto (pocos días). Busca
+   convexidad barata — mucha gamma por dólar de prima — pero
+   evitando las trampas que la hacen un billete de lotería:
+
+   PREMIA
+   · gamma/$ alta  → la delta crece rápido si el movimiento llega
+     (es el "motor" del ferrari: aceleración por cada euro puesto)
+   · IV NO inflada vs el histórico → no está ya descontado; pagas
+     una convexidad que el mercado no ha encarecido de antemano
+   · barata frente a su propia curva (ivEdge ≤ 0) → de oferta
+
+   CASTIGA (las trampas)
+   · probabilidad muy baja de acertar → lotería, no ferrari
+   · spread ancho → te comes la ganancia entrando y saliendo
+   · IV muy por encima de sus vecinas → ya está cara, sin recorrido
+   · sin interés abierto → no podrás salir
+
+   No es una recomendación: es un filtro de convexidad. El riesgo
+   de una compra de opción sigue siendo perder el 100%.
+   ═══════════════════════════════════════════════════════ */
+function ferrariScan(analyzed, opts = {}) {
+  const rows = (analyzed && analyzed.rows) ? analyzed.rows : [];
+  const S = opts.spot || (analyzed && analyzed.spot) || 0;
+  const expVol = isFinite(opts.expVol) ? opts.expVol : NaN;   // vol histórica esperada
+  const atmIv = (analyzed && analyzed.atmIv) || NaN;
+  if (!rows.length || !S) return { calls: [], puts: [] };
+
+  const cand = rows.filter(o =>
+    isFinite(o.gamma) && o.gamma > 0 &&
+    isFinite(o.mid) && o.mid > 0.05 &&           // no basura de céntimos
+    isFinite(o.delta) &&
+    o.mid * 100 >= 5                             // al menos $5 de prima (evita ruido)
+  ).map(o => {
+    const primaUSD = o.mid * 100;
+    // MOTOR: gamma por dólar de prima. Es lo que te da la aceleración
+    // (cuánta delta ganas por cada euro invertido si el precio se mueve).
+    const gammaPorDolar = o.gamma / o.mid;
+    // Prob. de que acabe con valor (que el movimiento llegue). En calls es
+    // ~delta; usamos |delta| como proxy de "probabilidad razonable".
+    const probAcertar = Math.abs(o.delta);
+    // ¿Está ya descontado? IV del contrato vs vol histórica esperada.
+    // Si la IV es mucho mayor que el histórico, el mercado ya cobró la fiesta.
+    const ivVsHist = isFinite(expVol) && expVol > 0 ? o.iv / expVol : 1;
+    // ¿Cara frente a sus vecinas? ivEdge>0 = más cara que la curva.
+    const edge = isFinite(o.ivEdge) ? o.ivEdge : 0;
+    // Liquidez: spread y OI.
+    const spreadPct = isFinite(o.spreadPct) ? o.spreadPct : 1;
+    const oi = isFinite(o.oi) ? o.oi : 0;
+
+    // ── SCORE equilibrado ──
+    // Base: log de la aceleración por dólar (el motor).
+    let score = Math.log(1 + gammaPorDolar * S);   // ×S para que sea adimensional
+    // Ventana de probabilidad: premia 0.15–0.45 (OTM con opción real de llegar),
+    // castiga <0.10 (lotería) y >0.55 (ya casi ITM, poca convexidad).
+    const probPenal =
+      probAcertar < 0.10 ? -1.2 :
+      probAcertar < 0.15 ? -0.4 :
+      probAcertar > 0.55 ? -0.6 :
+      probAcertar > 0.45 ? -0.2 : 0.35;
+    score += probPenal;
+    // Descuento por IV inflada vs histórico: si IV/hist > 1.5, penaliza fuerte.
+    if (isFinite(expVol) && expVol > 0) {
+      score -= Math.max(0, (ivVsHist - 1.3)) * 0.8;
+    }
+    // Cara frente a la curva → castiga; barata (edge<0) → premia un poco.
+    score -= edge * 6;
+    // Liquidez: spread ancho y sin OI matan la operación.
+    score -= Math.min(spreadPct, 0.5) * 2.5;
+    if (oi < 50) score -= 0.5;
+    if (oi < 10) score -= 0.8;
+
+    return {
+      ...o,
+      primaUSD, gammaPorDolar, probAcertar, ivVsHist, ferrariScore: score,
+      // "cuánto multiplica" aprox: si el subyacente hace un movimiento de 1σ
+      // a pocos días, cuánto ganaría la opción vs su precio (delta+½gamma·mov²)
+      multiplo: (() => {
+        const mov = S * (isFinite(expVol) ? expVol : o.iv) * Math.sqrt(3 / 365); // ~3 días, 1σ
+        const dir = o.type === 'C' ? 1 : -1;
+        const ganancia = Math.abs(o.delta) * mov + 0.5 * o.gamma * mov * mov;
+        return ganancia / o.mid;   // veces la prima
+      })(),
+    };
+  });
+
+  const byScore = (arr) => arr.sort((a, b) => b.ferrariScore - a.ferrariScore).slice(0, 6);
+  return {
+    calls: byScore(cand.filter(o => o.type === 'C')),
+    puts:  byScore(cand.filter(o => o.type === 'P')),
+  };
+}
+
 /* Impacto de un cambio de volatilidad sobre una estrategia:
    revalúa las patas con la vol esperada del modelo vs la IV de mercado.  */
 function volScenario(legs, S, t, r, q, ivMarket, volExpected) {
@@ -1925,8 +2039,18 @@ function stats(){
   const rally = pnl(st.S * 1.3, 1e-6, VV());          // +30%: un squeeze
   const rallyFuerte = pnl(st.S * 1.5, 1e-6, VV());    // +50%
 
+  // net: lo que pagas/cobras al abrir. Si es un único contrato pinchado en la
+  // cadena, usamos su precio de MERCADO real (ask si compras, bid si vendes) —
+  // el mismo que el Trade rápido — para que las tres secciones coincidan.
+  // Si no, el teórico (posiciones montadas a mano).
+  let netAbrir = entry()*100;
+  if(CH.picked && st.legs.length===1){
+    const l=st.legs[0];
+    const px = l.side==='B' ? CH.picked.ask : CH.picked.bid;
+    if(isFinite(px)) netAbrir = (l.side==='B'?1:-1)*l.qty*px*100;
+  }
   return{
-    max:mx, min:mn, be, net:entry()*100, cap:Math.abs(mn),
+    max:mx, min:mn, be, net:netAbrir, cap:Math.abs(mn),
     ilimitado, ilimitadoAbajo, ilimitadoArriba,
     gananciaIlimitada, ganaArriba, ganaAbajo,
     crash, crashFuerte, rally, rallyFuerte,
@@ -2299,7 +2423,14 @@ function volScen(){
   const unicaPata = st.legs.length===1 && isFinite(st.legs[0].ivReal) && st.legs[0].ivReal>0;
   const vMkt = unicaPata ? st.legs[0].ivReal : VV();
   const vMdl=st.expVol;
-  const valMkt=sVal(S,t,vMkt)*100, valMdl=sVal(S,t,vMdl)*100;
+  let valMkt=sVal(S,t,vMkt)*100;
+  // Si es un contrato pinchado, "vale ahora" = su precio de mercado real
+  // (el mid), coherente con el Trade rápido y con "Te pagan hoy".
+  if(CH.picked && st.legs.length===1 && isFinite(CH.picked.mid)){
+    const l=st.legs[0];
+    valMkt = (l.side==='B'?1:-1)*l.qty*CH.picked.mid*100;
+  }
+  const valMdl=sVal(S,t,vMdl)*100;
   const gap=valMkt-valMdl;
   const cobra=stats().net<0;
   const vrp=(vMkt-vMdl)*100;
@@ -2343,9 +2474,9 @@ function volScen(){
   txt+=`</div>`;
 
   txt+=`<div class="figs" style="margin:18px 0">
-    ${fig2('Vale ahora (según el mercado)', money(valMkt), 'mdl', 'Con IV '+pc(vMkt))}
-    ${fig2('Debería valer (según el histórico)', money(valMdl), 'mk', 'Con vol '+pc(vMdl))}
-    ${fig2(gap>0?'Te pagan de más':'Te cobran de más', money(Math.abs(gap)), gap>0?'up':'dn', 'Diferencia')}
+    ${fig2(cobra?'Cobras ahora (prima de mercado)':'Vale ahora (según el mercado)', money(Math.abs(valMkt)), 'mdl', 'Con IV '+pc(vMkt))}
+    ${fig2(cobra?'Deberías cobrar (según histórico)':'Debería valer (según el histórico)', money(Math.abs(valMdl)), 'mk', 'Con vol '+pc(vMdl))}
+    ${fig2(favorable?'A tu favor':'En tu contra', money(Math.abs(gap)), favorable?'up':'dn', 'Diferencia')}
   </div>`;
 
   txt+=`<h3 style="margin-top:20px">¿Y si el mercado se pone nervioso?</h3>
@@ -3166,7 +3297,7 @@ function renderChain(){
     ? st.rkTipo + st.rkNivel
     : 'compra' + (st.rkTipo==='calls'?'Calls':'Puts') + st.rkNivel;
 
-  renderDir();renderRank();renderTable();drawCone();renderGex();drawSmile();drawRND();
+  renderDir();renderRank();renderFerrari();renderTable();drawCone();renderGex();drawSmile();drawRND();
 }
 
 /* Cambia acción / instrumento / nivel */
@@ -3175,6 +3306,52 @@ function setRkTipo(t){ st.rkTipo=t; renderChain(); }
 function setRkNivel(n){ st.rkNivel=n; renderChain(); }
 /* compat: algún sitio viejo aún llama setRk */
 function setRk(k){ st.rkView=k; renderChain(); }
+
+/* ═══════ SECCIÓN FERRARI ═══════ */
+function setFer(t){ st.ferTipo=t;
+  $('ferBtnC').classList.toggle('on', t==='C');
+  $('ferBtnP').classList.toggle('on', t==='P');
+  renderFerrari();
+}
+function renderFerrari(){
+  const tab=$('ferTable'), note=$('ferNote');
+  if(!tab) return;
+  if(!CH.an || !CH.an.rows || !CH.an.rows.length){ tab.innerHTML=''; note.innerHTML=''; return; }
+  const tipo = st.ferTipo || 'C';
+  const fer = ferrariScan(CH.an, {spot:CH.spot, expVol:st.expVol});
+  const lista = tipo==='C' ? fer.calls : fer.puts;
+  if(!lista.length){ tab.innerHTML='<tbody><tr><td class="mute">Sin candidatas claras en esta cadena.</td></tr></tbody>'; note.innerHTML=''; return; }
+
+  tab.innerHTML =
+    '<thead><tr><th>Strike</th><th>Prima</th><th>Multiplica*</th><th>Acelera (γ/$)</th><th>Prob.</th><th>¿Cara?</th></tr></thead><tbody>'+
+    lista.map((o,i)=>{
+      const dist=((o.K/CH.spot-1)*100);
+      const caraTxt = o.ivVsHist>1.5 ? '<span class="dn">IV alta</span>' :
+                      o.ivEdge>0.01 ? '<span class="dn">algo cara</span>' :
+                      o.ivEdge<-0.01 ? '<span class="up">de oferta</span>' : 'justa';
+      return `<tr class="${i===0?'destacada':''}" onclick="pick(${o.K},'${o.type}','B')">
+        <td class="tk">${o.K} <span class="mute">(${dist>=0?'+':''}${dist.toFixed(0)}%)</span></td>
+        <td>$${o.primaUSD.toFixed(0)}</td>
+        <td class="up">${o.multiplo.toFixed(1)}×</td>
+        <td>${o.gammaPorDolar.toFixed(3)}</td>
+        <td>${(o.probAcertar*100).toFixed(0)}%</td>
+        <td>${caraTxt}</td>
+      </tr>`;
+    }).join('')+'</tbody>';
+
+  const mejor=lista[0];
+  const distM=((mejor.K/CH.spot-1)*100);
+  note.innerHTML=`<p><b>La mejor candidata</b> es la ${tipo==='C'?'call':'put'} <b>${mejor.K}</b>
+    (${distM>=0?'+':''}${distM.toFixed(0)}% del precio): cuesta <b class="num">$${mejor.primaUSD.toFixed(0)}</b>,
+    y si ${CH.sym} hace un movimiento típico de 2-3 días a tu favor, podría multiplicar del orden de
+    <b class="num up">${mejor.multiplo.toFixed(1)}×</b> su valor. Tiene una probabilidad estimada del
+    <b>${(mejor.probAcertar*100).toFixed(0)}%</b> de acabar con valor.</p>
+    <p class="tip"><b>*Multiplica</b> es una estimación con un movimiento de 1σ a ~3 días (delta+gamma), no una
+    promesa: si el movimiento no llega, el tiempo y la caída de IV te restan. Pincha una fila para llevarla al
+    <b>Trade rápido</b> y ver el P&L real con tu movimiento y plazo.</p>
+    <p class="tip"><b>Cómo leerlo:</b> "Acelera (γ/$)" es cuánta convexidad compras por dólar — más alto, más
+    explosiva. "¿Cara?" te avisa si el mercado ya la ha encarecido (entonces el recorrido es menor).</p>`;
+}
 
 function renderRank(){
   const list=CH.rk[st.rkView]||[];
@@ -3473,6 +3650,12 @@ function renderQuick(){
     (el ${p.side==='B'?'ask, porque compras':'bid, porque vendes'}). Si ${p.sym} ${mv>=0?'sube':'baja'} un <b>${Math.abs(mv).toFixed(1)}%</b>
     (a <b class="num">${S1.toFixed(2)}</b>) en <b>${hrs<1?Math.round(hrs*60)+' minutos':hrs+' horas'}</b>
     y cierras (${p.side==='B'?'vendiendo al bid':'comprando al ask'}), ${pnl>=0?'te llevas':'pierdes'} <b class="num ${pnl>=0?'up':'dn'}">${money(pnl)}</b>.</p>`;
+  if(p.side==='S'){
+    n+=`<p class="tip"><b>Ojo, dos cifras distintas:</b> cobras <b class="num">$${(entrada*100).toFixed(0)}</b> de prima al <b>abrir</b>,
+      pero eso no es tu ganancia. Si cierras ahora recomprando la ${p.type==='C'?'call':'put'} (que aún vale algo),
+      tu resultado neto es <b class="num ${pnl>=0?'up':'dn'}">${money(pnl)}</b>. Solo te quedas la prima entera
+      (${money(entrada*100*side*-1*-1)}) si la dejas <b>expirar sin valor</b>, aguantándola hasta el vencimiento.</p>`;
+  }
 
   n+=`<p><b>De dónde sale ese número:</b></p>
     <table class="quotes" style="margin:8px 0">
