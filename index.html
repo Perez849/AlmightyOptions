@@ -308,7 +308,13 @@ details[open]>.adv-summary::before{content:"▾ "}
 #deskAdv[open]{margin-top:4px}
 /* ── trade rápido ── */
 .quick-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--rule)}
-.qh-tag{font-family:var(--body);font-size:11px;font-weight:700;letter-spacing:.05em;padding:3px 9px;border-radius:4px;background:var(--brand-soft);color:var(--brand);border:1px solid var(--brand)}
+.qh-tmp{font-family:var(--body);font-size:11px;font-weight:700;letter-spacing:.05em;padding:3px 9px;border-radius:4px;background:var(--brand-soft);color:var(--brand);border:1px solid var(--brand)}
+
+.qh-toggle{display:inline-flex;gap:0;border:1px solid var(--rule2);border-radius:6px;overflow:hidden}
+.qh-side{font-family:var(--body);font-size:11px;font-weight:700;letter-spacing:.05em;padding:5px 12px;background:transparent;color:var(--ink3);border:0;cursor:pointer}
+.qh-side.on{background:var(--brand);color:#0C0E12}
+.qh-toggle{margin-right:4px}
+
 .qh-name{font-family:var(--disp);font-size:20px;font-weight:700;letter-spacing:.04em;color:var(--ink)}
 .qh-px{font-family:var(--num);font-size:13px;color:var(--ink2);margin-left:auto}
 .quick-ctrls{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px}
@@ -2255,6 +2261,10 @@ function grFigs(){
     eepRows=`<tr><td class="mute">Prima de ejercicio anticipado<span class="help">?<span class="bub">${HELP.eep}</span></span></td><td class="${eepTot>=0?'up':'dn'}">${money(eepTot)}</td></tr>`;
   }
   const rows=[
+    ['Delta', g.delta, 3, 'Cuánto ganas si el subyacente sube 1€ (tu direccionalidad)'],
+    ['Gamma', g.gamma, 4, 'Cómo crece tu delta según se mueve el precio'],
+    ['Theta', g.theta, 3, 'Lo que ganas/pierdes cada día que pasa'],
+    ['Vega', g.vega, 3, 'Cuánto cambia tu valor si la IV sube 1 punto'],
     ['Rho', g.rho, 3, 'Si suben los tipos de interés'],
     ['Vanna', g.vanna, 4, 'Cómo cambia tu direccionalidad con el miedo'],
     ['Volga', g.volga, 4, 'Cómo se acelera tu exposición al miedo'],
@@ -3188,7 +3198,7 @@ function renderRank(){
       list.map((o,i)=>{
         const distPct=((o.K/CH.spot-1)*100).toFixed(1);
         const barata=o.gangaVsCurva>0.003;
-        return `<tr class="${i===0?'destacada':''}" onclick="pick(${o.K},'${o.type}')">
+        return `<tr class="${i===0?'destacada':''}" onclick="pick(${o.K},'${o.type}','B')">
         <td class="tk">${o.type==='P'?'Put':'Call'} ${o.K}${i===0?'<br><small style="color:var(--brand)">▸ la mejor relación</small>':''}</td>
         <td class="num">$${(o.mid*100).toFixed(0)}</td>
         <td class="num ${o.apal>3?'up':''}">${o.apal.toFixed(1)}×</td>
@@ -3238,7 +3248,7 @@ function renderRank(){
     <th>Operable</th></tr></thead><tbody>`+
     list.map((o,i)=>{
       const distPct=(Math.abs(o.K-CH.spot)/CH.spot*100).toFixed(1);
-      return `<tr class="${i===0?'destacada':''}" onclick="pick(${o.K},'${o.type}')">
+      return `<tr class="${i===0?'destacada':''}" onclick="pick(${o.K},'${o.type}','S')">
       <td class="tk">${o.type==='P'?'Put':'Call'} ${o.K}${i===0?'<br><small style="color:var(--bull)">▸ la mejor pagada</small>':''}</td>
       <td class="num">$${(o.mid*100).toFixed(0)}</td>
       <td class="${o.probOTM>.8?'up':''}">${(o.probOTM*100).toFixed(0)}</td>
@@ -3294,7 +3304,7 @@ function renderTable(){
     rows.map(o=>{
       const atm=Math.abs(o.K-CH.spot)<CH.spot*.012;
       const rich=o.ivEdge>0.005,cheap=o.ivEdge<-0.005;
-      return `<tr class="${atm?'atm':''} ${rich?'rich':cheap?'cheap':''}" onclick="pick(${o.K},'${o.type}')">
+      return `<tr class="${atm?'atm':''} ${rich?'rich':cheap?'cheap':''}" onclick="pick(${o.K},'${o.type}','${st.rkAccion==='vender'?'S':'B'}')">
       <td class="tk">${o.type}</td><td class="tk">${o.K}</td>
       <td>${o.mid.toFixed(2)}</td>
       <td class="mk">${isFinite(o.pxExpVol)?o.pxExpVol.toFixed(2):'—'}</td>
@@ -3358,6 +3368,17 @@ function pick(K,type,side){
    COMPLETO (no aproximación por griegas, que se rompe con saltos grandes),
    y descomponemos el P&L en sus causas para que veas de dónde sale cada euro.
    ═══════════════════════════════════════════════════════════════════ */
+/* Cambia el lado (comprar/vender) desde el panel de trade rápido, y lo
+   sincroniza con la pata real para que TODAS las secciones de Estudiar
+   (escenarios, griegas, pagando bien...) reflejen el mismo lado. */
+function quickSide(s){
+  if(!CH.picked) return;
+  CH.picked.side = s;
+  if(st.legs.length===1){ st.legs[0].side = s; }
+  legs(); calc();                       // recalcula todo Estudiar con el nuevo lado
+  renderQuick();
+}
+
 function renderQuick(){
   const blk=$('quickBlk');
   const p=CH.picked;
@@ -3424,19 +3445,25 @@ function renderQuick(){
   const gLuego=greeks(p.type,S1,p.K,t1,r,q,iv1);
 
   $('quickHead').innerHTML=`<div class="quick-head">
-    <span class="qh-tag">${p.side==='B'?'COMPRAS':'VENDES'}</span>
+    <div class="qh-toggle">
+      <button class="qh-side${p.side==='B'?' on':''}" onclick="quickSide('B')">COMPRAR</button>
+      <button class="qh-side${p.side==='S'?' on':''}" onclick="quickSide('S')">VENDER</button>
+    </div>
     <span class="qh-name">${p.type==='C'?'Call':'Put'} ${p.K} · ${p.sym}</span>
-    <span class="qh-px">entras a $${entrada.toFixed(2)} <span class="mute">(${p.side==='B'?'ask':'bid'})</span> · spread $${(p.spread||0).toFixed(2)}</span>
+    <span class="qh-px">${p.side==='B'?'pagas':'cobras'} $${(entrada*100).toFixed(0)} <span class="mute">(${p.side==='B'?'ask':'bid'})</span> · spread $${((p.spread||0)*100).toFixed(0)}</span>
   </div>`;
 
-  const roi = entrada>0 ? pnl/(entrada*100)*100 : 0;
-  // El coste de SALIR: al cerrar, cruzas medio spread una vez. La entrada NO
-  // se cuenta aquí: el precio de entrada ya ES el ask (comprando) o el bid
-  // (vendiendo), así que ese coste ya está dentro del P&L. Contarlo otra vez
-  // sería duplicarlo. Lo único que resta aparte es la salida.
+  // ROI: al comprar, sobre la prima que pagas. Al vender, no "pones" la prima
+  // (la cobras) — el capital en riesgo es el margen. Usamos una aproximación de
+  // margen (≈ 20% del subyacente para desnudas) para no mentir con el %.
+  const capital = p.side==='B' ? entrada*100 : Math.max(S0*100*0.20, entrada*100);
+  const roi = capital>0 ? pnl/capital*100 : 0;
+  const roiLabel = p.side==='B' ? 'sobre lo que pones' : 'sobre el margen (aprox)';
+  // ¿el movimiento va a favor o en contra? (una put comprada pierde si sube)
+  const movFavor = side*soloPrecio>=0;
   $('quickFigs').innerHTML=
-    fig2(pnl>=0?'Ganarías':'Perderías', money(pnl), pnl>=0?'up':'dn', `${pct(roi)} sobre lo que pones`)+
-    fig2('Por el movimiento', money(side*soloPrecio*100), side*soloPrecio>=0?'up':'dn', 'delta + gamma')+
+    fig2(pnl>=0?'Ganarías':'Perderías', money(pnl), pnl>=0?'up':'dn', `${pct(roi)} ${roiLabel}`)+
+    fig2('Por el movimiento', money(side*soloPrecio*100), movFavor?'up':'dn', 'delta + gamma')+
     fig2('Te come el tiempo', money(side*soloTiempo*100), side*soloTiempo>=0?'up':'dn', `theta de ${hrs<1?Math.round(hrs*60)+' min':hrs+' h'}`)+
     (dIV!==0?fig2('Por la IV', money(side*soloIV*100), side*soloIV>=0?'up':'dn', `vega · ${dIV>0?'+':''}${dIV} pts`):'')+
     fig2('Spread (ida y vuelta)', '−$'+costeSpread.toFixed(0), 'dn', 'entras al ask, sales al bid');
@@ -3450,7 +3477,7 @@ function renderQuick(){
   n+=`<p><b>De dónde sale ese número:</b></p>
     <table class="quotes" style="margin:8px 0">
       <tbody>
-      <tr><td>El subyacente se mueve a tu favor</td><td class="num ${side*soloPrecio>=0?'up':'dn'}">${money(side*soloPrecio*100)}</td></tr>
+      <tr><td>El movimiento del subyacente (${movFavor?'a tu favor':'en tu contra'})</td><td class="num ${movFavor?'up':'dn'}">${money(side*soloPrecio*100)}</td></tr>
       <tr><td class="mute" style="padding-left:20px">· de eso, por delta (lineal)</td><td class="num mute">${money(side*efDelta*100)}</td></tr>
       <tr><td class="mute" style="padding-left:20px">· de eso, por gamma (la delta crece según sube)</td><td class="num ${side*efGamma>=0?'up':'dn'}">${money(side*efGamma*100)}</td></tr>
       <tr><td>El tiempo que pasa (theta)</td><td class="num ${side*soloTiempo>=0?'up':'dn'}">${money(side*soloTiempo*100)}</td></tr>
