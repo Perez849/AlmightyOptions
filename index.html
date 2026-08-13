@@ -310,6 +310,10 @@ details[open]>.adv-summary::before{content:"▾ "}
 .quick-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--rule)}
 .qh-tmp{font-family:var(--body);font-size:11px;font-weight:700;letter-spacing:.05em;padding:3px 9px;border-radius:4px;background:var(--brand-soft);color:var(--brand);border:1px solid var(--brand)}
 
+.sr-progress{margin:12px 0}
+.sr-bar{height:8px;background:var(--rule2);border-radius:4px;overflow:hidden}
+.sr-fill{height:100%;background:var(--brand);width:0;transition:width .3s}
+.sr-ptxt{font-family:var(--num);font-size:12px;color:var(--ink3);margin-top:6px}
 .ferrari-tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
 .fbtn{font-family:var(--body);font-size:12px;font-weight:600;padding:6px 12px;border-radius:6px;background:transparent;color:var(--ink3);border:1px solid var(--rule2);cursor:pointer}
 .fbtn.on{background:var(--brand);color:#0C0E12;border-color:var(--brand)}
@@ -506,32 +510,45 @@ summary:hover{color:var(--ink)}
     <button data-v="chain" onclick="go('chain')">Cadena</button>
   </nav>
 
-  <!-- ═══════════ HOY · oportunidades del día ═══════════ -->
+  <!-- ═══════════ HOY · escáner Stoch RSI ═══════════ -->
   <div class="view on" id="v-today">
     <section class="blk">
-      <h2>Tus favoritos<span class="sub">el monitor los revisa de un tirón</span></h2>
-      <div class="fav-row" id="favRow"></div>
-      <div class="btns" style="margin-top:14px">
-        <button class="btn solid" onclick="scanFavs()">Buscar oportunidades hoy</button>
+      <h2>Escáner Stoch RSI<span class="sub">sobreventa y sobrecompra en ~1000 valores USA</span></h2>
+      <div class="historia" style="font-size:13.5px;margin-bottom:14px">
+        <p>Calcula el <b>Stoch RSI (3, 3, 14, 14, close)</b> —igual que TradingView— sobre un universo enorme
+        de acciones americanas (S&P 500 + Nasdaq 100 + midcaps líquidas). Te señala como <b class="up">oportunidad
+        de compra</b> las que están en sobreventa extrema (<b>K ≤ 5</b>) y como <b class="dn">oportunidad de venta</b>
+        las de sobrecompra extrema (<b>K &gt; 90</b>). Pincha cualquiera para abrir su cadena de opciones.</p>
       </div>
-      <div class="caveat" id="tdMsg" style="display:none"></div>
+      <div class="btns" style="margin-bottom:6px">
+        <button class="btn solid" id="srScanBtn" onclick="scanStochRSI()">Escanear el mercado</button>
+        <button class="btn quiet sm" onclick="stopStochRSI()" id="srStopBtn" style="display:none">Detener</button>
+      </div>
+      <div class="sr-progress" id="srProg" style="display:none">
+        <div class="sr-bar"><div class="sr-fill" id="srFill"></div></div>
+        <div class="sr-ptxt" id="srPtxt"></div>
+      </div>
+      <div class="caveat" id="srMsg" style="display:none"></div>
     </section>
-    <div id="tdOut" style="display:none">
+
+    <div id="srOut" style="display:none">
       <section class="blk">
-        <h2>Dónde está el jugo<span class="sub" id="tdSub"></span></h2>
-        <div class="historia" id="tdIntro"></div>
-        <div id="tdCards"></div>
+        <h2>🟢 Oportunidades de compra<span class="sub" id="srBuyCount"></span></h2>
+        <div class="historia" style="font-size:13px;margin-bottom:10px">Sobreventa extrema: el RSI está en la parte baja de su rango. <b>Funciona mejor comprando a favor de la tendencia de fondo</b> — sobreventa dentro de una tendencia alcista.</div>
+        <div class="scrollx"><table class="quotes" id="srBuy"></table></div>
       </section>
-      <section class="blk" id="tdPortSec" style="display:none">
-        <h2>Cómo casa con tu cartera</h2>
-        <div class="historia" id="tdPort"></div>
+      <section class="blk">
+        <h2>🔴 Oportunidades de venta<span class="sub" id="srSellCount"></span></h2>
+        <div class="historia" style="font-size:13px;margin-bottom:10px">Sobrecompra extrema: el RSI está en la parte alta de su rango. Señal de agotamiento — más fiable en contra de rebotes dentro de una tendencia bajista.</div>
+        <div class="scrollx"><table class="quotes" id="srSell"></table></div>
       </section>
     </div>
-    <div class="empty" id="tdEmpty">
-      <strong>Tu radar de oportunidades</strong>
-      Añade tus tickers favoritos arriba y pulsa <b>Buscar oportunidades hoy</b>.
-      Para cada uno comparamos la volatilidad implícita que cobra el mercado con la histórica real,
-      y te decimos dónde te pagan de más — tengas la cuenta llena o vacía.
+
+    <div class="empty" id="srEmpty">
+      <strong>Radar Stoch RSI</strong>
+      Pulsa <b>Escanear el mercado</b> y el monitor descargará el histórico de cada valor y calculará
+      su Stoch RSI en directo. Tarda un poco (son cientos de valores), pero te deja solo lo que importa:
+      los extremos de sobreventa y sobrecompra listos para operar.
     </div>
   </div>
 
@@ -1100,6 +1117,52 @@ function riskNeutralDensity(sviP, F, t, r, kGrid) {
 }
 
 /* ═══ Pipeline completo: velas → retornos → GARCH+EWMA → pronóstico ═══ */
+/* ═══════════════════════════════════════════════════════════════
+   STOCH RSI (3, 3, 14, 14, close) — idéntico a TradingView
+   Cadena: precio → RSI(14, Wilder) → estocástico del RSI(14) →
+   suavizado K con SMA(3) → suavizado D con SMA(3) del K.
+   Devuelve el ÚLTIMO valor de K y D en escala 0-100.
+   ═══════════════════════════════════════════════════════════════ */
+function rsiWilder(closes, len){
+  if(closes.length < len+1) return [];
+  const rsi=new Array(closes.length).fill(NaN);
+  let avgG=0, avgL=0;
+  for(let i=1;i<=len;i++){
+    const ch=closes[i]-closes[i-1];
+    avgG += Math.max(ch,0); avgL += Math.max(-ch,0);
+  }
+  avgG/=len; avgL/=len;
+  rsi[len] = avgL===0 ? 100 : 100 - 100/(1+avgG/avgL);
+  for(let i=len+1;i<closes.length;i++){
+    const ch=closes[i]-closes[i-1];
+    avgG=(avgG*(len-1)+Math.max(ch,0))/len;
+    avgL=(avgL*(len-1)+Math.max(-ch,0))/len;
+    rsi[i]= avgL===0 ? 100 : 100 - 100/(1+avgG/avgL);
+  }
+  return rsi;
+}
+const STOCH_UNIVERSE = ["A", "AAL", "AAP", "AAPL", "ABBV", "ABC", "ABNB", "ABT", "ACGL", "ACN", "ADBE", "ADI", "ADM", "ADP", "ADSK", "AEE", "AEP", "AES", "AFL", "AFRM", "AI", "AIG", "AIZ", "AJG", "AKAM", "ALB", "ALGN", "ALL", "ALLE", "ALLY", "AMAT", "AMC", "AMCR", "AMD", "AME", "AMGN", "AMP", "AMT", "AMZN", "ANET", "ANSS", "AON", "AOS", "APA", "APD", "APH", "APP", "APTV", "ARE", "ARM", "ASAN", "ASML", "ATO", "AUR", "AVB", "AVGO", "AVY", "AWK", "AXON", "AXP", "AZN", "AZO", "BA", "BAC", "BALL", "BAX", "BBWI", "BBY", "BDX", "BEN", "BG", "BIIB", "BILL", "BIO", "BK", "BKNG", "BKR", "BLK", "BMBL", "BMY", "BR", "BRO", "BROS", "BSX", "BWA", "BXP", "C", "CAG", "CAH", "CARR", "CART", "CAT", "CAVA", "CB", "CBOE", "CBRE", "CCI", "CCL", "CDNS", "CDW", "CE", "CEG", "CELH", "CF", "CFG", "CHD", "CHRW", "CHTR", "CHWY", "CI", "CINF", "CL", "CLF", "CLX", "CMA", "CMCSA", "CME", "CMG", "CMI", "CMS", "CNC", "CNP", "COF", "COIN", "COO", "COP", "COR", "COST", "CPB", "CPRT", "CPT", "CRL", "CRM", "CRWD", "CSCO", "CSGP", "CSX", "CTAS", "CTLT", "CTRA", "CTSH", "CTVA", "CVNA", "CVS", "CVX", "CZR", "D", "DAL", "DASH", "DD", "DDOG", "DE", "DELL", "DFS", "DG", "DGX", "DHI", "DHR", "DIS", "DKNG", "DLR", "DLTR", "DOCU", "DOV", "DOW", "DPZ", "DRI", "DTE", "DUK", "DUOL", "DVA", "DVN", "DXCM", "EA", "EBAY", "ECL", "ED", "EFX", "EG", "EIX", "EL", "ELF", "ELV", "EMN", "EMR", "ENPH", "EOG", "EPAM", "EQIX", "EQR", "EQT", "ES", "ESS", "ESTC", "ETN", "ETR", "ETSY", "EVRG", "EW", "EXC", "EXPD", "EXPE", "EXR", "F", "FANG", "FAST", "FCX", "FDS", "FDX", "FE", "FFIV", "FI", "FIS", "FITB", "FLT", "FMC", "FOX", "FOXA", "FRT", "FSLR", "FTNT", "FTV", "FUBO", "GD", "GE", "GEHC", "GEN", "GFS", "GILD", "GIS", "GL", "GLW", "GM", "GNRC", "GOOG", "GOOGL", "GPC", "GPN", "GRMN", "GS", "GTLB", "GWW", "HAL", "HAS", "HBAN", "HCA", "HD", "HES", "HIG", "HII", "HIMS", "HLT", "HOLX", "HON", "HOOD", "HPE", "HPQ", "HRL", "HSIC", "HST", "HSY", "HUBS", "HUM", "HWM", "IBM", "ICE", "IDXX", "IEX", "IFF", "ILMN", "INCY", "INTC", "INTU", "INVH", "IONQ", "IOT", "IP", "IPG", "IQV", "IR", "IRM", "ISRG", "IT", "ITW", "IVZ", "J", "JBHT", "JBL", "JBLU", "JCI", "JD", "JKHY", "JNJ", "JNPR", "JPM", "K", "KDP", "KEY", "KEYS", "KHC", "KIM", "KLAC", "KMB", "KMI", "KMX", "KO", "KR", "KVUE", "KVYO", "L", "LCID", "LDOS", "LEN", "LH", "LHX", "LIN", "LKQ", "LLY", "LMT", "LNT", "LOW", "LRCX", "LULU", "LUV", "LVS", "LW", "LYB", "LYFT", "LYV", "MA", "MAA", "MAR", "MARA", "MAS", "MCD", "MCHP", "MCK", "MCO", "MDB", "MDLZ", "MDT", "MELI", "MET", "META", "MGM", "MHK", "MKC", "MKTX", "MLM", "MMC", "MMM", "MNST", "MO", "MOH", "MOS", "MPC", "MPWR", "MRK", "MRNA", "MRO", "MRVL", "MS", "MSCI", "MSFT", "MSI", "MSTR", "MTB", "MTCH", "MTD", "MU", "NCLH", "NDAQ", "NDSN", "NEE", "NEM", "NET", "NFLX", "NI", "NIO", "NKE", "NOC", "NOW", "NRG", "NSC", "NTAP", "NTRS", "NU", "NUE", "NVDA", "NVR", "NWS", "NWSA", "NXPI", "O", "ODFL", "OKE", "OKTA", "OMC", "ON", "ORCL", "ORLY", "OSCR", "OTIS", "OXY", "PANW", "PARA", "PATH", "PAYC", "PAYX", "PCAR", "PCG", "PDD", "PEG", "PEP", "PFE", "PFG", "PG", "PGR", "PH", "PHM", "PINS", "PKG", "PLD", "PLTR", "PLUG", "PM", "PNC", "PNR", "PNW", "PODD", "POOL", "PPG", "PPL", "PRU", "PSA", "PSX", "PTC", "PWR", "PXD", "PYPL", "QCOM", "QRVO", "RBLX", "RCL", "RDDT", "REG", "REGN", "RF", "RHI", "RIVN", "RJF", "RKLB", "RL", "RMD", "ROK", "ROL", "ROP", "ROST", "RSG", "RTX", "RUN", "SBAC", "SBUX", "SCHW", "SGEN", "SHOP", "SHW", "SIRI", "SJM", "SLB", "SMCI", "SNA", "SNAP", "SNOW", "SNPS", "SO", "SOFI", "SPG", "SPGI", "SPOT", "SQ", "SRE", "STE", "STLD", "STT", "STX", "STZ", "SWK", "SWKS", "SYF", "SYK", "SYY", "T", "TAP", "TDG", "TDOC", "TDY", "TEAM", "TECH", "TEL", "TER", "TFC", "TFX", "TGT", "TJX", "TMO", "TMUS", "TOST", "TPR", "TRGP", "TRMB", "TROW", "TRV", "TSCO", "TSLA", "TSN", "TT", "TTD", "TTWO", "TWLO", "TXN", "TXT", "TYL", "U", "UAL", "UBER", "UDR", "UHS", "ULTA", "UNH", "UNP", "UPS", "UPST", "URI", "USB", "V", "VICI", "VLO", "VMC", "VRSK", "VRSN", "VRTX", "VTR", "VTRS", "VZ", "W", "WAB", "WAT", "WBA", "WBD", "WDAY", "WDC", "WEC", "WELL", "WFC", "WM", "WMB", "WMT", "WOLF", "WRB", "WST", "WTW", "WY", "WYNN", "XEL", "XOM", "XRAY", "XYL", "YUM", "Z", "ZBH", "ZBRA", "ZI", "ZM", "ZS", "ZTS"];
+
+function stochRSI(closes, rsiLen=14, stochLen=14, kSmooth=3, dSmooth=3){
+  const rsi = rsiWilder(closes, rsiLen);
+  const rsiVals = rsi.filter(x=>isFinite(x));
+  if(rsiVals.length < stochLen + kSmooth + dSmooth) return null;
+  const stochRaw=[];
+  for(let i=stochLen-1;i<rsiVals.length;i++){
+    const win=rsiVals.slice(i-stochLen+1, i+1);
+    const lo=Math.min(...win), hi=Math.max(...win);
+    stochRaw.push(hi===lo ? 0 : (rsiVals[i]-lo)/(hi-lo)*100);
+  }
+  const kSeries=[];
+  for(let i=kSmooth-1;i<stochRaw.length;i++){
+    kSeries.push(stochRaw.slice(i-kSmooth+1,i+1).reduce((a,b)=>a+b,0)/kSmooth);
+  }
+  if(kSeries.length<dSmooth) return null;
+  const k = kSeries[kSeries.length-1];
+  const d = kSeries.slice(-dSmooth).reduce((a,b)=>a+b,0)/dSmooth;
+  return { k, d };
+}
+
 function returnsFromCandles(candles){
   const s=[...candles].sort((a,b)=>a.time-b.time);
   const r=[];
@@ -1653,6 +1716,10 @@ class DXLink{
     const from=Date.now()-days*86400000;
     this._s({type:'FEED_SUBSCRIPTION',channel:this.chC,
       add:[{type:'Candle',symbol:`${sym}{=${tf}}`,fromTime:from}]});
+  }
+  unsubscribeCandles(sym,tf='d'){
+    this._s({type:'FEED_SUBSCRIPTION',channel:this.chC,
+      remove:[{type:'Candle',symbol:`${sym}{=${tf}}`}]});
   }
   disconnect(){clearInterval(this.ka);if(this.ws)this.ws.close();this.ready=false;this.subs.clear();}
 }
@@ -4757,6 +4824,121 @@ function tapeRender(){
 function tapeGo(s){$('cSym').value=s;go('chain');}
 
 /* ── EL ESCÁNER ── */
+/* ═══════════════════════════════════════════════════════════════
+   ESCÁNER STOCH RSI · recorre ~600 valores USA por lotes,
+   descarga sus velas diarias por dxfeed y calcula el Stoch RSI.
+   Señala K≤5 (compra) y K>90 (venta). Pinchar abre la cadena.
+   ═══════════════════════════════════════════════════════════════ */
+let SR = { running:false, dx:null, results:[], done:0, total:0 };
+
+function stopStochRSI(){
+  SR.running=false;
+  try{ SR.dx && SR.dx.disconnect(); }catch(e){}
+  SR.dx=null;
+  $('srStopBtn').style.display='none';
+  $('srScanBtn').disabled=false;
+  $('srScanBtn').textContent='Escanear el mercado';
+}
+
+async function scanStochRSI(){
+  if(SR.running) return;
+  if(!CN.url||!CN.key){
+    const m=$('srMsg'); m.style.display='block';
+    m.innerHTML='Necesito el acceso a datos configurado. Ve a <b>Mi cuenta → Configurar acceso</b> (solo lectura, no hacen falta posiciones).';
+    return;
+  }
+  SR.running=true; SR.results=[]; SR.done=0;
+  const universe = STOCH_UNIVERSE.slice();
+  SR.total = universe.length;
+  $('srEmpty').style.display='none';
+  $('srMsg').style.display='none';
+  $('srOut').style.display='none';
+  $('srProg').style.display='block';
+  $('srScanBtn').disabled=true;
+  $('srScanBtn').textContent='Escaneando…';
+  $('srStopBtn').style.display='inline-block';
+  updateSRProgress();
+
+  try{
+    const dx=new DXLink(); SR.dx=dx;
+    await dx.connect(CN.url, CN.key);
+
+    // acumulador de velas por símbolo
+    const buckets = new Map();   // sym -> [candles]
+    dx.onCandle=(s,c)=>{
+      const base = s.split('{')[0];
+      if(!buckets.has(base)) buckets.set(base,[]);
+      buckets.get(base).push(c);
+    };
+
+    // procesamos en lotes para no saturar el feed
+    const BATCH=25, WAIT=2600;
+    for(let i=0;i<universe.length && SR.running;i+=BATCH){
+      const lote=universe.slice(i,i+BATCH);
+      buckets.clear();
+      lote.forEach(sym=>dx.subscribeCandles(sym, 260, 'd'));  // ~1 año de velas
+      await new Promise(r=>setTimeout(r, WAIT));               // deja llegar el snapshot
+      // calcular Stoch RSI de cada símbolo del lote
+      for(const sym of lote){
+        const cs=buckets.get(sym);
+        if(!cs || cs.length<40){ SR.done++; continue; }
+        const closes=[...cs].sort((a,b)=>a.time-b.time).map(c=>c.close).filter(x=>isFinite(x)&&x>0);
+        const sr=stochRSI(closes,14,14,3,3);
+        if(sr && isFinite(sr.k)){
+          SR.results.push({sym, k:sr.k, d:sr.d, last:closes[closes.length-1]});
+        }
+        SR.done++;
+      }
+      // desuscribir el lote para liberar el feed
+      lote.forEach(sym=>{ try{ dx.unsubscribeCandles && dx.unsubscribeCandles(sym,'d'); }catch(e){} });
+      updateSRProgress();
+      renderStochRSI();   // resultados en vivo, se van llenando
+    }
+    stopStochRSI();
+    renderStochRSI(true);
+  }catch(e){
+    const m=$('srMsg'); m.style.display='block';
+    m.innerHTML='Error durante el escaneo: '+(e.message||e)+'. Puedes reintentar.';
+    stopStochRSI();
+  }
+}
+
+function updateSRProgress(){
+  const pct = SR.total ? Math.round(SR.done/SR.total*100) : 0;
+  const fill=$('srFill'); if(fill) fill.style.width=pct+'%';
+  const t=$('srPtxt');
+  if(t) t.textContent = `${SR.done} / ${SR.total} valores · ${SR.results.filter(r=>r.k<=5||r.k>90).length} señales`;
+}
+
+function renderStochRSI(final){
+  const buys = SR.results.filter(r=>r.k<=5).sort((a,b)=>a.k-b.k);
+  const sells= SR.results.filter(r=>r.k>90).sort((a,b)=>b.k-a.k);
+  if(SR.results.length) $('srOut').style.display='block';
+  $('srBuyCount').textContent = buys.length?`${buys.length} en sobreventa`:'';
+  $('srSellCount').textContent= sells.length?`${sells.length} en sobrecompra`:'';
+
+  const fila=(r,cls)=>`<tr onclick="srGoChain('${r.sym}')">
+    <td class="tk"><b>${r.sym}</b></td>
+    <td class="num ${cls}">${r.k.toFixed(1)}</td>
+    <td class="num mute">${r.d.toFixed(1)}</td>
+    <td class="num">$${r.last.toFixed(2)}</td>
+    <td class="mute">${cls==='up'?'sobreventa →':'sobrecompra →'}</td></tr>`;
+
+  $('srBuy').innerHTML = buys.length
+    ? '<thead><tr><th>Ticker</th><th>K</th><th>D</th><th>Precio</th><th></th></tr></thead><tbody>'+buys.map(r=>fila(r,'up')).join('')+'</tbody>'
+    : `<tbody><tr><td class="mute">${final?'Ninguno en sobreventa extrema (K≤5) ahora mismo.':'Buscando…'}</td></tr></tbody>`;
+  $('srSell').innerHTML = sells.length
+    ? '<thead><tr><th>Ticker</th><th>K</th><th>D</th><th>Precio</th><th></th></tr></thead><tbody>'+sells.map(r=>fila(r,'dn')).join('')+'</tbody>'
+    : `<tbody><tr><td class="mute">${final?'Ninguno en sobrecompra extrema (K>90) ahora mismo.':'Buscando…'}</td></tr></tbody>`;
+}
+
+// pinchar un ticker → abrir su cadena de opciones
+function srGoChain(sym){
+  const inp=$('sym'); if(inp){ inp.value=sym; st.sym=sym; }
+  go('chain');
+  if(typeof scanChain==='function') scanChain();
+}
+
 async function scanFavs(){
   const favs=getFavs();
   const msg=$('tdMsg');
