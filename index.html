@@ -560,6 +560,37 @@ summary:hover{color:var(--ink)}
       su Stoch RSI en directo. Tarda un poco (son cientos de valores), pero te deja solo lo que importa:
       los extremos de sobreventa y sobrecompra listos para operar.
     </div>
+
+    <section class="blk" style="margin-top:22px">
+      <h2>⚡ Radar de agotamiento intradía<span class="sub">zonas estiradas en tus favoritos (velas 15m)</span></h2>
+      <div class="historia" style="font-size:13.5px;margin-bottom:12px">
+        <p>Sobre tus <b>favoritos</b>, mira si el precio está <b>estirado</b> respecto a su VWAP del día
+        (VWAP ± 2,2·ATR) con el <b>RSI-5 en extremo</b> — las condiciones donde una reversión del 1-2% es
+        más probable. Pensado para trades rápidos de opciones (ATM, vencimiento cercano).</p>
+        <p class="caveat" style="margin-top:8px"><b>Sin humo:</b> esto <b>no predice</b> el giro. Marca cuándo
+        un valor está en zona de agotamiento — puede rebotar o seguir de largo. En opciones cortas, si el giro
+        no llega pronto, el theta y una posible caída de IV te comen la prima aunque aciertes la dirección.
+        Es un radar para que <b>tú</b> mires el contexto y decidas, no una señal automática de compra.</p>
+      </div>
+      <div class="btns" style="margin-bottom:6px">
+        <button class="btn solid" id="agScanBtn" onclick="scanAgotamiento()">Escanear favoritos (15m)</button>
+        <button class="btn quiet" id="agWatchBtn" onclick="toggleAgWatch()">Vigilar cada 30 min</button>
+      </div>
+      <div class="pm-cap" id="agWatchState" style="margin-bottom:6px"></div>
+      <div class="caveat" id="agMsg" style="display:none"></div>
+      <div id="agOut" style="display:none">
+        <div class="scrollx"><table class="quotes" id="agTable"></table></div>
+        <div class="historia" style="font-size:12.5px;margin-top:10px">
+          <b>Distancia</b> = cuántos ATR está el precio por encima/debajo del VWAP (más = más estirado).
+          <b>Objetivo</b> = un giro del 1,5% desde aquí. Pincha una fila para abrir su cadena de opciones.
+        </div>
+      </div>
+      <div class="empty" id="agEmpty">
+        <strong>Radar intradía</strong>
+        Añade tickers a Favoritos y pulsa <b>Escanear favoritos</b>. Sobre velas de 15 minutos,
+        te marca los que estén en zona de agotamiento ahora mismo.
+      </div>
+    </section>
   </div>
 
   <!-- ═══════════ MI CUENTA ═══════════ -->
@@ -1133,6 +1164,125 @@ function riskNeutralDensity(sviP, F, t, r, kGrid) {
    suavizado K con SMA(3) → suavizado D con SMA(3) del K.
    Devuelve el ÚLTIMO valor de K y D en escala 0-100.
    ═══════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════
+   SEÑAL DE AGOTAMIENTO INTRADÍA · zonas donde el precio está
+   estadísticamente estirado respecto al VWAP del día.
+
+   Honestidad por delante: esto NO predice el giro. Marca cuándo un
+   valor está lejos de su VWAP y su oscilador rápido está en extremo
+   — condiciones donde HISTÓRICAMENTE la reversión es más probable,
+   pero NUNCA segura. Puede seguir de largo (y en opciones cortas eso
+   duele rápido). Es un radar para que MIRES, no un gatillo.
+
+   Componentes (sobre velas intradía, p.ej. 15m):
+   · VWAP del día (precio medio ponderado por volumen desde la apertura)
+   · Bandas = VWAP ± mult·ATR (mide cuán estirado está)
+   · RSI rápido (5) para confirmar agotamiento del impulso
+   · distancia en nº de ATR (el "cuánto de extremo")
+   ═══════════════════════════════════════════════════════════════ */
+function rsiFast(closes, len){
+  // RSI simple (media móvil), rápido para intradía. Devuelve la serie.
+  if(closes.length < len+1) return [];
+  const out=new Array(closes.length).fill(NaN);
+  for(let i=len;i<closes.length;i++){
+    let g=0,l=0;
+    for(let j=i-len+1;j<=i;j++){ const ch=closes[j]-closes[j-1]; if(ch>0)g+=ch; else l-=ch; }
+    const rs = l===0 ? 100 : g/l;
+    out[i] = l===0 ? 100 : 100-100/(1+rs);
+  }
+  return out;
+}
+function atrFrom(highs, lows, closes, len){
+  // ATR clásico (media móvil del True Range). Devuelve el último valor.
+  if(closes.length < len+1) return NaN;
+  const tr=[];
+  for(let i=1;i<closes.length;i++){
+    tr.push(Math.max(
+      highs[i]-lows[i],
+      Math.abs(highs[i]-closes[i-1]),
+      Math.abs(lows[i]-closes[i-1])));
+  }
+  if(tr.length<len) return NaN;
+  let s=0; for(let i=tr.length-len;i<tr.length;i++) s+=tr[i];
+  return s/len;
+}
+/* ═══════════════════════════════════════════════════════════════
+   STRIKE ÓPTIMO PARA UN TRADE DE REVERSIÓN RÁPIDA
+   Dada una cadena y una dirección (call/put), elige el contrato con
+   la mejor relación GAMMA/THETA: máxima aceleración por el mínimo
+   coste de tiempo. Para capturar un giro del 1-2% en horas, eso es
+   lo que quieres — no la opción más barata (muy OTM, delta ridícula)
+   ni la más cara. Filtra por liquidez y descarta lo que no sirve.
+   ═══════════════════════════════════════════════════════════════ */
+function strikeOptimoReversion(rows, spot, tipo){
+  // tipo: 'call' o 'put'. rows: filas de la cadena con delta,gamma,theta,mid,oi,spreadPct.
+  const wantType = tipo.startsWith('call') ? 'C' : 'P';
+  const cand = (rows||[]).filter(o =>
+    o.type===wantType &&
+    isFinite(o.gamma) && o.gamma>0 &&
+    isFinite(o.theta) &&
+    isFinite(o.mid) && o.mid>0.05 &&
+    isFinite(o.delta) &&
+    Math.abs(o.delta) >= 0.25 && Math.abs(o.delta) <= 0.75  // ni muy OTM ni muy ITM: la zona reactiva
+  ).map(o => {
+    // gamma por dólar de theta pagado: cuánta aceleración compras por cada
+    // dólar de decaimiento diario. Alto = reacciona fuerte y el tiempo pesa poco.
+    const thetaAbs = Math.abs(o.theta) || 1e-6;
+    const gammaPorTheta = o.gamma / thetaAbs;
+    // penalización por iliquidez
+    const sp = isFinite(o.spreadPct) ? o.spreadPct : 0.1;
+    const liq = 1 / (1 + sp*3) * (o.oi>50?1:0.7);
+    return { ...o, gammaPorTheta, score: gammaPorTheta * liq };
+  });
+  if(!cand.length) return null;
+  cand.sort((a,b)=>b.score-a.score);
+  return cand[0];
+}
+
+function agotamientoSignal(candles, opts={}){
+  // candles: [{time,open,high,low,close,volume}] intradía, ordenadas asc.
+  const mult = opts.mult ?? 2.2;     // nº de ATR para la banda extrema
+  const rsiLen = opts.rsiLen ?? 5;
+  const atrLen = opts.atrLen ?? 14;
+  if(!candles || candles.length < atrLen+3) return null;
+
+  // VWAP del DÍA: reiniciar el acumulado en cada sesión nueva.
+  // Detectamos cambio de día por la fecha UTC de cada vela.
+  const dayOf = t => new Date(t).toISOString().slice(0,10);
+  let cumPV=0, cumV=0, curDay=null;
+  const vwapSeries=[];
+  for(const c of candles){
+    const d=dayOf(c.time);
+    if(d!==curDay){ cumPV=0; cumV=0; curDay=d; }
+    const tp=(c.high+c.low+c.close)/3;
+    const v=c.volume>0?c.volume:1;
+    cumPV+=tp*v; cumV+=v;
+    vwapSeries.push(cumV>0?cumPV/cumV:c.close);
+  }
+
+  const highs=candles.map(c=>c.high), lows=candles.map(c=>c.low), closes=candles.map(c=>c.close);
+  const atr=atrFrom(highs,lows,closes,atrLen);
+  const rsi=rsiFast(closes,rsiLen);
+  const last=candles.length-1;
+  const price=closes[last];
+  const vwap=vwapSeries[last];
+  const rsiNow=rsi[last];
+  if(!isFinite(atr)||!isFinite(vwap)||!isFinite(rsiNow)||atr<=0) return null;
+
+  const upper=vwap+mult*atr, lower=vwap-mult*atr;
+  const distATR=(price-vwap)/atr;   // cuántos ATR por encima(+)/debajo(-) del VWAP
+
+  // Clasificación de la señal (sin prometer nada):
+  let tipo='ninguna', fuerza=0;
+  if(price<=lower && rsiNow<25){ tipo='call'; fuerza=Math.min((lower-price)/atr + (25-rsiNow)/25, 3); }
+  else if(price>=upper && rsiNow>75){ tipo='put'; fuerza=Math.min((price-upper)/atr + (rsiNow-75)/25, 3); }
+  else if(price<=lower){ tipo='call_debil'; fuerza=(lower-price)/atr; }
+  else if(price>=upper){ tipo='put_debil'; fuerza=(price-upper)/atr; }
+
+  return { tipo, fuerza, price, vwap, upper, lower, atr, rsi:rsiNow, distATR,
+           objetivoCall:price*1.015, objetivoPut:price*0.985 };
+}
+
 function rsiWilder(closes, len){
   if(closes.length < len+1) return [];
   const rsi=new Array(closes.length).fill(NaN);
@@ -4881,6 +5031,174 @@ function stopStochRSI(){
   $('srStopBtn').style.display='none';
   $('srScanBtn').disabled=false;
   $('srScanBtn').textContent='Escanear el mercado';
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ESCÁNER DE AGOTAMIENTO INTRADÍA · sobre los favoritos, con velas
+   de 15m. Marca zonas estiradas para trades rápidos de opciones.
+   ═══════════════════════════════════════════════════════════════ */
+let AG = { running:false, dx:null };
+
+/* ═══════════════════════════════════════════════════════════════
+   AUTO-VIGILANCIA · mientras la web esté abierta, revisa los
+   favoritos cada 30 min y avisa con notificación del navegador si
+   salta una señal FUERTE (call/put, no las débiles). No funciona
+   con la web cerrada — para eso haría falta un servidor 24/7.
+   ═══════════════════════════════════════════════════════════════ */
+let AGWATCH = { on:false, timer:null, ultimasSenales:new Set() };
+
+async function toggleAgWatch(){
+  if(AGWATCH.on){
+    AGWATCH.on=false;
+    if(AGWATCH.timer) clearInterval(AGWATCH.timer);
+    AGWATCH.timer=null;
+    $('agWatchBtn').textContent='Vigilar cada 30 min';
+    $('agWatchBtn').classList.remove('solid');
+    $('agWatchState') && ($('agWatchState').textContent='');
+    return;
+  }
+  // pedir permiso de notificaciones
+  if('Notification' in window && Notification.permission!=='granted'){
+    try{ await Notification.requestPermission(); }catch(e){}
+  }
+  AGWATCH.on=true;
+  $('agWatchBtn').textContent='Vigilando ✓ (parar)';
+  $('agWatchBtn').classList.add('solid');
+  $('agWatchState') && ($('agWatchState').textContent='La web debe seguir abierta. Revisión cada 30 min.');
+  // primera pasada ya
+  agWatchTick();
+  AGWATCH.timer=setInterval(agWatchTick, 30*60*1000);
+}
+
+async function agWatchTick(){
+  if(!AGWATCH.on) return;
+  const favs=getFavs();
+  if(!favs.length || !CN.url || !CN.key) return;
+  try{
+    const dx=new DXLink();
+    await dx.connect(CN.url, CN.key);
+    const buckets=new Map();
+    dx.onCandle=(s,c)=>{ const b=s.split('{')[0]; if(!buckets.has(b))buckets.set(b,[]); buckets.get(b).push(c); };
+    favs.forEach(sym=>dx.subscribeCandles(sym,5,'15m'));
+    await new Promise(r=>setTimeout(r,3500));
+    const nuevas=[];
+    for(const sym of favs){
+      const cs=buckets.get(sym);
+      if(!cs||cs.length<20) continue;
+      const candles=[...cs].sort((a,b)=>a.time-b.time)
+        .map(c=>({time:c.time,open:c.open,high:c.high,low:c.low,close:c.close,volume:c.volume||1}))
+        .filter(c=>isFinite(c.close)&&c.close>0);
+      const sig=agotamientoSignal(candles,{mult:2.2,rsiLen:5,atrLen:14});
+      if(sig && (sig.tipo==='call'||sig.tipo==='put')){
+        const meta=STOCK_META[sym]||[sym,'—'];
+        nuevas.push({sym,nombre:meta[0],...sig});
+      }
+    }
+    dx.disconnect();
+    // pintar en la tabla
+    if(nuevas.length) renderAgotamiento(nuevas);
+    // notificar SOLO las señales nuevas (que no estaban en la pasada anterior)
+    const clave=s=>`${s.sym}:${s.tipo}`;
+    const nowSet=new Set(nuevas.map(clave));
+    const frescas=nuevas.filter(s=>!AGWATCH.ultimasSenales.has(clave(s)));
+    AGWATCH.ultimasSenales=nowSet;
+    if(frescas.length && 'Notification' in window && Notification.permission==='granted'){
+      frescas.forEach(s=>{
+        const dir=s.tipo==='call'?'CALL (giro alcista)':'PUT (giro bajista)';
+        const strikeATM=Math.round(s.price);
+        new Notification(`⚡ ${s.sym} en agotamiento`, {
+          body: `${dir}\nPrecio $${s.price.toFixed(2)} · ${s.distATR>=0?'+':''}${s.distATR.toFixed(1)} ATR del VWAP · RSI ${s.rsi.toFixed(0)}\nIdea: ${s.tipo==='call'?'CALL':'PUT'} ~${strikeATM} ATM, 1-3 DTE · objetivo ${s.tipo==='call'?'+':'−'}1.5%`,
+          tag: clave(s)
+        });
+      });
+    }
+  }catch(e){ /* silencioso: reintentará en 30 min */ }
+}
+
+async function scanAgotamiento(){
+  if(AG.running) return;
+  if(!CN.url||!CN.key){
+    const m=$('agMsg'); if(m){m.style.display='block';
+      m.innerHTML='Necesito el acceso a datos configurado (Mi cuenta → Configurar acceso).';}
+    return;
+  }
+  const favs=getFavs();
+  if(!favs.length){
+    const m=$('agMsg'); if(m){m.style.display='block';
+      m.innerHTML='Añade tickers a <b>Favoritos</b> primero (en Mi cuenta). Este radar mira solo tus favoritos, no todo el mercado, porque las velas intradía consumen más.';}
+    return;
+  }
+  AG.running=true;
+  $('agEmpty') && ($('agEmpty').style.display='none');
+  $('agMsg') && ($('agMsg').style.display='none');
+  $('agScanBtn').disabled=true; $('agScanBtn').textContent='Escaneando…';
+  $('agOut') && ($('agOut').style.display='block');
+  $('agTable').innerHTML='<tbody><tr><td class="mute">Pidiendo velas de 15m…</td></tr></tbody>';
+
+  try{
+    const dx=new DXLink(); AG.dx=dx;
+    await dx.connect(CN.url, CN.key);
+    const buckets=new Map();
+    dx.onCandle=(s,c)=>{ const b=s.split('{')[0];
+      if(!buckets.has(b)) buckets.set(b,[]); buckets.get(b).push(c); };
+
+    // 15m: pedimos ~5 días de sesiones (suficiente para VWAP del día + ATR/RSI)
+    favs.forEach(sym=>dx.subscribeCandles(sym, 5, '15m'));
+    await new Promise(r=>setTimeout(r, 3500));
+
+    const filas=[];
+    for(const sym of favs){
+      const cs=buckets.get(sym);
+      if(!cs || cs.length<20) continue;
+      const candles=[...cs].sort((a,b)=>a.time-b.time)
+        .map(c=>({time:c.time,open:c.open,high:c.high,low:c.low,close:c.close,volume:c.volume||c.vwapVolume||1}))
+        .filter(c=>isFinite(c.close)&&c.close>0);
+      const sig=agotamientoSignal(candles,{mult:2.2,rsiLen:5,atrLen:14});
+      if(sig && sig.tipo!=='ninguna'){
+        const meta=STOCK_META[sym]||[sym,'—'];
+        filas.push({sym, nombre:meta[0], ...sig});
+      }
+    }
+    // orden: señales fuertes (call/put) primero, luego por fuerza
+    const rank={call:0,put:0,call_debil:1,put_debil:1};
+    filas.sort((a,b)=>(rank[a.tipo]-rank[b.tipo])||(b.fuerza-a.fuerza));
+    renderAgotamiento(filas);
+    dx.disconnect();
+  }catch(e){
+    const m=$('agMsg'); if(m){m.style.display='block'; m.innerHTML='Error: '+(e.message||e);}
+    $('agTable').innerHTML='';
+  }
+  AG.running=false;
+  $('agScanBtn').disabled=false; $('agScanBtn').textContent='Escanear favoritos (15m)';
+}
+
+function renderAgotamiento(filas){
+  const t=$('agTable');
+  if(!filas.length){
+    t.innerHTML='<tbody><tr><td class="mute">Ningún favorito en zona de agotamiento ahora mismo. Es lo normal la mayor parte del tiempo — el radar solo salta en extremos.</td></tr></tbody>';
+    return;
+  }
+  const etq={call:'🟢 Giro alcista (fuerte)',put:'🔴 Giro bajista (fuerte)',
+             call_debil:'🟢 estirado abajo',put_debil:'🔴 estirado arriba'};
+  const cls=tt=>tt.startsWith('call')?'up':'dn';
+  // Recomendación de opción: para reversión rápida, ATM/ligera ITM y vencimiento
+  // cercano (1-3 DTE) que dé margen a que el giro llegue. El strike ATM se
+  // estima del precio; el óptimo exacto sale al pinchar (carga la cadena real).
+  const recomienda=r=>{
+    const dir=r.tipo.startsWith('call')?'CALL':'PUT';
+    const strikeATM=Math.round(r.price);
+    return `${dir} ~${strikeATM} (ATM) · 1-3 DTE`;
+  };
+  t.innerHTML='<thead><tr><th>Ticker</th><th>Señal</th><th>Precio</th><th>Distancia</th><th>RSI-5</th><th>Qué comprar</th><th>Objetivo</th></tr></thead><tbody>'+
+    filas.map(r=>`<tr onclick="srGoChain('${r.sym}')">
+      <td class="tk"><b>${r.sym}</b><br><span class="mute" style="font-size:11px">${r.nombre}</span></td>
+      <td class="${cls(r.tipo)}"><b>${etq[r.tipo]}</b></td>
+      <td class="num">$${r.price.toFixed(2)}<br><span class="mute" style="font-size:11px">VWAP ${r.vwap.toFixed(2)}</span></td>
+      <td class="num ${cls(r.tipo)}">${r.distATR>=0?'+':''}${r.distATR.toFixed(1)} ATR</td>
+      <td class="num ${r.rsi<25?'up':r.rsi>75?'dn':'mute'}">${r.rsi.toFixed(0)}</td>
+      <td class="tk" style="font-size:12px">${recomienda(r)}</td>
+      <td class="num">${r.tipo.startsWith('call')?'$'+r.objetivoCall.toFixed(2):'$'+r.objetivoPut.toFixed(2)}<br><span class="mute" style="font-size:11px">${r.tipo.startsWith('call')?'+':'−'}1.5%</span></td>
+    </tr>`).join('')+'</tbody>';
 }
 
 async function scanStochRSI(){
