@@ -310,6 +310,14 @@ details[open]>.adv-summary::before{content:"▾ "}
 .quick-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--rule)}
 .qh-tmp{font-family:var(--body);font-size:11px;font-weight:700;letter-spacing:.05em;padding:3px 9px;border-radius:4px;background:var(--brand-soft);color:var(--brand);border:1px solid var(--brand)}
 
+.bt-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:8px 0}
+.bt-cell{background:var(--card2,rgba(255,255,255,.03));border:1px solid var(--rule2);border-radius:8px;padding:12px;text-align:center}
+.bt-num{font-family:var(--num);font-size:20px;font-weight:700;line-height:1.1}
+.bt-num.up{color:var(--bull,#3fb950)}.bt-num.dn{color:var(--bear,#f85149)}.bt-num.mute{color:var(--ink3)}
+.bt-lbl{font-family:var(--body);font-size:11px;color:var(--ink3);margin-top:6px;line-height:1.2}
+.bt-verdict{margin-top:12px;padding:12px 14px;border-radius:8px;font-weight:600;font-size:14px;background:var(--card2,rgba(255,255,255,.03));border:1px solid var(--rule2)}
+.bt-verdict.up{border-color:var(--bull,#3fb950)}.bt-verdict.dn{border-color:var(--bear,#f85149)}
+@media(max-width:600px){.bt-grid{grid-template-columns:repeat(2,1fr)}}
 .proxy-meter{margin:10px 0 14px;padding:10px 12px;background:var(--card2,rgba(255,255,255,.03));border:1px solid var(--rule2);border-radius:8px}
 .pm-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
 .pm-lbl{font-family:var(--body);font-size:12px;color:var(--ink3);font-weight:600;letter-spacing:.03em;text-transform:uppercase}
@@ -340,6 +348,8 @@ details[open]>.adv-summary::before{content:"▾ "}
 .qc-row input[type=range]{flex:1;accent-color:var(--brand)}
 .qc-val{font-size:14px;font-weight:600;color:var(--ink);min-width:56px;text-align:right}
 /* ── favoritos ── */
+.fav-block{margin:4px 0 14px}
+.fav-lbl{font-family:var(--body);font-size:12px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;color:var(--ink3);margin-bottom:8px}
 .fav-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .fav{display:inline-flex;align-items:center;gap:7px;padding:7px 12px;border:1px solid var(--rule2);
   border-radius:6px;background:var(--paper2);font-family:var(--num);font-size:13px;font-weight:600;
@@ -572,6 +582,10 @@ summary:hover{color:var(--ink)}
         no llega pronto, el theta y una posible caída de IV te comen la prima aunque aciertes la dirección.
         Es un radar para que <b>tú</b> mires el contexto y decidas, no una señal automática de compra.</p>
       </div>
+      <div class="fav-block">
+        <div class="fav-lbl">Tus favoritos <span class="mute">(el radar mira solo estos)</span></div>
+        <div class="fav-row" id="favRow"></div>
+      </div>
       <div class="btns" style="margin-bottom:6px">
         <button class="btn solid" id="agScanBtn" onclick="scanAgotamiento()">Escanear favoritos (15m)</button>
         <button class="btn quiet" id="agWatchBtn" onclick="toggleAgWatch()">Vigilar cada 30 min</button>
@@ -582,7 +596,7 @@ summary:hover{color:var(--ink)}
         <div class="scrollx"><table class="quotes" id="agTable"></table></div>
         <div class="historia" style="font-size:12.5px;margin-top:10px">
           <b>Distancia</b> = cuántos ATR está el precio por encima/debajo del VWAP (más = más estirado).
-          <b>Objetivo</b> = un giro del 1,5% desde aquí. Pincha una fila para abrir su cadena de opciones.
+          <b>Objetivo</b> = el VWAP, que es a donde tiende a volver el precio cuando revierte (con el % que daría ese recorrido). Pincha una fila para abrir su cadena de opciones.
         </div>
       </div>
       <div class="empty" id="agEmpty">
@@ -590,6 +604,25 @@ summary:hover{color:var(--ink)}
         Añade tickers a Favoritos y pulsa <b>Escanear favoritos</b>. Sobre velas de 15 minutos,
         te marca los que estén en zona de agotamiento ahora mismo.
       </div>
+    </section>
+
+    <section class="blk" style="margin-top:22px">
+      <h2>🔬 Backtest de la señal<span class="sub">¿esta señal gana o pierde en datos reales?</span></h2>
+      <div class="historia" style="font-size:13.5px;margin-bottom:12px">
+        <p>Esto es lo que de verdad importa: coge tus favoritos, aplica la señal de agotamiento
+        <b>con confirmación estructural</b> (mecha de rechazo + ruptura + volumen) sobre su histórico
+        de 15m, y simula cada trade en el subyacente. Te dice, en números fríos: de cada señal,
+        cuántas llegaron al objetivo antes que al stop, y si el conjunto <b>gana o pierde</b>.</p>
+        <p class="caveat" style="margin-top:8px"><b>Lo honesto:</b> mide el movimiento del <b>subyacente</b>,
+        no la opción exacta (la opción amplifica el resultado por la gamma, pero también sufre theta e IV).
+        Es una aproximación seria de si la señal tiene ventaja, no una promesa de beneficio. Con pocos días
+        de histórico habrá pocas señales — cuantas más, más fiable el número.</p>
+      </div>
+      <div class="btns" style="margin-bottom:6px">
+        <button class="btn solid" id="btBtn" onclick="correrBacktest()">Backtestear mis favoritos</button>
+      </div>
+      <div class="caveat" id="btMsg" style="display:none"></div>
+      <div id="btOut" style="display:none"></div>
     </section>
   </div>
 
@@ -1241,13 +1274,15 @@ function strikeOptimoReversion(rows, spot, tipo){
 
 function agotamientoSignal(candles, opts={}){
   // candles: [{time,open,high,low,close,volume}] intradía, ordenadas asc.
-  const mult = opts.mult ?? 2.2;     // nº de ATR para la banda extrema
+  const mult = opts.mult ?? 2.0;     // nº de ATR para la banda extrema
   const rsiLen = opts.rsiLen ?? 5;
   const atrLen = opts.atrLen ?? 14;
+  const mechaMin = opts.mechaMin ?? 0.40;   // mecha de rechazo mín (40% del rango)
+  const volMin = opts.volMin ?? 1.2;        // volumen relativo mín (clímax)
+  const requireConfirm = opts.requireConfirm ?? true;  // exigir confirmación estructural
   if(!candles || candles.length < atrLen+3) return null;
 
   // VWAP del DÍA: reiniciar el acumulado en cada sesión nueva.
-  // Detectamos cambio de día por la fecha UTC de cada vela.
   const dayOf = t => new Date(t).toISOString().slice(0,10);
   let cumPV=0, cumV=0, curDay=null;
   const vwapSeries=[];
@@ -1264,23 +1299,62 @@ function agotamientoSignal(candles, opts={}){
   const atr=atrFrom(highs,lows,closes,atrLen);
   const rsi=rsiFast(closes,rsiLen);
   const last=candles.length-1;
+  if(last<1) return null;
   const price=closes[last];
   const vwap=vwapSeries[last];
   const rsiNow=rsi[last];
   if(!isFinite(atr)||!isFinite(vwap)||!isFinite(rsiNow)||atr<=0) return null;
 
   const upper=vwap+mult*atr, lower=vwap-mult*atr;
-  const distATR=(price-vwap)/atr;   // cuántos ATR por encima(+)/debajo(-) del VWAP
+  const distATR=(price-vwap)/atr;
 
-  // Clasificación de la señal (sin prometer nada):
+  // ── Métricas de la vela ANTERIOR (la que hizo el extremo) ──
+  const prev=candles[last-1], prevVwap=vwapSeries[last-1];
+  const prevLowerBand=prevVwap-mult*atr, prevUpperBand=prevVwap+mult*atr;
+  const rango=Math.max(prev.high-prev.low, 1e-9);
+  const mechaInf=(Math.min(prev.open,prev.close)-prev.low)/rango;   // % mecha inferior
+  const mechaSup=(prev.high-Math.max(prev.open,prev.close))/rango;  // % mecha superior
+  // volumen relativo de la vela anterior vs media de 10 previas
+  let volMedia=0, nv=0;
+  for(let i=Math.max(0,last-11); i<last; i++){ volMedia+=(candles[i].volume||1); nv++; }
+  volMedia = nv? volMedia/nv : 1;
+  const volRel = (prev.volume||1)/(volMedia||1);
+
+  /* ═══ SEÑAL CON CONFIRMACIÓN ESTRUCTURAL (la mejora clave) ═══
+     No basta con tocar la banda. Exigimos la SECUENCIA:
+       Vela anterior: hizo el extremo (perforó banda) + mecha de rechazo
+         (≥40% del rango: tocó y volvió, señal de absorción) + volumen alto.
+       Vela actual:  CONFIRMA rompiendo la estructura de la vela de rechazo
+         (call: cierra por encima de su máximo; put: por debajo de su mínimo).
+     Así no "atrapamos cuchillos": si el valor sigue cayendo con fuerza,
+     las velas cierran en mínimos (sin mecha) y no hay ruptura → no hay señal. */
+  const setupAlcista = (prev.low<=prevLowerBand) && (mechaInf>=mechaMin) && (volRel>=volMin);
+  const setupBajista = (prev.high>=prevUpperBand) && (mechaSup>=mechaMin) && (volRel>=volMin);
+  const confirmaCall = setupAlcista && (price > prev.high);   // rompe el máximo de la vela de rechazo
+  const confirmaPut  = setupBajista && (price < prev.low);    // rompe el mínimo
+
   let tipo='ninguna', fuerza=0;
-  if(price<=lower && rsiNow<25){ tipo='call'; fuerza=Math.min((lower-price)/atr + (25-rsiNow)/25, 3); }
-  else if(price>=upper && rsiNow>75){ tipo='put'; fuerza=Math.min((price-upper)/atr + (rsiNow-75)/25, 3); }
-  else if(price<=lower){ tipo='call_debil'; fuerza=(lower-price)/atr; }
-  else if(price>=upper){ tipo='put_debil'; fuerza=(price-upper)/atr; }
+  if(requireConfirm){
+    // Modo estricto: solo señal si hay confirmación estructural completa
+    if(confirmaCall){ tipo='call'; fuerza=Math.min((prevLowerBand-prev.low)/atr + mechaInf + (volRel-1), 3); }
+    else if(confirmaPut){ tipo='put'; fuerza=Math.min((prev.high-prevUpperBand)/atr + mechaSup + (volRel-1), 3); }
+    // señales "en vigilancia": setup formado pero aún sin confirmar (para avisar de que puede venir)
+    else if(setupAlcista){ tipo='call_setup'; fuerza=mechaInf; }
+    else if(setupBajista){ tipo='put_setup'; fuerza=mechaSup; }
+  } else {
+    // Modo simple (el antiguo, por si se quiere comparar en el backtest)
+    if(price<=lower && rsiNow<25){ tipo='call'; fuerza=(lower-price)/atr; }
+    else if(price>=upper && rsiNow>75){ tipo='put'; fuerza=(price-upper)/atr; }
+  }
+
+  const objetivo1 = price + (vwap - price) * 0.5;
+  const objetivo2 = vwap;
+  const recorridoPct = Math.abs((vwap - price) / price) * 100;
 
   return { tipo, fuerza, price, vwap, upper, lower, atr, rsi:rsiNow, distATR,
-           objetivoCall:price*1.015, objetivoPut:price*0.985 };
+           mechaInf, mechaSup, volRel, confirmaCall, confirmaPut,
+           objetivo1, objetivo2, recorridoPct,
+           objetivoCall:vwap, objetivoPut:vwap };
 }
 
 function rsiWilder(closes, len){
@@ -4684,6 +4758,7 @@ function go(v){
   ['today','book','desk','chain'].forEach(k=>$('v-'+k).classList.toggle('on',k===v));
   if(v==='desk')setTimeout(calc,20);
   if(v==='chain'&&CH.an)setTimeout(renderChain,20);
+  if(v==='today'){ renderFavs(); renderProxyMeter(); }
 }
 $('tpl').innerHTML=Object.keys(TPL).map(n=>`<button class="chip" onclick="tpl('${n}')">${n}</button>`).join('');
 ['S','DTE','IV','r','q','model'].forEach(i=>$(i).addEventListener('input',calc));
@@ -5115,6 +5190,284 @@ async function agWatchTick(){
   }catch(e){ /* silencioso: reintentará en 30 min */ }
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   BACKTEST · mide si la señal de agotamiento estructural gana o
+   pierde en datos reales. Recorre el histórico vela a vela; en cada
+   señal confirmada, simula el trade en el SUBYACENTE:
+     · entrada = precio de cierre de la vela de confirmación
+     · objetivo = VWAP (reversión) O un % fijo, lo que se elija
+     · stop = a una distancia (en ATR) al otro lado
+   y mira qué toca antes mirando las velas siguientes. Devuelve
+   estadísticas honestas: nº de señales, aciertos, fallos, y la
+   esperanza matemática por trade. SIN promesas: son TUS datos.
+   ═══════════════════════════════════════════════════════════════ */
+function backtestAgotamiento(candles, opts={}){
+  const objMode = opts.objMode || 'vwap';
+  const objPct = opts.objPct ?? 0.015;
+  const stopATR = opts.stopATR ?? 1.5;
+  const maxHold = opts.maxHold ?? 16;
+  const mult = opts.mult ?? 2.0;
+  const rsiLen = opts.rsiLen ?? 5;
+  const atrLen = opts.atrLen ?? 14;
+  const mechaMin = opts.mechaMin ?? 0.40;
+  const volMin = opts.volMin ?? 1.2;
+  const requireConfirm = opts.requireConfirm ?? true;
+  // Filtros de la evidencia (opcionales):
+  const soloHorasClave = opts.soloHorasClave ?? false;  // primera y última hora de sesión
+  const volatMin = opts.volatMin ?? 0;                  // volatilidad realizada mín (% anual)
+  const warm = Math.max(atrLen+2, 20);
+
+  // ── Precálculo O(n): VWAP del día, ATR y RSI de toda la serie ──
+  const n0=candles.length;
+  const dayOf = t => new Date(t).toISOString().slice(0,10);
+  const vwap=new Array(n0); let cumPV=0,cumV=0,curDay=null;
+  for(let i=0;i<n0;i++){
+    const c=candles[i], d=dayOf(c.time);
+    if(d!==curDay){cumPV=0;cumV=0;curDay=d;}
+    const tp=(c.high+c.low+c.close)/3, v=c.volume>0?c.volume:1;
+    cumPV+=tp*v; cumV+=v; vwap[i]=cumV>0?cumPV/cumV:c.close;
+  }
+  // ATR rolling (media simple del True Range)
+  const tr=new Array(n0).fill(NaN);
+  for(let i=1;i<n0;i++){
+    tr[i]=Math.max(candles[i].high-candles[i].low,
+      Math.abs(candles[i].high-candles[i-1].close),
+      Math.abs(candles[i].low-candles[i-1].close));
+  }
+  const atrArr=new Array(n0).fill(NaN);
+  for(let i=atrLen;i<n0;i++){ let s=0; for(let k=i-atrLen+1;k<=i;k++) s+=tr[k]; atrArr[i]=s/atrLen; }
+  // RSI rápido
+  const closes=candles.map(c=>c.close);
+  const rsiArr=rsiFast(closes,rsiLen);
+  // volatilidad realizada rolling (~20 velas) anualizada, para el filtro
+  const volArr=new Array(n0).fill(NaN);
+  for(let i=21;i<n0;i++){
+    let s=0,s2=0,m=20;
+    for(let k=i-m+1;k<=i;k++){ const r=Math.log(candles[k].close/candles[k-1].close); s+=r; s2+=r*r; }
+    const mean=s/m, varr=(s2/m-mean*mean);
+    volArr[i]=Math.sqrt(Math.max(varr,0)*252*26)*100; // 26 velas de 15m por sesión ≈ escala intradía→anual
+  }
+
+  const horaNY = t => {
+    // hora de Nueva York para el filtro de "primera/última hora"
+    const s=new Date(t).toLocaleString('en-US',{timeZone:'America/New_York',hour:'2-digit',minute:'2-digit',hour12:false});
+    const [hh,mm]=s.split(':').map(Number); return (hh===24?0:hh)*60+mm;
+  };
+
+  const trades=[];
+  for(let i=warm;i<n0-1;i++){
+    const atr=atrArr[i], vw=vwap[i], price=closes[i], rsiNow=rsiArr[i];
+    if(!isFinite(atr)||!isFinite(vw)||!isFinite(rsiNow)||atr<=0) continue;
+
+    // filtro de hora: solo primera hora (9:30-10:30) y última (15:00-16:00) NY
+    if(soloHorasClave){
+      const m=horaNY(candles[i].time);
+      const enClave=(m>=570&&m<=630)||(m>=900&&m<=960);
+      if(!enClave) continue;
+    }
+    // filtro de volatilidad
+    if(volatMin>0 && (!isFinite(volArr[i])||volArr[i]<volatMin)) continue;
+
+    const upper=vw+mult*atr, lower=vw-mult*atr;
+    const prev=candles[i-1], prevVw=vwap[i-1];
+    const prevLower=prevVw-mult*atr, prevUpper=prevVw+mult*atr;
+    const rango=Math.max(prev.high-prev.low,1e-9);
+    const mechaInf=(Math.min(prev.open,prev.close)-prev.low)/rango;
+    const mechaSup=(prev.high-Math.max(prev.open,prev.close))/rango;
+    let volMedia=0,nv=0; for(let k=Math.max(0,i-11);k<i;k++){volMedia+=(candles[k].volume||1);nv++;}
+    volMedia=nv?volMedia/nv:1; const volRel=(prev.volume||1)/(volMedia||1);
+
+    const setupAlc=(prev.low<=prevLower)&&(mechaInf>=mechaMin)&&(volRel>=volMin);
+    const setupBaj=(prev.high>=prevUpper)&&(mechaSup>=mechaMin)&&(volRel>=volMin);
+    let tipo=null;
+    if(requireConfirm){
+      if(setupAlc && price>prev.high) tipo='call';
+      else if(setupBaj && price<prev.low) tipo='put';
+    }else{
+      if(price<=lower && rsiNow<25) tipo='call';
+      else if(price>=upper && rsiNow>75) tipo='put';
+    }
+    if(!tipo) continue;
+
+    const esCall=tipo==='call', entry=price;
+    let target = objMode==='vwap' ? vw : (esCall?entry*(1+objPct):entry*(1-objPct));
+    const stop = esCall ? entry-stopATR*atr : entry+stopATR*atr;
+
+    let salida=null,resultado=null;
+    for(let j=i+1;j<Math.min(i+1+maxHold,n0);j++){
+      const c=candles[j];
+      if(esCall){
+        if(c.low<=stop){salida=stop;resultado='stop';break;}
+        if(c.high>=target){salida=target;resultado='target';break;}
+      }else{
+        if(c.high>=stop){salida=stop;resultado='stop';break;}
+        if(c.low<=target){salida=target;resultado='target';break;}
+      }
+    }
+    if(!salida){const jl=Math.min(i+maxHold,n0-1);salida=candles[jl].close;resultado='tiempo';}
+    const pnlPct=esCall?(salida-entry)/entry:(entry-salida)/entry;
+    trades.push({tipo,entry,target,stop,salida,resultado,pnlPct,time:candles[i].time});
+  }
+
+  const n=trades.length;
+  const wins=trades.filter(t=>t.pnlPct>0), losses=trades.filter(t=>t.pnlPct<=0);
+  const winRate=n?wins.length/n:0;
+  const avgWin=wins.length?wins.reduce((a,b)=>a+b.pnlPct,0)/wins.length:0;
+  const avgLoss=losses.length?losses.reduce((a,b)=>a+b.pnlPct,0)/losses.length:0;
+  const expectancy=n?trades.reduce((a,b)=>a+b.pnlPct,0)/n:0;
+  const totalPnl=trades.reduce((a,b)=>a+b.pnlPct,0);
+  const nTarget=trades.filter(t=>t.resultado==='target').length;
+  const nStop=trades.filter(t=>t.resultado==='stop').length;
+  const nTiempo=trades.filter(t=>t.resultado==='tiempo').length;
+  // profit factor: suma ganada / suma perdida (en valor absoluto)
+  const sumW=wins.reduce((a,b)=>a+b.pnlPct,0), sumL=Math.abs(losses.reduce((a,b)=>a+b.pnlPct,0));
+  const profitFactor = sumL>0 ? sumW/sumL : (sumW>0?Infinity:0);
+
+  return { n, winRate, avgWin, avgLoss, expectancy, totalPnl, profitFactor, nTarget, nStop, nTiempo, trades };
+}
+
+
+async function correrBacktest(){
+  if(!CN.url||!CN.key){
+    const m=$('btMsg'); m.style.display='block';
+    m.innerHTML='Necesito el acceso a datos configurado (Mi cuenta → Configurar acceso).'; return;
+  }
+  const favs=getFavs();
+  if(!favs.length){
+    const m=$('btMsg'); m.style.display='block';
+    m.innerHTML='Añade tickers a <b>Favoritos</b> primero.'; return;
+  }
+  $('btBtn').disabled=true; $('btBtn').textContent='Backtesteando…';
+  $('btMsg').style.display='block'; $('btMsg').textContent='Descargando el máximo de histórico de 15m de '+favs.length+' tickers… (puede tardar)';
+  $('btOut').style.display='none';
+
+  try{
+    const dx=new DXLink();
+    await dx.connect(CN.url, CN.key);
+    const buckets=new Map();
+    dx.onCandle=(s,c)=>{ const b=s.split('{')[0]; if(!buckets.has(b))buckets.set(b,[]); buckets.get(b).push(c); };
+    // Pedimos el MÁXIMO histórico intradía: 120 días de velas de 15m.
+    // dxfeed sirve lo que tenga; si da menos, trabajamos con lo que llegue.
+    favs.forEach(sym=>dx.subscribeCandles(sym, 120, '15m'));
+    await new Promise(r=>setTimeout(r, 8000));   // más espera: es mucho más histórico
+    dx.disconnect();
+
+    // preparar velas por ticker
+    const seriesPorTicker={};
+    for(const sym of favs){
+      const cs=buckets.get(sym);
+      if(!cs || cs.length<40){ seriesPorTicker[sym]={err:'pocas velas ('+(cs?cs.length:0)+')'}; continue; }
+      seriesPorTicker[sym]={candles:[...cs].sort((a,b)=>a.time-b.time)
+        .map(c=>({time:c.time,open:c.open,high:c.high,low:c.low,close:c.close,volume:c.volume||1}))
+        .filter(c=>isFinite(c.close)&&c.close>0)};
+    }
+
+    // Tres variantes para comparar (todas sobre los mismos datos, tus favoritos):
+    //  A) Simple: solo toca banda + RSI extremo (el método viejo)
+    //  B) Confirmada: + mecha de rechazo + ruptura + volumen (la mejora)
+    //  C) Confirmada + filtros de la evidencia: solo primera/última hora y con volatilidad alta
+    const variantes=[
+      {id:'simple', nombre:'Señal simple (solo banda+RSI)', opts:{requireConfirm:false, objMode:'vwap', stopATR:1.5, maxHold:16}},
+      {id:'confirm', nombre:'Con confirmación estructural', opts:{requireConfirm:true, objMode:'vwap', stopATR:1.5, maxHold:16}},
+      {id:'filtros', nombre:'Confirmada + horas clave + volatilidad', opts:{requireConfirm:true, objMode:'vwap', stopATR:1.5, maxHold:16, soloHorasClave:true, volatMin:35}},
+    ];
+
+    const resultados={};
+    let velasTotales=0, diasAprox=0;
+    for(const v of variantes){
+      const agg={n:0,wins:0,nTarget:0,nStop:0,nTiempo:0,sumPnl:0,sumWin:0,sumLoss:0,nLoss:0, porTicker:[]};
+      for(const sym of favs){
+        const S=seriesPorTicker[sym];
+        if(S.err){ if(v.id==='confirm') agg.porTicker.push({sym,err:S.err}); continue; }
+        const bt=backtestAgotamiento(S.candles, v.opts);
+        agg.porTicker.push({sym, bt, velas:S.candles.length});
+        agg.n+=bt.n; agg.nTarget+=bt.nTarget; agg.nStop+=bt.nStop; agg.nTiempo+=bt.nTiempo; agg.sumPnl+=bt.totalPnl;
+        bt.trades.forEach(t=>{ if(t.pnlPct>0){agg.wins++;agg.sumWin+=t.pnlPct;} else {agg.nLoss++;agg.sumLoss+=t.pnlPct;} });
+      }
+      resultados[v.id]={nombre:v.nombre, agg};
+    }
+    // estimar cuánto histórico llegó (para avisar de la fiabilidad)
+    for(const sym of favs){ const S=seriesPorTicker[sym]; if(S.candles){ velasTotales+=S.candles.length; } }
+    diasAprox = Math.round(velasTotales/favs.length/26);  // ~26 velas de 15m por sesión
+
+    renderBacktest(resultados, variantes, {diasAprox, favs:favs.length});
+    $('btMsg').style.display='none';
+  }catch(e){
+    $('btMsg').style.display='block'; $('btMsg').innerHTML='Error: '+(e.message||e);
+  }
+  $('btBtn').disabled=false; $('btBtn').textContent='Backtestear mis favoritos';
+}
+
+function renderBacktest(resultados, variantes, meta){
+  const out=$('btOut'); out.style.display='block';
+  const pct=x=>((x>=0?'+':'')+(x*100).toFixed(2)+'%');
+
+  // ── tabla comparativa de las 3 variantes ──
+  let html=`<section class="blk" style="margin-top:4px">
+    <h2>Comparativa de variantes<span class="sub">~${meta.diasAprox} días de 15m · ${meta.favs} favoritos</span></h2>
+    <div class="historia" style="font-size:12.5px;margin-bottom:10px">
+      Las tres corren sobre <b>los mismos datos</b> (tus favoritos). Así ves si la confirmación
+      estructural y los filtros de la evidencia (primera/última hora, volatilidad alta) aportan de verdad
+      o solo reducen señales. Lo que manda es la <b>esperanza por trade</b> y el <b>profit factor</b>.
+    </div>
+    <div class="scrollx"><table class="quotes">
+    <thead><tr><th>Variante</th><th>Señales</th><th>Aciertos</th><th>Esperanza</th><th>Profit factor</th><th>Veredicto</th></tr></thead><tbody>`;
+  for(const v of variantes){
+    const a=resultados[v.id].agg;
+    const exp=a.n?a.sumPnl/a.n:0;
+    const sumW=a.sumWin, sumL=Math.abs(a.sumLoss);
+    const pf=sumL>0?sumW/sumL:(sumW>0?Infinity:0);
+    const fiable=a.n>=30;
+    const cls=!fiable?'mute':exp>0.001?'up':exp<-0.001?'dn':'mute';
+    const vered=!fiable?'⚠ pocas':exp>0.001?'✅ ventaja':exp<-0.001?'❌ pierde':'➖ plana';
+    html+=`<tr>
+      <td class="tk" style="font-size:12px">${v.nombre}</td>
+      <td class="num">${a.n}</td>
+      <td class="num">${a.n?(a.wins/a.n*100).toFixed(0)+'%':'—'}</td>
+      <td class="num ${cls}"><b>${a.n?pct(exp):'—'}</b></td>
+      <td class="num ${cls}">${a.n?(pf===Infinity?'∞':pf.toFixed(2)):'—'}</td>
+      <td class="${cls}" style="font-size:12px">${vered}</td></tr>`;
+  }
+  html+='</tbody></table></div>';
+  if(meta.diasAprox<20){
+    html+=`<div class="bt-verdict dn" style="margin-top:12px">⚠️ Solo llegaron ~${meta.diasAprox} días de histórico. La evidencia pide ≥100 señales por variante para fiarse. Con esto, los números son orientativos, no concluyentes.</div>`;
+  }
+  html+='</section>';
+
+  // ── detalle de la variante recomendada (confirmada+filtros si tiene señales, si no la confirmada) ──
+  const elegida = resultados.filtros.agg.n>=20 ? resultados.filtros : resultados.confirm;
+  const a=elegida.agg;
+  const exp=a.n?a.sumPnl/a.n*100:0;
+  const winRate=a.n?a.wins/a.n*100:0;
+  const avgWin=a.wins?a.sumWin/a.wins*100:0;
+  const avgLoss=a.nLoss?a.sumLoss/a.nLoss*100:0;
+  const expCls=exp>0.1?'up':exp<-0.1?'dn':'mute';
+  html+=`<section class="blk"><h2>Detalle · ${elegida.nombre}<span class="sub">${a.n} señales</span></h2>
+    <div class="bt-grid">
+      <div class="bt-cell"><div class="bt-num ${expCls}">${exp>=0?'+':''}${exp.toFixed(2)}%</div><div class="bt-lbl">Esperanza / trade</div></div>
+      <div class="bt-cell"><div class="bt-num">${winRate.toFixed(0)}%</div><div class="bt-lbl">Aciertos</div></div>
+      <div class="bt-cell"><div class="bt-num up">+${avgWin.toFixed(2)}%</div><div class="bt-lbl">Ganancia media</div></div>
+      <div class="bt-cell"><div class="bt-num dn">${avgLoss.toFixed(2)}%</div><div class="bt-lbl">Pérdida media</div></div>
+    </div>
+    <div class="historia" style="font-size:12px;margin-top:10px">
+      Objetivo: ${a.nTarget} · Stop: ${a.nStop} · Por tiempo: ${a.nTiempo}. Mide el movimiento del
+      <b>subyacente</b>; la opción ATM lo amplifica (gamma) pero sufre theta e IV. Indicador de ventaja, no P&L exacto.
+    </div>`;
+  // desglose por ticker de la variante confirmada
+  html+=`<h2 style="margin-top:16px">Por ticker (confirmada)</h2><div class="scrollx"><table class="quotes">
+    <thead><tr><th>Ticker</th><th>Señales</th><th>Aciertos</th><th>Esperanza</th><th>Velas</th></tr></thead><tbody>`;
+  for(const r of resultados.confirm.agg.porTicker){
+    if(r.err){ html+=`<tr><td class="tk"><b>${r.sym}</b></td><td class="mute" colspan="4">${r.err}</td></tr>`; continue; }
+    const b=r.bt, e=b.n?b.expectancy*100:0;
+    html+=`<tr><td class="tk"><b>${r.sym}</b></td><td class="num">${b.n}</td>
+      <td class="num">${b.n?(b.winRate*100).toFixed(0)+'%':'—'}</td>
+      <td class="num ${e>0.1?'up':e<-0.1?'dn':'mute'}">${b.n?(e>=0?'+':'')+e.toFixed(2)+'%':'—'}</td>
+      <td class="num mute">${r.velas}</td></tr>`;
+  }
+  html+='</tbody></table></div></section>';
+  out.innerHTML=html;
+}
+
 async function scanAgotamiento(){
   if(AG.running) return;
   if(!CN.url||!CN.key){
@@ -5197,7 +5550,7 @@ function renderAgotamiento(filas){
       <td class="num ${cls(r.tipo)}">${r.distATR>=0?'+':''}${r.distATR.toFixed(1)} ATR</td>
       <td class="num ${r.rsi<25?'up':r.rsi>75?'dn':'mute'}">${r.rsi.toFixed(0)}</td>
       <td class="tk" style="font-size:12px">${recomienda(r)}</td>
-      <td class="num">${r.tipo.startsWith('call')?'$'+r.objetivoCall.toFixed(2):'$'+r.objetivoPut.toFixed(2)}<br><span class="mute" style="font-size:11px">${r.tipo.startsWith('call')?'+':'−'}1.5%</span></td>
+      <td class="num">$${r.objetivo2.toFixed(2)}<br><span class="mute" style="font-size:11px">VWAP · ${r.recorridoPct.toFixed(1)}%</span></td>
     </tr>`).join('')+'</tbody>';
 }
 
