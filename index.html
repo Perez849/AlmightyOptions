@@ -620,6 +620,11 @@ summary:hover{color:var(--ink)}
       </div>
       <div class="btns" style="margin-bottom:6px">
         <button class="btn solid" id="btBtn" onclick="correrBacktest()">Backtestear mis favoritos</button>
+        <select id="btRigor" class="btn quiet" style="padding:8px">
+          <option value="suave">Rigor: suave (más señales)</option>
+          <option value="medio" selected>Rigor: medio</option>
+          <option value="estricto">Rigor: estricto (menos señales)</option>
+        </select>
       </div>
       <div class="caveat" id="btMsg" style="display:none"></div>
       <div id="btOut" style="display:none"></div>
@@ -5255,6 +5260,8 @@ function backtestAgotamiento(candles, opts={}){
   };
 
   const trades=[];
+  // embudo de diagnóstico: cuántas velas pasan cada filtro (para ver dónde mueren las señales)
+  let fTocaBanda=0, fMecha=0, fVolumen=0, fConfirmada=0;
   for(let i=warm;i<n0-1;i++){
     const atr=atrArr[i], vw=vwap[i], price=closes[i], rsiNow=rsiArr[i];
     if(!isFinite(atr)||!isFinite(vw)||!isFinite(rsiNow)||atr<=0) continue;
@@ -5279,6 +5286,13 @@ function backtestAgotamiento(candles, opts={}){
 
     const setupAlc=(prev.low<=prevLower)&&(mechaInf>=mechaMin)&&(volRel>=volMin);
     const setupBaj=(prev.high>=prevUpper)&&(mechaSup>=mechaMin)&&(volRel>=volMin);
+    // embudo (para diagnóstico): dónde se van quedando las señales
+    const tocaBandaInf=prev.low<=prevLower, tocaBandaSup=prev.high>=prevUpper;
+    if(tocaBandaInf||tocaBandaSup){ fTocaBanda++;
+      if((tocaBandaInf&&mechaInf>=mechaMin)||(tocaBandaSup&&mechaSup>=mechaMin)){ fMecha++;
+        if(setupAlc||setupBaj) fVolumen++;
+      }
+    }
     let tipo=null;
     if(requireConfirm){
       if(setupAlc && price>prev.high) tipo='call';
@@ -5288,6 +5302,7 @@ function backtestAgotamiento(candles, opts={}){
       else if(price>=upper && rsiNow>75) tipo='put';
     }
     if(!tipo) continue;
+    fConfirmada++;
 
     const esCall=tipo==='call', entry=price;
     let target = objMode==='vwap' ? vw : (esCall?entry*(1+objPct):entry*(1-objPct));
@@ -5323,7 +5338,8 @@ function backtestAgotamiento(candles, opts={}){
   const sumW=wins.reduce((a,b)=>a+b.pnlPct,0), sumL=Math.abs(losses.reduce((a,b)=>a+b.pnlPct,0));
   const profitFactor = sumL>0 ? sumW/sumL : (sumW>0?Infinity:0);
 
-  return { n, winRate, avgWin, avgLoss, expectancy, totalPnl, profitFactor, nTarget, nStop, nTiempo, trades };
+  return { n, winRate, avgWin, avgLoss, expectancy, totalPnl, profitFactor, nTarget, nStop, nTiempo, trades,
+           embudo:{ tocaBanda:fTocaBanda, mecha:fMecha, volumen:fVolumen, confirmada:fConfirmada } };
 }
 
 
@@ -5362,26 +5378,34 @@ async function correrBacktest(){
         .filter(c=>isFinite(c.close)&&c.close>0)};
     }
 
+    // Rigor elegido por el usuario: afloja o aprieta los filtros de la señal.
+    const rigor = ($('btRigor') && $('btRigor').value) || 'medio';
+    const P = {
+      estricto: { mult:2.0, mechaMin:0.40, volMin:1.2, volatMin:35 },
+      medio:    { mult:1.8, mechaMin:0.33, volMin:1.1, volatMin:25 },
+      suave:    { mult:1.5, mechaMin:0.30, volMin:1.0, volatMin:0  },
+    }[rigor];
+    const baseOpts = { objMode:'vwap', stopATR:1.5, maxHold:16, mult:P.mult, mechaMin:P.mechaMin, volMin:P.volMin };
+
     // Tres variantes para comparar (todas sobre los mismos datos, tus favoritos):
-    //  A) Simple: solo toca banda + RSI extremo (el método viejo)
-    //  B) Confirmada: + mecha de rechazo + ruptura + volumen (la mejora)
-    //  C) Confirmada + filtros de la evidencia: solo primera/última hora y con volatilidad alta
     const variantes=[
-      {id:'simple', nombre:'Señal simple (solo banda+RSI)', opts:{requireConfirm:false, objMode:'vwap', stopATR:1.5, maxHold:16}},
-      {id:'confirm', nombre:'Con confirmación estructural', opts:{requireConfirm:true, objMode:'vwap', stopATR:1.5, maxHold:16}},
-      {id:'filtros', nombre:'Confirmada + horas clave + volatilidad', opts:{requireConfirm:true, objMode:'vwap', stopATR:1.5, maxHold:16, soloHorasClave:true, volatMin:35}},
+      {id:'simple', nombre:'Señal simple (solo banda+RSI)', opts:{...baseOpts, requireConfirm:false}},
+      {id:'confirm', nombre:'Con confirmación estructural', opts:{...baseOpts, requireConfirm:true}},
+      {id:'filtros', nombre:'Confirmada + horas clave + volatilidad', opts:{...baseOpts, requireConfirm:true, soloHorasClave:true, volatMin:P.volatMin}},
     ];
 
     const resultados={};
     let velasTotales=0, diasAprox=0;
     for(const v of variantes){
-      const agg={n:0,wins:0,nTarget:0,nStop:0,nTiempo:0,sumPnl:0,sumWin:0,sumLoss:0,nLoss:0, porTicker:[]};
+      const agg={n:0,wins:0,nTarget:0,nStop:0,nTiempo:0,sumPnl:0,sumWin:0,sumLoss:0,nLoss:0, porTicker:[],
+                 emb:{tocaBanda:0,mecha:0,volumen:0,confirmada:0}};
       for(const sym of favs){
         const S=seriesPorTicker[sym];
         if(S.err){ if(v.id==='confirm') agg.porTicker.push({sym,err:S.err}); continue; }
         const bt=backtestAgotamiento(S.candles, v.opts);
         agg.porTicker.push({sym, bt, velas:S.candles.length});
         agg.n+=bt.n; agg.nTarget+=bt.nTarget; agg.nStop+=bt.nStop; agg.nTiempo+=bt.nTiempo; agg.sumPnl+=bt.totalPnl;
+        if(bt.embudo){ agg.emb.tocaBanda+=bt.embudo.tocaBanda; agg.emb.mecha+=bt.embudo.mecha; agg.emb.volumen+=bt.embudo.volumen; agg.emb.confirmada+=bt.embudo.confirmada; }
         bt.trades.forEach(t=>{ if(t.pnlPct>0){agg.wins++;agg.sumWin+=t.pnlPct;} else {agg.nLoss++;agg.sumLoss+=t.pnlPct;} });
       }
       resultados[v.id]={nombre:v.nombre, agg};
@@ -5390,7 +5414,7 @@ async function correrBacktest(){
     for(const sym of favs){ const S=seriesPorTicker[sym]; if(S.candles){ velasTotales+=S.candles.length; } }
     diasAprox = Math.round(velasTotales/favs.length/26);  // ~26 velas de 15m por sesión
 
-    renderBacktest(resultados, variantes, {diasAprox, favs:favs.length});
+    renderBacktest(resultados, variantes, {diasAprox, favs:favs.length, rigor});
     $('btMsg').style.display='none';
   }catch(e){
     $('btMsg').style.display='block'; $('btMsg').innerHTML='Error: '+(e.message||e);
@@ -5431,6 +5455,17 @@ function renderBacktest(resultados, variantes, meta){
   html+='</tbody></table></div>';
   if(meta.diasAprox<20){
     html+=`<div class="bt-verdict dn" style="margin-top:12px">⚠️ Solo llegaron ~${meta.diasAprox} días de histórico. La evidencia pide ≥100 señales por variante para fiarse. Con esto, los números son orientativos, no concluyentes.</div>`;
+  }
+  // Embudo de diagnóstico: dónde mueren las señales (usa la variante confirmada)
+  const emb=resultados.confirm.agg.emb;
+  if(emb){
+    html+=`<div class="historia" style="font-size:12.5px;margin-top:12px">
+      <b>Embudo de señales</b> (rigor: ${meta.rigor}). Así ves dónde se filtran, por si salen pocas:<br>
+      Tocaron la banda: <b>${emb.tocaBanda}</b> → con mecha de rechazo: <b>${emb.mecha}</b> →
+      con volumen (setup): <b>${emb.volumen}</b> → <b>confirmadas por ruptura: ${emb.confirmada}</b>.
+      ${emb.confirmada===0 && emb.tocaBanda>0 ? '<br>🔧 Salen 0 señales porque el último filtro (la ruptura) es muy exigente con este histórico. Baja el rigor a <b>suave</b> o consigue más días de datos.' : ''}
+      ${emb.tocaBanda===0 ? '<br>🔧 Ni siquiera se toca la banda: llegaron muy pocas velas. Necesitas más histórico.' : ''}
+    </div>`;
   }
   html+='</section>';
 
