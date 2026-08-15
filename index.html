@@ -571,64 +571,6 @@ summary:hover{color:var(--ink)}
       los extremos de sobreventa y sobrecompra listos para operar.
     </div>
 
-    <section class="blk" style="margin-top:22px">
-      <h2>⚡ Radar de agotamiento intradía<span class="sub">zonas estiradas en tus favoritos (velas 15m)</span></h2>
-      <div class="historia" style="font-size:13.5px;margin-bottom:12px">
-        <p>Sobre tus <b>favoritos</b>, mira si el precio está <b>estirado</b> respecto a su VWAP del día
-        (VWAP ± 2,2·ATR) con el <b>RSI-5 en extremo</b> — las condiciones donde una reversión del 1-2% es
-        más probable. Pensado para trades rápidos de opciones (ATM, vencimiento cercano).</p>
-        <p class="caveat" style="margin-top:8px"><b>Sin humo:</b> esto <b>no predice</b> el giro. Marca cuándo
-        un valor está en zona de agotamiento — puede rebotar o seguir de largo. En opciones cortas, si el giro
-        no llega pronto, el theta y una posible caída de IV te comen la prima aunque aciertes la dirección.
-        Es un radar para que <b>tú</b> mires el contexto y decidas, no una señal automática de compra.</p>
-      </div>
-      <div class="fav-block">
-        <div class="fav-lbl">Tus favoritos <span class="mute">(el radar mira solo estos)</span></div>
-        <div class="fav-row" id="favRow"></div>
-      </div>
-      <div class="btns" style="margin-bottom:6px">
-        <button class="btn solid" id="agScanBtn" onclick="scanAgotamiento()">Escanear favoritos (15m)</button>
-        <button class="btn quiet" id="agWatchBtn" onclick="toggleAgWatch()">Vigilar cada 30 min</button>
-      </div>
-      <div class="pm-cap" id="agWatchState" style="margin-bottom:6px"></div>
-      <div class="caveat" id="agMsg" style="display:none"></div>
-      <div id="agOut" style="display:none">
-        <div class="scrollx"><table class="quotes" id="agTable"></table></div>
-        <div class="historia" style="font-size:12.5px;margin-top:10px">
-          <b>Distancia</b> = cuántos ATR está el precio por encima/debajo del VWAP (más = más estirado).
-          <b>Objetivo</b> = el VWAP, que es a donde tiende a volver el precio cuando revierte (con el % que daría ese recorrido). Pincha una fila para abrir su cadena de opciones.
-        </div>
-      </div>
-      <div class="empty" id="agEmpty">
-        <strong>Radar intradía</strong>
-        Añade tickers a Favoritos y pulsa <b>Escanear favoritos</b>. Sobre velas de 15 minutos,
-        te marca los que estén en zona de agotamiento ahora mismo.
-      </div>
-    </section>
-
-    <section class="blk" style="margin-top:22px">
-      <h2>🔬 Backtest de la señal<span class="sub">¿esta señal gana o pierde en datos reales?</span></h2>
-      <div class="historia" style="font-size:13.5px;margin-bottom:12px">
-        <p>Esto es lo que de verdad importa: coge tus favoritos, aplica la señal de agotamiento
-        <b>con confirmación estructural</b> (mecha de rechazo + ruptura + volumen) sobre su histórico
-        de 15m, y simula cada trade en el subyacente. Te dice, en números fríos: de cada señal,
-        cuántas llegaron al objetivo antes que al stop, y si el conjunto <b>gana o pierde</b>.</p>
-        <p class="caveat" style="margin-top:8px"><b>Lo honesto:</b> mide el movimiento del <b>subyacente</b>,
-        no la opción exacta (la opción amplifica el resultado por la gamma, pero también sufre theta e IV).
-        Es una aproximación seria de si la señal tiene ventaja, no una promesa de beneficio. Con pocos días
-        de histórico habrá pocas señales — cuantas más, más fiable el número.</p>
-      </div>
-      <div class="btns" style="margin-bottom:6px">
-        <button class="btn solid" id="btBtn" onclick="correrBacktest()">Backtestear mis favoritos</button>
-        <select id="btRigor" class="btn quiet" style="padding:8px">
-          <option value="suave">Rigor: suave (más señales)</option>
-          <option value="medio" selected>Rigor: medio</option>
-          <option value="estricto">Rigor: estricto (menos señales)</option>
-        </select>
-      </div>
-      <div class="caveat" id="btMsg" style="display:none"></div>
-      <div id="btOut" style="display:none"></div>
-    </section>
   </div>
 
   <!-- ═══════════ MI CUENTA ═══════════ -->
