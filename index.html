@@ -318,6 +318,9 @@ details[open]>.adv-summary::before{content:"▾ "}
 .bt-verdict{margin-top:12px;padding:12px 14px;border-radius:8px;font-weight:600;font-size:14px;background:var(--card2,rgba(255,255,255,.03));border:1px solid var(--rule2)}
 .bt-verdict.up{border-color:var(--bull,#3fb950)}.bt-verdict.dn{border-color:var(--bear,#f85149)}
 @media(max-width:600px){.bt-grid{grid-template-columns:repeat(2,1fr)}}
+.str-card{margin:14px 0;padding:14px;background:var(--card2,rgba(255,255,255,.03));border:1px solid var(--rule2);border-radius:10px}
+.str-head{font-family:var(--body);font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ink2);margin-bottom:10px}
+.str-be{font-family:var(--body);font-size:12.5px;color:var(--ink2);margin-top:10px;line-height:1.5}
 .proxy-meter{margin:10px 0 14px;padding:10px 12px;background:var(--card2,rgba(255,255,255,.03));border:1px solid var(--rule2);border-radius:8px}
 .pm-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
 .pm-lbl{font-family:var(--body);font-size:12px;color:var(--ink3);font-weight:600;letter-spacing:.03em;text-transform:uppercase}
@@ -607,10 +610,50 @@ summary:hover{color:var(--ink)}
           <b>IV/RV</b> = implícita entre realizada; por debajo de 1, la prima está barata.
         </div>
       </div>
+      <div id="gbStraddle" style="display:none"></div>
       <div class="empty" id="gbEmpty">
         <strong>Buscador de prima barata</strong>
         Añade tickers arriba y pulsa <b>Buscar prima barata</b>. Te ordeno los valores por
         dónde el mercado está pagando de menos por el movimiento — sin necesidad de acertar la dirección.
+      </div>
+    </section>
+
+    <section class="blk" style="margin-top:22px">
+      <h2>🧭 RSI diario + 4h alineados<span class="sub">tu hipótesis, medida en datos reales</span></h2>
+      <div class="historia" style="font-size:13.5px;margin-bottom:12px">
+        <p>Tu idea: cuando el <b>RSI del diario</b> y el <b>RSI de 4 horas</b> se alinean, viene
+        movimiento. Esto <b>no lo da por bueno</b> — lo mide en el histórico de cada valor.</p>
+        <p style="margin-top:6px">Detecta cuatro estados: <b>compra</b> (ambos saliendo de sobreventa
+        y girando arriba), <b>venta</b> (ambos saliendo de sobrecompra girando abajo), y continuación
+        <b>alcista</b>/<b>bajista</b> (ambos del mismo lado de 50 y en la misma dirección). Para cada uno
+        te dice qué pasó las veces anteriores en ESE valor.</p>
+        <p class="caveat" style="margin-top:8px"><b>Sin trampa:</b> al medir el pasado, para cada vela de
+        4h solo se usa el RSI de la última vela diaria <b>ya cerrada</b>. Si no, estaría mirando el futuro
+        y el resultado sería mentira bonita.</p>
+      </div>
+      <div class="btns" style="margin-bottom:6px">
+        <button class="btn solid" id="dirBtn" onclick="scanDireccional()">Medir mi hipótesis</button>
+        <select id="dirHor" class="btn quiet" style="padding:8px">
+          <option value="3">Horizonte: 12 horas</option>
+          <option value="6" selected>Horizonte: 1 día</option>
+          <option value="12">Horizonte: 2 días</option>
+          <option value="30">Horizonte: 1 semana</option>
+        </select>
+      </div>
+      <div class="caveat" id="dirMsg" style="display:none"></div>
+      <div id="dirOut" style="display:none"><div class="scrollx"><table class="quotes" id="dirTable"></table></div>
+        <div class="historia" style="font-size:12.5px;margin-top:10px">
+          <b>Estado</b> = en qué situación está ahora mismo esa alineación. <b>Acierto</b> = % de veces
+          que, tras ese mismo estado, el precio fue a favor en el horizonte elegido. <b>P(1,5%)</b> = veces
+          que alcanzó tu objetivo. <b>Casos</b> = cuántas veces ocurrió (menos de 30 = no te fíes).
+          Un acierto del 50% significa moneda al aire: la señal no aporta. Por encima de 55-60% con
+          muchos casos, hay ventaja real.
+        </div>
+      </div>
+      <div class="empty" id="dirEmpty">
+        <strong>Tu hipótesis, medida</strong>
+        Pulsa <b>Medir mi hipótesis</b> y te digo, con los datos de tus favoritos, si la alineación
+        RSI diario + 4h anticipa subidas de verdad o no. El número decide, no la opinión.
       </div>
     </section>
 
@@ -5209,7 +5252,231 @@ async function agWatchTick(){
    Esto es lo que hacen las mesas de volatilidad. No es magia:
    es detectar prima mal puesta y medirla con datos.
    ═══════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════
+   CONSTRUCTOR DE STRADDLE / STRANGLE
+   Dada la cadena real y el spot, monta la operación concreta:
+   qué comprar, a qué precio, cuánto cuesta y dónde están los
+   puntos de empate. Sin adivinar dirección: ganas si se mueve
+   fuerte hacia cualquier lado.
+   ═══════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════
+   SESGO DIRECCIONAL · basado en TIME-SERIES MOMENTUM
+   La única predicción de dirección con evidencia sólida y repetida
+   (Moskowitz, Ooi & Pedersen 2012; documentado en 58 mercados y
+   +25 años): el retorno pasado de un activo predice positivamente
+   su retorno futuro, con persistencia de meses.
+
+   Aquí NO adivinamos el giro de mañana. Medimos:
+   1. Momentum en varios horizontes (1, 3, 6 y 12 meses).
+   2. Alineación con las medias móviles (tendencia estructural).
+   3. Y lo más importante: cuántas veces, EN EL HISTÓRICO DE ESTE
+      VALOR, esa misma configuración fue seguida de subida o bajada.
+      Eso da una probabilidad MEDIDA, no una opinión.
+   ═══════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════
+   ALINEACIÓN RSI MULTI-TEMPORALIDAD (diario + 4h)
+   Tu hipótesis: cuando el RSI del diario y el de 4h se alinean,
+   viene un movimiento. Esto NO lo asume — lo MIDE.
+
+   Cuidado clave (si no, el resultado sería mentira): para cada
+   vela de 4h del pasado, solo se usa el RSI diario de la ÚLTIMA
+   VELA DIARIA YA CERRADA en ese momento. Nada de mirar el futuro.
+
+   Estados que detecta:
+     · 'compra'  → ambos RSI saliendo de sobreventa y girando arriba
+     · 'venta'   → ambos saliendo de sobrecompra y girando abajo
+     · 'alcista' → ambos por encima de 50 y subiendo (continuación)
+     · 'bajista' → ambos por debajo de 50 y bajando
+   Y para cada uno mide, en el histórico de ese valor, qué pasó
+   después: % de acierto, % de veces que hizo tu objetivo, y
+   retorno medio a favor.
+   ═══════════════════════════════════════════════════════════════ */
+function alineacionMTF(diarias, h4, opts={}){
+  const rsiLen = opts.rsiLen ?? 14;
+  const horizonte = opts.horizonte ?? 6;        // nº de velas de 4h hacia delante (6 ≈ 1 sesión)
+  const objetivoPct = opts.objetivoPct ?? 1.5;
+  const sobreventa = opts.sobreventa ?? 35;
+  const sobrecompra = opts.sobrecompra ?? 65;
+  if(!diarias || !h4 || diarias.length < rsiLen+5 || h4.length < rsiLen+horizonte+5) return null;
+
+  const cD = diarias.map(c=>c.close), cH = h4.map(c=>c.close);
+  const rsiD = rsiWilder(cD, rsiLen);
+  const rsiH = rsiWilder(cH, rsiLen);
+
+  // Para cada vela de 4h, el índice de la última vela DIARIA ya cerrada.
+  // Una vela diaria está "cerrada" cuando su tiempo + 1 día <= tiempo de la vela 4h.
+  const idxDiaria = new Array(h4.length).fill(-1);
+  let j = 0;
+  for(let i=0;i<h4.length;i++){
+    while(j+1 < diarias.length && diarias[j+1].time + 86400000 <= h4[i].time) j++;
+    // aseguramos que la diaria j ya cerró antes de esta vela de 4h
+    idxDiaria[i] = (diarias[j].time + 86400000 <= h4[i].time) ? j : j-1;
+  }
+
+  const estadoEn = (i) => {
+    const jd = idxDiaria[i];
+    if(jd < rsiLen+1 || i < rsiLen+1) return null;
+    const rD = rsiD[jd], rDprev = rsiD[jd-1];
+    const rH = rsiH[i], rHprev = rsiH[i-1];
+    if(![rD,rDprev,rH,rHprev].every(x=>isFinite(x))) return null;
+    const subeD = rD > rDprev, subeH = rH > rHprev;
+    // salida de sobreventa en AMBAS temporalidades, girando arriba
+    if(rD < sobreventa+15 && rH < sobreventa && subeD && subeH) return 'compra';
+    // salida de sobrecompra en ambas, girando abajo
+    if(rD > sobrecompra-15 && rH > sobrecompra && !subeD && !subeH) return 'venta';
+    // continuación alcista: ambos por encima de 50 y subiendo
+    if(rD > 50 && rH > 50 && subeD && subeH) return 'alcista';
+    // continuación bajista
+    if(rD < 50 && rH < 50 && !subeD && !subeH) return 'bajista';
+    return null;
+  };
+
+  // ── MEDICIÓN HISTÓRICA por estado ──
+  const stats = {};
+  const esAlcista = e => (e==='compra' || e==='alcista');
+  for(let i=rsiLen+2; i<h4.length-horizonte; i++){
+    const e = estadoEn(i);
+    if(!e) continue;
+    const p0 = cH[i], p1 = cH[i+horizonte];
+    if(!isFinite(p0)||!isFinite(p1)||p0<=0) continue;
+    const fwd = (p1/p0 - 1)*100;
+    const aFavor = esAlcista(e) ? fwd : -fwd;      // retorno a favor de la dirección del estado
+    if(!stats[e]) stats[e] = {n:0, aciertos:0, objetivo:0, suma:0, sumaAbs:0};
+    const s = stats[e];
+    s.n++; s.suma += aFavor; s.sumaAbs += Math.abs(fwd);
+    if(aFavor > 0) s.aciertos++;
+    if(aFavor >= objetivoPct) s.objetivo++;
+  }
+  for(const k in stats){
+    const s = stats[k];
+    s.pAcierto = s.n ? s.aciertos/s.n : NaN;
+    s.pObjetivo = s.n ? s.objetivo/s.n : NaN;
+    s.retMedio = s.n ? s.suma/s.n : NaN;
+    s.movMedio = s.n ? s.sumaAbs/s.n : NaN;
+  }
+
+  // ── ESTADO ACTUAL ──
+  const iNow = h4.length-1;
+  const estadoActual = estadoEn(iNow);
+  const jd = idxDiaria[iNow];
+  return {
+    estadoActual,
+    rsiDiario: isFinite(rsiD[jd]) ? rsiD[jd] : NaN,
+    rsiH4: rsiH[iNow],
+    precio: cH[iNow],
+    stats,
+    horizonte,
+    velasD: diarias.length, velasH: h4.length
+  };
+}
+
+function sesgoDireccional(closes, opts={}){
+  const horizonte = opts.horizonte ?? 10;     // días de mercado hacia delante que nos importan
+  const objetivoPct = opts.objetivoPct ?? 1.5;
+  if(!closes || closes.length < 260) return null;   // hace falta ~1 año para el momentum de 12m
+
+  const N = closes.length;
+  const px = closes[N-1];
+  const retDe = d => (N-1-d >= 0) ? (px/closes[N-1-d] - 1)*100 : NaN;
+  // momentum en los horizontes documentados (en días de mercado)
+  const m1  = retDe(21);    // ~1 mes
+  const m3  = retDe(63);    // ~3 meses
+  const m6  = retDe(126);   // ~6 meses
+  const m12 = retDe(252);   // ~12 meses (el del paper)
+
+  const sma = d => { if(N<d) return NaN; let s=0; for(let i=N-d;i<N;i++) s+=closes[i]; return s/d; };
+  const sma50 = sma(50), sma200 = sma(200);
+  const sobre50 = isFinite(sma50) ? (px/sma50-1)*100 : NaN;
+  const sobre200 = isFinite(sma200) ? (px/sma200-1)*100 : NaN;
+
+  // Puntuación de alineación: cada señal aporta +1 (alcista) o -1 (bajista)
+  const señales = [m1,m3,m6,m12,sobre50,sobre200];
+  const votos = señales.filter(x=>isFinite(x)).map(x=>x>0?1:-1);
+  const suma = votos.reduce((a,b)=>a+b,0);
+  const alineacion = votos.length ? suma/votos.length : 0;    // -1 (todo bajista) a +1 (todo alcista)
+  const direccion = alineacion>=0.34 ? 'alcista' : alineacion<=-0.34 ? 'bajista' : 'mixto';
+
+  /* ── VALIDACIÓN EN EL PROPIO HISTÓRICO ──
+     Recorremos el pasado: cada día calculamos la misma alineación con los datos
+     de ENTONCES, y miramos qué pasó en los siguientes `horizonte` días. Así
+     obtenemos la probabilidad real de acierto de esta configuración en ESTE valor.
+     Nada de teoría: su propio comportamiento medido. */
+  let nCasos=0, nAcierto=0, nObjetivo=0, sumaRet=0;
+  for(let i=252; i<N-horizonte; i++){
+    const p=closes[i];
+    const r1=(p/closes[i-21]-1), r3=(p/closes[i-63]-1), r6=(p/closes[i-126]-1), r12=(p/closes[i-252]-1);
+    let s50=0,s200=0;
+    { let s=0; for(let k=i-50;k<i;k++) s+=closes[k]; s50=p/(s/50)-1; }
+    { let s=0; for(let k=i-200;k<i;k++) s+=closes[k]; s200=p/(s/200)-1; }
+    const v=[r1,r3,r6,r12,s50,s200].map(x=>x>0?1:-1);
+    const al=v.reduce((a,b)=>a+b,0)/v.length;
+    const dirPasada = al>=0.34?'alcista':al<=-0.34?'bajista':'mixto';
+    if(dirPasada!==direccion || direccion==='mixto') continue;   // solo casos como el actual
+    const fwd=(closes[i+horizonte]/p-1)*100;
+    nCasos++;
+    sumaRet += (direccion==='alcista'? fwd : -fwd);
+    if(direccion==='alcista' ? fwd>0 : fwd<0) nAcierto++;
+    if(direccion==='alcista' ? fwd>=objetivoPct : fwd<=-objetivoPct) nObjetivo++;
+  }
+  const pAcierto = nCasos? nAcierto/nCasos : NaN;
+  const pObjetivo = nCasos? nObjetivo/nCasos : NaN;
+  const retMedio = nCasos? sumaRet/nCasos : NaN;   // retorno medio a favor de la dirección
+
+  return { px, m1, m3, m6, m12, sobre50, sobre200, alineacion, direccion,
+           nCasos, pAcierto, pObjetivo, retMedio, horizonte };
+}
+
+function montarStraddle(rows, spot, opts={}){
+  const tipo = opts.tipo || 'straddle';        // 'straddle' (mismo strike) | 'strangle' (separados)
+  const anchoStrangle = opts.anchoStrangle ?? 0.03;  // 3% fuera del dinero para el strangle
+  if(!rows || !rows.length || !isFinite(spot) || spot<=0) return null;
+
+  const calls = rows.filter(r=>r.type==='C' && isFinite(r.K));
+  const puts  = rows.filter(r=>r.type==='P' && isFinite(r.K));
+  if(!calls.length || !puts.length) return null;
+
+  const mid = r => (isFinite(r.bid)&&isFinite(r.ask)&&r.ask>0) ? (r.bid+r.ask)/2 : NaN;
+  const cercano = (arr, objetivo) => arr.reduce((best,r)=>
+    (!best || Math.abs(r.K-objetivo)<Math.abs(best.K-objetivo)) ? r : best, null);
+
+  let call, put;
+  if(tipo==='strangle'){
+    call = cercano(calls, spot*(1+anchoStrangle));   // call por encima
+    put  = cercano(puts,  spot*(1-anchoStrangle));   // put por debajo
+  } else {
+    // straddle: el strike más cercano al spot, el MISMO para ambas patas
+    const kATM = cercano(calls, spot).K;
+    call = calls.find(r=>r.K===kATM);
+    put  = cercano(puts, kATM);
+  }
+  if(!call || !put) return null;
+
+  const cCall = mid(call), cPut = mid(put);
+  if(!isFinite(cCall) || !isFinite(cPut)) return null;
+  const coste = cCall + cPut;                        // prima total por contrato (×100 acciones)
+  const costePct = coste/spot*100;                   // cuánto tiene que moverse para empatar
+
+  // puntos de empate al vencimiento
+  const beAlza  = (tipo==='strangle' ? call.K : call.K) + coste;
+  const beBaja  = (tipo==='strangle' ? put.K  : put.K)  - coste;
+  // spread de entrada (coste de cruzar la horquilla, importa mucho en 2 patas)
+  const spreadCall = (isFinite(call.ask)&&isFinite(call.bid)&&cCall>0)?(call.ask-call.bid)/cCall*100:NaN;
+  const spreadPut  = (isFinite(put.ask)&&isFinite(put.bid)&&cPut>0)?(put.ask-put.bid)/cPut*100:NaN;
+
+  return {
+    tipo,
+    call:{K:call.K, bid:call.bid, ask:call.ask, mid:cCall, oi:call.oi},
+    put: {K:put.K,  bid:put.bid,  ask:put.ask,  mid:cPut,  oi:put.oi},
+    coste, costeUSD:coste*100, costePct,
+    beAlza, beBaja,
+    movNecesarioAlza:(beAlza/spot-1)*100,
+    movNecesarioBaja:(1-beBaja/spot)*100,
+    spreadCall, spreadPut, spot
+  };
+}
+
 function gammaBarata(closes, iv, dias, objetivoPct=1.5){
+
   // closes: cierres DIARIOS (ordenados asc). iv: volatilidad implícita (0.26 = 26%).
   // dias: horizonte de la operación (días de calendario del vencimiento).
   if(!closes || closes.length < 60 || !isFinite(iv) || iv<=0 || dias<=0) return null;
@@ -5635,6 +5902,224 @@ function renderAgotamiento(filas){
 
 /* Escáner de prima barata sobre los favoritos: pide IV real del mercado
    y velas diarias, y ordena por dónde la prima está peor puesta. */
+/* Escáner de sesgo direccional sobre los favoritos */
+/* Monta el straddle real: carga la cadena, coge el vencimiento adecuado,
+   suscribe las quotes de las patas y muestra la operación concreta. */
+async function verStraddle(sym, dias, spotRef){
+  const cont=$('gbStraddle');
+  cont.style.display='block';
+  cont.innerHTML='<div class="historia">Cargando la cadena de '+sym+'…</div>';
+  try{
+    const ch=await api('chain',{symbol:sym});
+    const it=(ch&&ch.data&&ch.data.items?ch.data.items:(ch&&ch.items?ch.items:[]));
+    const exps=(it[0]&&it[0].expirations)||[];
+    if(!exps.length){ cont.innerHTML='<div class="caveat">No llegaron vencimientos para '+sym+'.</div>'; return; }
+    // vencimiento más cercano al horizonte
+    let exp=exps[0], dif=Infinity;
+    for(const e of exps){ const d=+e['days-to-expiration']; if(!isFinite(d))continue;
+      const x=Math.abs(d-dias); if(x<dif){dif=x;exp=e;} }
+    const dte=+exp['days-to-expiration'];
+    const strikes=exp.strikes||[];
+    if(!strikes.length){ cont.innerHTML='<div class="caveat">Ese vencimiento no trae strikes.</div>'; return; }
+
+    // suscribir quotes de los strikes cercanos al dinero
+    const cerca=strikes
+      .map(s=>({K:+s['strike-price'], c:s['call-streamer-symbol'], p:s['put-streamer-symbol']}))
+      .filter(s=>isFinite(s.K) && Math.abs(s.K/spotRef-1)<0.12)
+      .sort((a,b)=>Math.abs(a.K-spotRef)-Math.abs(b.K-spotRef)).slice(0,14);
+    if(!cerca.length){ cont.innerHTML='<div class="caveat">No hay strikes cerca del precio.</div>'; return; }
+
+    const dx=new DXLink();
+    await dx.connect(CN.url, CN.key);
+    const q={};
+    dx.onQuote=(s,d)=>{ q[s]={bid:d.bid, ask:d.ask}; };
+    const syms=[];
+    cerca.forEach(s=>{ if(s.c)syms.push(s.c); if(s.p)syms.push(s.p); });
+    dx.subscribe(syms);
+    await new Promise(r=>setTimeout(r,3000));
+    dx.disconnect();
+
+    const rows=[];
+    cerca.forEach(s=>{
+      if(s.c&&q[s.c]) rows.push({K:s.K,type:'C',bid:q[s.c].bid,ask:q[s.c].ask,oi:0});
+      if(s.p&&q[s.p]) rows.push({K:s.K,type:'P',bid:q[s.p].bid,ask:q[s.p].ask,oi:0});
+    });
+    const st=montarStraddle(rows, spotRef, {tipo:'straddle'});
+    const sg=montarStraddle(rows, spotRef, {tipo:'strangle', anchoStrangle:0.04});
+    if(!st){ cont.innerHTML='<div class="caveat">No llegaron precios de las opciones (¿mercado cerrado?). Inténtalo en horario de mercado.</div>'; return; }
+
+    const bloque=(o,nombre)=>o?`
+      <div class="str-card">
+        <div class="str-head">${nombre} · vence en ${dte} días (${exp['expiration-date']||''})</div>
+        <table class="quotes"><tbody>
+          <tr><td class="tk">COMPRAR CALL</td><td class="num">strike ${o.call.K}</td>
+              <td class="num">bid ${o.call.bid?.toFixed(2)} / ask ${o.call.ask?.toFixed(2)}</td>
+              <td class="num"><b>$${(o.call.mid*100).toFixed(0)}</b></td></tr>
+          <tr><td class="tk">COMPRAR PUT</td><td class="num">strike ${o.put.K}</td>
+              <td class="num">bid ${o.put.bid?.toFixed(2)} / ask ${o.put.ask?.toFixed(2)}</td>
+              <td class="num"><b>$${(o.put.mid*100).toFixed(0)}</b></td></tr>
+          <tr><td class="tk"><b>COSTE TOTAL</b></td><td class="num" colspan="2">${o.costePct.toFixed(2)}% del precio</td>
+              <td class="num"><b>$${o.costeUSD.toFixed(0)}</b></td></tr>
+        </tbody></table>
+        <div class="str-be">
+          Ganas si el subyacente <b class="up">sube por encima de ${o.beAlza.toFixed(2)}</b> (+${o.movNecesarioAlza.toFixed(2)}%)
+          o <b class="dn">baja de ${o.beBaja.toFixed(2)}</b> (−${o.movNecesarioBaja.toFixed(2)}%) al vencimiento.
+          Antes del vencimiento ganas mucho antes, porque las opciones conservan valor temporal.
+        </div>
+      </div>`:'';
+
+    cont.innerHTML=`<h2 style="margin-top:18px">Operación montada · ${sym}<span class="sub">precio ${spotRef.toFixed(2)}</span></h2>
+      ${bloque(st,'STRADDLE (mismo strike, más caro y más sensible)')}
+      ${bloque(sg,'STRANGLE (strikes separados, más barato, necesita más movimiento)')}
+      <div class="historia" style="font-size:12.5px;margin-top:10px">
+        Precios de mercado en vivo (mid entre bid y ask). El coste real de entrada será algo peor
+        por la horquilla — con dos patas la pagas dos veces, así que en valores poco líquidos esto
+        se come parte de la ventaja. <b>Riesgo máximo = la prima pagada</b> ($${st.costeUSD.toFixed(0)} por contrato).
+      </div>`;
+  }catch(e){
+    cont.innerHTML='<div class="caveat">Error montando la operación: '+(e.message||e)+'</div>';
+  }
+}
+
+async function scanDireccional(){
+  if(!CN.url||!CN.key){
+    const m=$('dirMsg'); m.style.display='block';
+    m.innerHTML='Necesito el acceso a datos configurado (Mi cuenta → Configurar acceso).'; return;
+  }
+  const favs=getFavs();
+  if(!favs.length){
+    const m=$('dirMsg'); m.style.display='block';
+    m.innerHTML='Añade tickers a <b>Favoritos</b> arriba primero.'; return;
+  }
+  const hor=+(($('dirHor')&&$('dirHor').value)||6);
+  $('dirBtn').disabled=true; $('dirBtn').textContent='Midiendo…';
+  $('dirEmpty').style.display='none';
+  $('dirMsg').style.display='block'; $('dirMsg').textContent='Descargando velas diarias y de 4h de '+favs.length+' valores…';
+  try{
+    const dx=new DXLink();
+    await dx.connect(CN.url, CN.key);
+    const vD={}, vH={};
+    dx.onCandle=(sym,c)=>{
+      const base=sym.split('{')[0];
+      const tf=(sym.match(/\{=(\w+)\}/)||[])[1]||'d';
+      const dest = (tf==='d') ? vD : vH;
+      (dest[base]=dest[base]||[]).push(c);
+    };
+    favs.forEach(s=>dx.subscribeCandles(s, 400, 'd'));
+    favs.forEach(s=>dx.subscribeCandles(s, 180, '4h'));
+    await new Promise(r=>setTimeout(r, 7000));
+    dx.disconnect();
+
+    const filas=[];
+    for(const s of favs){
+      const dia=(vD[s]||[]).sort((a,b)=>a.time-b.time).filter(c=>isFinite(c.close)&&c.close>0);
+      const h4=(vH[s]||[]).sort((a,b)=>a.time-b.time).filter(c=>isFinite(c.close)&&c.close>0);
+      if(dia.length<40||h4.length<60){ filas.push({sym:s, err:'pocas velas (D:'+dia.length+' 4h:'+h4.length+')'}); continue; }
+      const r=alineacionMTF(dia,h4,{horizonte:hor, objetivoPct:1.5});
+      if(!r){ filas.push({sym:s, err:'no se pudo calcular'}); continue; }
+      const meta=STOCK_META[s]||[s,'—'];
+      filas.push({sym:s, nombre:meta[0], ...r});
+    }
+    // primero los que tienen estado activo ahora
+    filas.sort((a,b)=>{
+      if(a.err&&b.err) return 0; if(a.err) return 1; if(b.err) return -1;
+      const ea=a.estadoActual?1:0, eb=b.estadoActual?1:0;
+      if(ea!==eb) return eb-ea;
+      const sa=a.estadoActual?(a.stats[a.estadoActual]||{}).pAcierto||0:0;
+      const sb=b.estadoActual?(b.stats[b.estadoActual]||{}).pAcierto||0:0;
+      return sb-sa;
+    });
+    renderDireccional(filas, hor);
+  }catch(e){
+    $('dirMsg').style.display='block'; $('dirMsg').innerHTML='Error: '+(e.message||e);
+  }
+  $('dirBtn').disabled=false; $('dirBtn').textContent='Medir mi hipótesis';
+}
+
+function renderDireccional(filas, hor){
+  $('dirOut').style.display='block';
+  const t=$('dirTable');
+  const ETQ={compra:'🟢 COMPRA (sale de sobreventa)', venta:'🔴 VENTA (sale de sobrecompra)',
+             alcista:'🟢 alcista (continuación)', bajista:'🔴 bajista (continuación)'};
+  let html='<thead><tr><th>Valor</th><th>RSI D / 4h</th><th>Estado ahora</th><th>Acierto</th><th>P(1,5%)</th><th>Ret. medio</th><th>Casos</th></tr></thead><tbody>';
+  for(const f of filas){
+    if(f.err){ html+=`<tr><td class="tk"><b>${f.sym}</b></td><td class="mute" colspan="6">${f.err}</td></tr>`; continue; }
+    const e=f.estadoActual;
+    const s=e?(f.stats[e]||null):null;
+    const esAlc=e==='compra'||e==='alcista';
+    const cls=!e?'mute':(esAlc?'up':'dn');
+    const fiable=s&&s.n>=30;
+    const paCls=!fiable?'mute':s.pAcierto>0.55?'up':s.pAcierto<0.45?'dn':'mute';
+    html+=`<tr onclick="srGoChain('${f.sym}')">
+      <td class="tk"><b>${f.sym}</b><br><span class="mute" style="font-size:11px">${f.nombre}</span></td>
+      <td class="num">${isFinite(f.rsiDiario)?f.rsiDiario.toFixed(0):'—'} / ${isFinite(f.rsiH4)?f.rsiH4.toFixed(0):'—'}</td>
+      <td class="${cls}" style="font-size:12px">${e?('<b>'+ETQ[e]+'</b>'):'<span class="mute">sin alineación</span>'}</td>
+      <td class="num ${paCls}">${s?'<b>'+(s.pAcierto*100).toFixed(0)+'%</b>':'—'}</td>
+      <td class="num">${s?(s.pObjetivo*100).toFixed(0)+'%':'—'}</td>
+      <td class="num ${s&&s.retMedio>0?'up':'dn'}">${s?((s.retMedio>=0?'+':'')+s.retMedio.toFixed(2)+'%'):'—'}</td>
+      <td class="num ${fiable?'mute':'dn'}">${s?s.n+(fiable?'':' ⚠'):'—'}</td>
+    </tr>`;
+    // desglose de TODOS los estados de ese valor (el veredicto de tu hipótesis)
+    if(f.stats && Object.keys(f.stats).length){
+      const det=Object.keys(f.stats).map(k=>{
+        const st=f.stats[k];
+        const ok=st.n>=30;
+        const col=!ok?'mute':st.pAcierto>0.55?'up':st.pAcierto<0.45?'dn':'mute';
+        return `<span class="${col}">${k}: ${(st.pAcierto*100).toFixed(0)}% (${st.n})</span>`;
+      }).join(' · ');
+      html+=`<tr><td colspan="7" class="mute" style="font-size:11.5px;padding-top:0">↳ histórico: ${det}</td></tr>`;
+    }
+  }
+  html+='</tbody>';
+  t.innerHTML=html;
+
+  // VEREDICTO GLOBAL sobre la hipótesis: agregamos todos los valores
+  const tot={};
+  for(const f of filas){
+    if(f.err||!f.stats) continue;
+    for(const k in f.stats){
+      const s=f.stats[k];
+      if(!tot[k]) tot[k]={n:0,aciertos:0,objetivo:0,suma:0};
+      tot[k].n+=s.n; tot[k].aciertos+=s.aciertos; tot[k].objetivo+=s.objetivo; tot[k].suma+=s.suma;
+    }
+  }
+  let vered='';
+  const compra=tot.compra, alcista=tot.alcista;
+  const lineas=[];
+  for(const k of ['compra','venta','alcista','bajista']){
+    const s=tot[k]; if(!s||!s.n) continue;
+    const pa=s.aciertos/s.n*100, ret=s.suma/s.n;
+    const fiable=s.n>=100;
+    const juicio = !fiable ? '⚠ pocos casos' : pa>57 ? '✅ ventaja real' : pa>52 ? '➖ ligera ventaja' : pa<48 ? '❌ va en contra' : '➖ moneda al aire';
+    lineas.push(`<b>${k}</b>: ${pa.toFixed(1)}% acierto · retorno medio ${ret>=0?'+':''}${ret.toFixed(2)}% · ${s.n} casos → ${juicio}`);
+  }
+  const m=$('dirMsg'); m.style.display='block';
+  m.innerHTML = lineas.length
+    ? '<b>Veredicto sobre tu hipótesis</b> (todos tus favoritos juntos, horizonte '+hor+' velas de 4h):<br>'+lineas.join('<br>')+
+      '<br><span style="font-size:12px">50% = moneda al aire (la señal no aporta). Por encima de 57% con 100+ casos, hay ventaja real.</span>'
+    : 'No se pudo medir: faltan datos. Revisa que lleguen velas de 4h de tus favoritos.';
+}
+
+/* Montador de straddle: carga la cadena real del ticker y arma la operación */
+async function montarStraddleUI(sym, diasObjetivo){
+  try{
+    const [ch] = await Promise.all([api('chain',{symbol:sym})]);
+    const it=(ch?.data?.items||ch?.items||[]);
+    const exps=(it[0]?.expirations)||[];
+    if(!exps.length) return null;
+    // vencimiento más cercano al horizonte pedido
+    const target=diasObjetivo||30;
+    let mejor=exps[0], mejorDif=Infinity;
+    for(const e of exps){
+      const d=+e['days-to-expiration'];
+      if(!isFinite(d)) continue;
+      const dif=Math.abs(d-target);
+      if(dif<mejorDif){ mejorDif=dif; mejor=e; }
+    }
+    return { exp:mejor, dte:+mejor['days-to-expiration'], fecha:mejor['expiration-date'], strikes:mejor.strikes||[] };
+  }catch(e){ return null; }
+}
+
 async function scanGammaBarata(){
   if(!CN.url||!CN.key){
     const m=$('gbMsg'); m.style.display='block';
@@ -5699,9 +6184,9 @@ function renderGammaBarata(filas, dias){
   $('gbOut').style.display='block';
   const t=$('gbTable');
   const buenas=filas.filter(f=>!f.err&&f.ventajaPct>0).length;
-  t.innerHTML='<thead><tr><th>Valor</th><th>Necesitas</th><th>Se mueve</th><th>Ventaja</th><th>P(1,5%)</th><th>IV / RV</th></tr></thead><tbody>'+
+  t.innerHTML='<thead><tr><th>Valor</th><th>Necesitas</th><th>Se mueve</th><th>Ventaja</th><th>P(1,5%)</th><th>IV / RV</th><th></th></tr></thead><tbody>'+
     filas.map(f=>{
-      if(f.err) return `<tr><td class="tk"><b>${f.sym}</b></td><td class="mute" colspan="5">${f.err}</td></tr>`;
+      if(f.err) return `<tr><td class="tk"><b>${f.sym}</b></td><td class="mute" colspan="6">${f.err}</td></tr>`;
       const cls = f.ventajaPct>0.15?'up':f.ventajaPct<-0.15?'dn':'mute';
       const ivrCls = f.ivRvRatio<0.95?'up':f.ivRvRatio>1.15?'dn':'mute';
       return `<tr onclick="srGoChain('${f.sym}')">
@@ -5711,6 +6196,7 @@ function renderGammaBarata(filas, dias){
         <td class="num ${cls}"><b>${f.ventajaPct>=0?'+':''}${f.ventajaPct.toFixed(2)}%</b><br><span class="mute" style="font-size:11px">${f.ventajaPct>0.15?'prima barata':f.ventajaPct<-0.15?'prima cara':'justa'}</span></td>
         <td class="num">${(f.pObjetivo*100).toFixed(0)}%</td>
         <td class="num ${ivrCls}">${f.ivRvRatio.toFixed(2)}<br><span class="mute" style="font-size:11px">${f.iv.toFixed(0)}/${f.rv.toFixed(0)}</span></td>
+        <td><button class="btn quiet sm" onclick="event.stopPropagation();verStraddle('${f.sym}',${dias},${f.spot})">Montar</button></td>
       </tr>`;
     }).join('')+'</tbody>';
 
