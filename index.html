@@ -571,6 +571,49 @@ summary:hover{color:var(--ink)}
       los extremos de sobreventa y sobrecompra listos para operar.
     </div>
 
+    <section class="blk" style="margin-top:22px">
+      <h2>💎 Prima mal puesta<span class="sub">dónde el mercado infravalora el movimiento</span></h2>
+      <div class="historia" style="font-size:13.5px;margin-bottom:12px">
+        <p><b>Aquí no se adivina la dirección.</b> Se busca dónde el mercado de opciones está
+        <b>cobrando poco</b> por el movimiento que ese valor suele hacer. Si compras un straddle
+        (call+put al mismo strike), ganas si se mueve fuerte <b>en cualquier sentido</b> — que es
+        justo lo que necesitas.</p>
+        <p style="margin-top:6px">Para cada valor calculo el <b>movimiento que necesitas para empatar</b>
+        (lo que cuesta la prima) y lo comparo con <b>cuánto se ha movido de verdad</b> en su histórico.
+        Si se mueve más de lo que cuesta, la prima está barata y comprar volatilidad tiene ventaja.</p>
+      </div>
+
+      <div class="fav-block">
+        <div class="fav-lbl">Tus favoritos <span class="mute">(los que analiza)</span></div>
+        <div class="fav-row" id="favRow"></div>
+      </div>
+
+      <div class="btns" style="margin-bottom:6px">
+        <button class="btn solid" id="gbBtn" onclick="scanGammaBarata()">Buscar prima barata</button>
+        <select id="gbDias" class="btn quiet" style="padding:8px">
+          <option value="2">Horizonte: 2 días</option>
+          <option value="5" selected>Horizonte: 5 días</option>
+          <option value="10">Horizonte: 10 días</option>
+          <option value="30">Horizonte: 30 días</option>
+        </select>
+      </div>
+      <div class="caveat" id="gbMsg" style="display:none"></div>
+      <div id="gbOut" style="display:none"><div class="scrollx"><table class="quotes" id="gbTable"></table></div>
+        <div class="historia" style="font-size:12.5px;margin-top:10px">
+          <b>Necesitas</b> = cuánto tiene que moverse (arriba o abajo) para empatar con la prima.
+          <b>Se mueve</b> = cuánto se mueve de media en la realidad, ese plazo.
+          <b>Ventaja</b> = la diferencia: positiva significa que históricamente el movimiento
+          superó lo que cuesta la prima. <b>P(1,5%)</b> = con qué frecuencia hizo tu 1,5%.
+          <b>IV/RV</b> = implícita entre realizada; por debajo de 1, la prima está barata.
+        </div>
+      </div>
+      <div class="empty" id="gbEmpty">
+        <strong>Buscador de prima barata</strong>
+        Añade tickers arriba y pulsa <b>Buscar prima barata</b>. Te ordeno los valores por
+        dónde el mercado está pagando de menos por el movimiento — sin necesidad de acertar la dirección.
+      </div>
+    </section>
+
   </div>
 
   <!-- ═══════════ MI CUENTA ═══════════ -->
@@ -5148,7 +5191,66 @@ async function agWatchTick(){
    estadísticas honestas: nº de señales, aciertos, fallos, y la
    esperanza matemática por trade. SIN promesas: son TUS datos.
    ═══════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════
+   MOTOR "GAMMA BARATA" · ¿el mercado infravalora el movimiento?
+
+   La idea, que es la buena: NO intentamos adivinar la dirección
+   (eso es imposible). Medimos si el mercado de opciones está
+   COBRANDO POCO por el movimiento que ese valor suele hacer.
+
+   · Coste de entrada (breakeven): un straddle ATM cuesta ≈
+     0,8·S·σ·√T. Ese es el % que el subyacente TIENE que moverse
+     (en cualquier dirección) para que empates.
+   · Realidad histórica: en ventanas del mismo plazo, ¿cuántas
+     veces se movió MÁS que eso? ¿y cuánto de media?
+   · Si el movimiento real medio supera el breakeven, comprar
+     volatilidad tiene esperanza POSITIVA — sin adivinar el sentido.
+
+   Esto es lo que hacen las mesas de volatilidad. No es magia:
+   es detectar prima mal puesta y medirla con datos.
+   ═══════════════════════════════════════════════════════════════ */
+function gammaBarata(closes, iv, dias, objetivoPct=1.5){
+  // closes: cierres DIARIOS (ordenados asc). iv: volatilidad implícita (0.26 = 26%).
+  // dias: horizonte de la operación (días de calendario del vencimiento).
+  if(!closes || closes.length < 60 || !isFinite(iv) || iv<=0 || dias<=0) return null;
+
+  const T = dias/365;
+  // Precio del straddle ATM ≈ 0.7979·S·σ·√T (fórmula de Brenner-Subrahmanyam).
+  // Como % del spot, ese es el movimiento que necesitas para empatar.
+  const breakevenPct = 0.7979 * iv * Math.sqrt(T) * 100;
+
+  // Movimiento REAL histórico en ventanas del mismo nº de días de mercado.
+  const barras = Math.max(1, Math.round(dias * 252/365));   // días de mercado ≈ calendario × 252/365
+  const movs=[];
+  for(let i=barras; i<closes.length; i++){
+    const r = Math.abs(closes[i]/closes[i-barras] - 1) * 100;
+    if(isFinite(r)) movs.push(r);
+  }
+  if(movs.length < 20) return null;
+
+  const n = movs.length;
+  const medio = movs.reduce((a,b)=>a+b,0)/n;                    // movimiento medio real (%)
+  const pSupera = movs.filter(m=>m>breakevenPct).length/n;      // % de veces que supera el breakeven
+  const pObjetivo = movs.filter(m=>m>=objetivoPct).length/n;    // % de veces que hace tu 1,5%
+  const mediana = [...movs].sort((a,b)=>a-b)[Math.floor(n/2)];
+
+  // Ventaja aproximada del comprador de straddle: lo que se mueve de media
+  // menos lo que pagas. Positivo = la prima está barata para ese movimiento.
+  const ventajaPct = medio - breakevenPct;
+  // Volatilidad realizada anualizada (para comparar con la implícita)
+  const rets=[];
+  for(let i=1;i<closes.length;i++) rets.push(Math.log(closes[i]/closes[i-1]));
+  const m0=rets.reduce((a,b)=>a+b,0)/rets.length;
+  const v0=rets.reduce((a,b)=>a+(b-m0)*(b-m0),0)/Math.max(rets.length-1,1);
+  const rv = Math.sqrt(v0*252);                                  // realizada anualizada
+  const ivRvRatio = rv>0 ? iv/rv : NaN;                          // <1 = implícita barata vs real
+
+  return { breakevenPct, medio, mediana, pSupera, pObjetivo, ventajaPct,
+           rv:rv*100, iv:iv*100, ivRvRatio, muestras:n, barras };
+}
+
 function backtestAgotamiento(candles, opts={}){
+
   const objMode = opts.objMode || 'vwap';
   const objPct = opts.objPct ?? 0.015;
   const stopATR = opts.stopATR ?? 1.5;
@@ -5529,6 +5631,99 @@ function renderAgotamiento(filas){
       <td class="tk" style="font-size:12px">${recomienda(r)}</td>
       <td class="num">$${r.objetivo2.toFixed(2)}<br><span class="mute" style="font-size:11px">VWAP · ${r.recorridoPct.toFixed(1)}%</span></td>
     </tr>`).join('')+'</tbody>';
+}
+
+/* Escáner de prima barata sobre los favoritos: pide IV real del mercado
+   y velas diarias, y ordena por dónde la prima está peor puesta. */
+async function scanGammaBarata(){
+  if(!CN.url||!CN.key){
+    const m=$('gbMsg'); m.style.display='block';
+    m.innerHTML='Necesito el acceso a datos configurado (Mi cuenta → Configurar acceso).'; return;
+  }
+  const favs=getFavs();
+  if(!favs.length){
+    const m=$('gbMsg'); m.style.display='block';
+    m.innerHTML='Añade tickers a <b>Favoritos</b> arriba primero.'; return;
+  }
+  const dias = +(($('gbDias')&&$('gbDias').value) || 5);
+  $('gbBtn').disabled=true; $('gbBtn').textContent='Analizando…';
+  $('gbEmpty').style.display='none';
+  $('gbMsg').style.display='block'; $('gbMsg').textContent='Pidiendo volatilidad implícita e histórico de '+favs.length+' valores…';
+
+  try{
+    // 1) IV real del mercado por ticker (métricas de tastytrade)
+    const mets={};
+    for(const s of favs){
+      try{
+        const m=await api('metrics',{symbol:s});
+        mets[s]=(m&&m.data&&m.data.items?m.data.items:(m&&m.items?m.items:[]))[0]||null;
+      }catch(e){ mets[s]=null; }
+    }
+    // 2) velas diarias para el movimiento real histórico
+    const dx=new DXLink();
+    await dx.connect(CN.url, CN.key);
+    const velas={};
+    dx.onCandle=(sym,c)=>{ const b=sym.split('{')[0]; (velas[b]=velas[b]||[]).push(c); };
+    favs.forEach(s=>dx.subscribeCandles(s, 400, 'd'));
+    await new Promise(r=>setTimeout(r, 5000));
+    dx.disconnect();
+
+    // 3) calcular
+    const filas=[];
+    for(const s of favs){
+      const cs=(velas[s]||[]).sort((a,b)=>a.time-b.time);
+      const closes=cs.map(c=>c.close).filter(x=>isFinite(x)&&x>0);
+      const m=mets[s];
+      let iv = m ? parseFloat(m['implied-volatility-index']) : NaN;
+      if(isFinite(iv) && iv>3) iv/=100;                 // 26.1 → 0.261
+      let ivRank = m ? parseFloat(m['implied-volatility-index-rank']) : NaN;
+      if(isFinite(ivRank) && ivRank>1.5) ivRank/=100;
+      if(!isFinite(iv) || closes.length<60){ filas.push({sym:s, err: !isFinite(iv)?'sin IV del mercado':'pocas velas ('+closes.length+')'}); continue; }
+      const g = gammaBarata(closes, iv, dias, 1.5);
+      if(!g){ filas.push({sym:s, err:'no se pudo calcular'}); continue; }
+      const meta=STOCK_META[s]||[s,'—'];
+      filas.push({sym:s, nombre:meta[0], ivRank, spot:closes[closes.length-1], ...g});
+    }
+    filas.sort((a,b)=>{
+      if(a.err&&b.err) return 0; if(a.err) return 1; if(b.err) return -1;
+      return b.ventajaPct-a.ventajaPct;
+    });
+    renderGammaBarata(filas, dias);
+  }catch(e){
+    $('gbMsg').style.display='block'; $('gbMsg').innerHTML='Error: '+(e.message||e);
+  }
+  $('gbBtn').disabled=false; $('gbBtn').textContent='Buscar prima barata';
+}
+
+function renderGammaBarata(filas, dias){
+  $('gbOut').style.display='block';
+  const t=$('gbTable');
+  const buenas=filas.filter(f=>!f.err&&f.ventajaPct>0).length;
+  t.innerHTML='<thead><tr><th>Valor</th><th>Necesitas</th><th>Se mueve</th><th>Ventaja</th><th>P(1,5%)</th><th>IV / RV</th></tr></thead><tbody>'+
+    filas.map(f=>{
+      if(f.err) return `<tr><td class="tk"><b>${f.sym}</b></td><td class="mute" colspan="5">${f.err}</td></tr>`;
+      const cls = f.ventajaPct>0.15?'up':f.ventajaPct<-0.15?'dn':'mute';
+      const ivrCls = f.ivRvRatio<0.95?'up':f.ivRvRatio>1.15?'dn':'mute';
+      return `<tr onclick="srGoChain('${f.sym}')">
+        <td class="tk"><b>${f.sym}</b><br><span class="mute" style="font-size:11px">${f.nombre}</span></td>
+        <td class="num">${f.breakevenPct.toFixed(2)}%<br><span class="mute" style="font-size:11px">para empatar</span></td>
+        <td class="num">${f.medio.toFixed(2)}%<br><span class="mute" style="font-size:11px">media real</span></td>
+        <td class="num ${cls}"><b>${f.ventajaPct>=0?'+':''}${f.ventajaPct.toFixed(2)}%</b><br><span class="mute" style="font-size:11px">${f.ventajaPct>0.15?'prima barata':f.ventajaPct<-0.15?'prima cara':'justa'}</span></td>
+        <td class="num">${(f.pObjetivo*100).toFixed(0)}%</td>
+        <td class="num ${ivrCls}">${f.ivRvRatio.toFixed(2)}<br><span class="mute" style="font-size:11px">${f.iv.toFixed(0)}/${f.rv.toFixed(0)}</span></td>
+      </tr>`;
+    }).join('')+'</tbody>';
+
+  const cab=$('gbMsg');
+  if(buenas===0){
+    cab.style.display='block';
+    cab.innerHTML='<b>Ninguno con prima barata a '+dias+' días.</b> Es un resultado válido y frecuente: '+
+      'el mercado suele cobrar de más por la volatilidad (por eso vender primas funciona tan a menudo). '+
+      'Prueba otro horizonte — la prima barata aparece cuando la IV está baja y el valor sigue movido.';
+  } else {
+    cab.style.display='block';
+    cab.innerHTML='<b>'+buenas+' valor(es) con prima barata a '+dias+' días.</b> En esos, históricamente el movimiento superó lo que cuesta la prima. Pincha para ver su cadena.';
+  }
 }
 
 async function scanStochRSI(){
