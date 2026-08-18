@@ -6481,20 +6481,31 @@ async function gexDeTicker(sym){
   await dx.connect(CN.url, CN.key);
   const gre={}, sumRaw={};
   dx.onGreeks=(s,g)=>{ gre[s]=g; };
-  dx.onSummary=(s,d)=>{ if(d && isFinite(d.openInterest)) sumRaw[s]=d.openInterest; };
+  dx.onSummary=(s,d)=>{ if(d && isFinite(d.oi)) sumRaw[s]=d.oi; };
   dx.subscribe(syms);
-  await new Promise(r=>setTimeout(r, 4000));
+  await new Promise(r=>setTimeout(r, 7000));   // decenas de contratos: hace falta margen
   dx.disconnect();
 
   const rows=[];
+  let conGamma=0, conOI=0;
   for(const s of syms){
     const m=meta[s]; if(!m) continue;
     const g=gre[s];
     const oi = isFinite(sumRaw[s])?sumRaw[s]:(isFinite(ois[s])?ois[s]:NaN);
+    if(g && isFinite(g.gamma)) conGamma++;
+    if(isFinite(oi) && oi>0) conOI++;
     if(!g || !isFinite(g.gamma) || !isFinite(oi) || oi<=0) continue;
     rows.push({K:m.K, type:m.type, gamma:g.gamma, oi});
   }
-  if(rows.length<6) return {sym, err:'faltan datos de gamma/OI ('+rows.length+' contratos)'};
+  if(rows.length<6){
+    // Diagnóstico concreto: decir QUÉ falta, no un error genérico
+    let det;
+    if(conGamma===0 && conOI===0) det='no llegó ni gamma ni open interest de '+syms.length+' contratos. Suele pasar con el mercado cerrado: las griegas se calculan en vivo.';
+    else if(conGamma===0) det='llegó open interest ('+conOI+') pero NO las griegas. Con el mercado cerrado dxfeed no publica gamma.';
+    else if(conOI===0) det='llegaron griegas ('+conGamma+') pero NO el open interest. El OI se publica una vez al día tras el cierre.';
+    else det='solo '+rows.length+' contratos completos (gamma '+conGamma+', OI '+conOI+') de '+syms.length+'.';
+    return {sym, err:det};
+  }
 
   const gex=calcularGEX(rows, spot);
   if(!gex) return {sym, err:'no se pudo calcular'};
