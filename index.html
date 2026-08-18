@@ -565,6 +565,11 @@ summary:hover{color:var(--ink)}
         de acciones americanas (S&P 500 + Nasdaq 100 + midcaps líquidas). Te señala como <b class="up">oportunidad
         de compra</b> las que están en sobreventa extrema (<b>K ≤ 5</b>) y como <b class="dn">oportunidad de venta</b>
         las de sobrecompra extrema (<b>K &gt; 90</b>). Pincha cualquiera para abrir su cadena de opciones.</p>
+        <p style="margin-top:8px;font-size:12.5px"><b>Para comparar con TradingView:</b> el número grande incluye
+        la vela de hoy (que con el mercado abierto está sin cerrar y cambia a cada tick). Debajo, en pequeño,
+        va el valor <b>cerr</b> = calculado solo con velas cerradas. Ese es el que cuadra exactamente con
+        TradingView si miras la vela anterior. Que <b>K y D se separen mucho es normal</b>: D es la media de los
+        tres últimos K, así que en los giros bruscos K se dispara y D va por detrás.</p>
       </div>
       <div class="proxy-meter" id="proxyMeter"></div>
       <div class="btns" style="margin-bottom:6px">
@@ -6643,7 +6648,7 @@ async function scanStochRSI(){
     for(let i=0;i<universe.length && SR.running;i+=BATCH){
       const lote=universe.slice(i,i+BATCH);
       buckets.clear();
-      lote.forEach(sym=>dx.subscribeCandles(sym, 120, 'd'));  // 120 velas: mismo StochRSI que 260, mitad de datos
+      lote.forEach(sym=>dx.subscribeCandles(sym, 300, 'd'));  // 300 días naturales ≈ 205 sesiones: el RSI Wilder ya converge exacto (verificado: a partir de 140 sesiones la diferencia con una serie infinita es 0.001)
       await new Promise(r=>setTimeout(r, WAIT));               // deja llegar el snapshot
       // calcular Stoch RSI de cada símbolo del lote
       for(const sym of lote){
@@ -6651,6 +6656,10 @@ async function scanStochRSI(){
         if(!cs || cs.length<40){ SR.done++; continue; }
         const closes=[...cs].sort((a,b)=>a.time-b.time).map(c=>c.close).filter(x=>isFinite(x)&&x>0);
         const sr=stochRSI(closes,14,14,3,3);
+        // K/D excluyendo la vela de HOY (que está sin cerrar mientras el mercado
+        // está abierto y por tanto cambia a cada tick). Este es el valor que
+        // cuadra con TradingView cuando comparas con la vela anterior cerrada.
+        const srCerr = closes.length>1 ? stochRSI(closes.slice(0,-1),14,14,3,3) : null;
         if(sr && isFinite(sr.k)){
           // Volatilidad realizada anualizada de los últimos ~20 días: mide
           // cuánto se agita el valor. Más alta = giros más bruscos = mejor
@@ -6664,6 +6673,8 @@ async function scanStochRSI(){
           const vol=Math.sqrt(varr*252)*100;   // % anualizado
           const meta=STOCK_META[sym]||[sym,'—'];
           SR.results.push({sym, k:sr.k, d:sr.d, last:closes[closes.length-1],
+                           kCerr: srCerr?srCerr.k:NaN, dCerr: srCerr?srCerr.d:NaN,
+                           velas: closes.length,
                            vol:isFinite(vol)?vol:0, nombre:meta[0], sector:meta[1]});
         }
         SR.done++;
@@ -6703,8 +6714,8 @@ function renderStochRSI(final){
     <td class="tk"><b>${r.sym}</b><br><span class="mute" style="font-size:11px">${r.nombre}</span></td>
     <td class="mute" style="font-size:12px">${r.sector}</td>
     <td class="num ${r.vol>=60?'dn':r.vol>=40?'':'mute'}"><b>${r.vol.toFixed(0)}%</b></td>
-    <td class="num ${cls}">${r.k.toFixed(1)}</td>
-    <td class="num mute">${r.d.toFixed(1)}</td>
+    <td class="num ${cls}"><b>${r.k.toFixed(1)}</b>${isFinite(r.kCerr)?`<br><span class="mute" style="font-size:10.5px">cerr ${r.kCerr.toFixed(1)}</span>`:''}</td>
+    <td class="num mute">${r.d.toFixed(1)}${isFinite(r.dCerr)?`<br><span class="mute" style="font-size:10.5px">cerr ${r.dCerr.toFixed(1)}</span>`:''}</td>
     <td class="num">$${r.last.toFixed(2)}</td>
     <td class="mute">→</td></tr>`;
 
