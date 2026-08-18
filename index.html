@@ -318,6 +318,30 @@ details[open]>.adv-summary::before{content:"▾ "}
 .bt-verdict{margin-top:12px;padding:12px 14px;border-radius:8px;font-weight:600;font-size:14px;background:var(--card2,rgba(255,255,255,.03));border:1px solid var(--rule2)}
 .bt-verdict.up{border-color:var(--bull,#3fb950)}.bt-verdict.dn{border-color:var(--bear,#f85149)}
 @media(max-width:600px){.bt-grid{grid-template-columns:repeat(2,1fr)}}
+.gx-setup{margin-bottom:12px;padding:11px 13px;border-radius:8px;border:1px solid var(--rule2);background:rgba(255,255,255,.02)}
+.gx-setup.up{border-color:var(--bull,#3fb950);background:rgba(63,185,80,.07)}
+.gx-setup.dn{border-color:var(--bear,#f85149);background:rgba(248,81,73,.07)}
+.gx-setup-h{font-family:var(--body);font-size:14px;font-weight:700;margin-bottom:7px}
+.gx-setup-b{font-family:var(--body);font-size:12.5px;color:var(--ink2);line-height:1.55;margin-top:5px}
+.gx-stars{font-size:12px;color:var(--ink3);letter-spacing:1px}
+.gx-tag{font-size:9px;padding:1px 4px;border-radius:3px;background:var(--rule2);color:var(--ink3);vertical-align:middle}
+.gx-tag.up{color:var(--bull,#3fb950)}.gx-tag.dn{color:var(--bear,#f85149)}
+.gx-card{margin:14px 0;padding:14px;background:var(--card2,rgba(255,255,255,.03));border:1px solid var(--rule2);border-radius:10px}
+.gx-title{font-size:15px;margin-bottom:8px}
+.gx-regime{font-family:var(--body);font-size:13px;font-weight:700;padding:8px 10px;border-radius:6px;margin-bottom:10px;border:1px solid var(--rule2)}
+.gx-regime.up{color:var(--bull,#3fb950)}.gx-regime.dn{color:var(--bear,#f85149)}
+.gx-levels{display:grid;gap:5px;margin-bottom:10px;font-family:var(--body);font-size:12.5px}
+.gx-lbl{color:var(--ink3);margin-right:8px}
+.gx-val{font-family:var(--num);font-weight:700}
+.gx-read{font-family:var(--body);font-size:12.5px;color:var(--ink2);line-height:1.5;padding:9px 11px;background:rgba(255,255,255,.02);border-radius:6px;margin-bottom:10px}
+.gx-bars{display:flex;flex-direction:column;gap:2px}
+.gx-row{display:flex;align-items:center;gap:6px;font-family:var(--num);font-size:11px}
+.gx-row.gx-now{background:rgba(255,255,255,.06);border-radius:3px}
+.gx-k{width:58px;text-align:right;color:var(--ink3)}
+.gx-track{flex:1;height:9px;background:var(--rule2);border-radius:3px;overflow:hidden}
+.gx-fill{display:block;height:100%}
+.gx-fill.up{background:var(--bull,#3fb950)}.gx-fill.dn{background:var(--bear,#f85149)}
+.gx-v{width:56px;text-align:right}
 .str-card{margin:14px 0;padding:14px;background:var(--card2,rgba(255,255,255,.03));border:1px solid var(--rule2);border-radius:10px}
 .str-head{font-family:var(--body);font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ink2);margin-bottom:10px}
 .str-be{font-family:var(--body);font-size:12.5px;color:var(--ink2);margin-top:10px;line-height:1.5}
@@ -573,17 +597,22 @@ summary:hover{color:var(--ink)}
       su Stoch RSI en directo. Tarda un poco (son cientos de valores), pero te deja solo lo que importa:
       los extremos de sobreventa y sobrecompra listos para operar.
     </div>
-
     <section class="blk" style="margin-top:22px">
-      <h2>💎 Prima mal puesta<span class="sub">dónde el mercado infravalora el movimiento</span></h2>
+      <h2>⚖️ Desequilibrio de gamma (GEX)<span class="sub">lo que los dealers están OBLIGADOS a hacer</span></h2>
       <div class="historia" style="font-size:13.5px;margin-bottom:12px">
-        <p><b>Aquí no se adivina la dirección.</b> Se busca dónde el mercado de opciones está
-        <b>cobrando poco</b> por el movimiento que ese valor suele hacer. Si compras un straddle
-        (call+put al mismo strike), ganas si se mueve fuerte <b>en cualquier sentido</b> — que es
-        justo lo que necesitas.</p>
-        <p style="margin-top:6px">Para cada valor calculo el <b>movimiento que necesitas para empatar</b>
-        (lo que cuesta la prima) y lo comparo con <b>cuánto se ha movido de verdad</b> en su histórico.
-        Si se mueve más de lo que cuesta, la prima está barata y comprar volatilidad tiene ventaja.</p>
+        <p>Esto no es un indicador más. Los indicadores (RSI, MACD, medias) son todos funciones del
+        precio pasado — mezclarlos no añade información nueva. Esto es un <b>desequilibrio estructural</b>:
+        quien te vende las opciones tiene que cubrirse comprando o vendiendo acciones, y esa operativa
+        es <b>mecánica</b>. No la elige: su posición se la impone.</p>
+        <p style="margin-top:6px">
+        <b class="dn">GEX negativo</b> → los dealers <b>amplifican</b>: compran en subidas y venden en caídas.
+        Los movimientos se aceleran y llegan más lejos. Es el régimen donde comprar opciones funciona.<br>
+        <b class="up">GEX positivo</b> → los dealers <b>amortiguan</b>: el precio se imana al strike de más gamma
+        y se queda en rango. Malo para comprar, bueno para vender primas.</p>
+        <p class="caveat" style="margin-top:8px"><b>Honestidad:</b> el posicionamiento de los dealers se
+        <b>estima</b> — el dato público no dice quién tiene cada lado. Y el GEX describe el <b>régimen y los
+        niveles clave</b>, no una flecha mágica de dirección. Pero es la única "descompensación" real que
+        puedes calcular con tus datos, y sí condiciona el corto plazo.</p>
       </div>
 
       <div class="fav-block">
@@ -592,70 +621,22 @@ summary:hover{color:var(--ink)}
       </div>
 
       <div class="btns" style="margin-bottom:6px">
-        <button class="btn solid" id="gbBtn" onclick="scanGammaBarata()">Buscar prima barata</button>
-        <select id="gbDias" class="btn quiet" style="padding:8px">
-          <option value="2">Horizonte: 2 días</option>
-          <option value="5" selected>Horizonte: 5 días</option>
-          <option value="10">Horizonte: 10 días</option>
-          <option value="30">Horizonte: 30 días</option>
-        </select>
+        <button class="btn solid" id="gxBtn" onclick="scanGEX()">Analizar desequilibrio</button>
       </div>
-      <div class="caveat" id="gbMsg" style="display:none"></div>
-      <div id="gbOut" style="display:none"><div class="scrollx"><table class="quotes" id="gbTable"></table></div>
-        <div class="historia" style="font-size:12.5px;margin-top:10px">
-          <b>Necesitas</b> = cuánto tiene que moverse (arriba o abajo) para empatar con la prima.
-          <b>Se mueve</b> = cuánto se mueve de media en la realidad, ese plazo.
-          <b>Ventaja</b> = la diferencia: positiva significa que históricamente el movimiento
-          superó lo que cuesta la prima. <b>P(1,5%)</b> = con qué frecuencia hizo tu 1,5%.
-          <b>IV/RV</b> = implícita entre realizada; por debajo de 1, la prima está barata.
-        </div>
-      </div>
-      <div id="gbStraddle" style="display:none"></div>
-      <div class="empty" id="gbEmpty">
-        <strong>Buscador de prima barata</strong>
-        Añade tickers arriba y pulsa <b>Buscar prima barata</b>. Te ordeno los valores por
-        dónde el mercado está pagando de menos por el movimiento — sin necesidad de acertar la dirección.
+      <div class="caveat" id="gxMsg" style="display:none"></div>
+      <div id="gxOut" style="display:none"></div>
+      <div class="empty" id="gxEmpty">
+        <strong>Mapa de gamma</strong>
+        Añade tickers arriba y pulsa <b>Analizar desequilibrio</b>. Para cada valor te digo si los dealers
+        amplifican o amortiguan, dónde está el nivel que cambia el régimen (gamma flip), el strike que
+        actúa de imán, y los muros de calls y puts que hacen de resistencia y soporte reales.
       </div>
     </section>
 
-    <section class="blk" style="margin-top:22px">
-      <h2>🧭 RSI diario + 4h alineados<span class="sub">tu hipótesis, medida en datos reales</span></h2>
-      <div class="historia" style="font-size:13.5px;margin-bottom:12px">
-        <p>Tu idea: cuando el <b>RSI del diario</b> y el <b>RSI de 4 horas</b> se alinean, viene
-        movimiento. Esto <b>no lo da por bueno</b> — lo mide en el histórico de cada valor.</p>
-        <p style="margin-top:6px">Detecta cuatro estados: <b>compra</b> (ambos saliendo de sobreventa
-        y girando arriba), <b>venta</b> (ambos saliendo de sobrecompra girando abajo), y continuación
-        <b>alcista</b>/<b>bajista</b> (ambos del mismo lado de 50 y en la misma dirección). Para cada uno
-        te dice qué pasó las veces anteriores en ESE valor.</p>
-        <p class="caveat" style="margin-top:8px"><b>Sin trampa:</b> al medir el pasado, para cada vela de
-        4h solo se usa el RSI de la última vela diaria <b>ya cerrada</b>. Si no, estaría mirando el futuro
-        y el resultado sería mentira bonita.</p>
-      </div>
-      <div class="btns" style="margin-bottom:6px">
-        <button class="btn solid" id="dirBtn" onclick="scanDireccional()">Medir mi hipótesis</button>
-        <select id="dirHor" class="btn quiet" style="padding:8px">
-          <option value="3">Horizonte: 12 horas</option>
-          <option value="6" selected>Horizonte: 1 día</option>
-          <option value="12">Horizonte: 2 días</option>
-          <option value="30">Horizonte: 1 semana</option>
-        </select>
-      </div>
-      <div class="caveat" id="dirMsg" style="display:none"></div>
-      <div id="dirOut" style="display:none"><div class="scrollx"><table class="quotes" id="dirTable"></table></div>
-        <div class="historia" style="font-size:12.5px;margin-top:10px">
-          <b>Estado</b> = en qué situación está ahora mismo esa alineación. <b>Acierto</b> = % de veces
-          que, tras ese mismo estado, el precio fue a favor en el horizonte elegido. <b>P(1,5%)</b> = veces
-          que alcanzó tu objetivo. <b>Casos</b> = cuántas veces ocurrió (menos de 30 = no te fíes).
-          Un acierto del 50% significa moneda al aire: la señal no aporta. Por encima de 55-60% con
-          muchos casos, hay ventaja real.
-        </div>
-      </div>
-      <div class="empty" id="dirEmpty">
-        <strong>Tu hipótesis, medida</strong>
-        Pulsa <b>Medir mi hipótesis</b> y te digo, con los datos de tus favoritos, si la alineación
-        RSI diario + 4h anticipa subidas de verdad o no. El número decide, no la opinión.
-      </div>
-    </section>
+
+
+
+
 
   </div>
 
@@ -5426,6 +5407,211 @@ function sesgoDireccional(closes, opts={}){
            nCasos, pAcierto, pObjetivo, retMedio, horizonte };
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   GEX · DESEQUILIBRIO DE GAMMA DE LOS CREADORES DE MERCADO
+   Esto NO es un indicador derivado del precio (esos no aportan
+   información nueva: todos son funciones del pasado). Es un
+   DESEQUILIBRIO ESTRUCTURAL real: los dealers que te venden las
+   opciones tienen que cubrirse comprando/vendiendo acciones, y esa
+   operativa es MECÁNICA — no la eligen, su posición se la impone.
+
+   · GEX positivo (dealers largos de gamma): venden en subidas y
+     compran en caídas → amortiguan. El precio tiende a imanarse
+     al strike de mayor gamma. Régimen de rango/reversión.
+   · GEX negativo (dealers cortos): compran en subidas y venden en
+     caídas → AMPLIFICAN. Régimen de tendencia: los movimientos se
+     aceleran y llegan más lejos.
+   · Gamma flip: el precio donde se cambia de régimen.
+   · Muro de calls / puts: donde se concentra el gamma arriba/abajo
+     → resistencia/soporte reales, porque ahí operan más los dealers.
+
+   AVISO: el posicionamiento se ESTIMA (el dato público no dice
+   quién tiene cada lado). Convención estándar: dealers largos de
+   calls y cortos de puts.
+   ═══════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════
+   CONFLUENCIA · GEX (dónde) + Stoch RSI (cuándo)
+   Los patrones de giro con causa MECÁNICA, no estadística:
+
+   El GEX dice dónde los dealers están OBLIGADOS a comprar o vender.
+   El Stoch RSI dice si el movimiento actual está agotado.
+   Cuando coinciden, el giro tiene un motor real detrás — alguien
+   que TIENE que operar en ese nivel — en vez de ser una esperanza.
+
+   Casos que detecta (de más a menos fiable):
+   · SUELO MECÁNICO: precio en muro de puts + gamma positivo +
+     sobreventa → los dealers compran ahí para cubrirse y el
+     vendedor está agotado. Es el mejor setup de giro alcista.
+   · TECHO MECÁNICO: precio en muro de calls + gamma positivo +
+     sobrecompra → los dealers venden ahí. Giro bajista.
+   · IMÁN: precio lejos del strike de más gamma con gamma positivo
+     → tirón mecánico hacia ese nivel.
+   · TRAMPA (aviso): gamma negativo → NO operar giros. Ahí los
+     dealers amplifican y el precio atraviesa los niveles.
+   ═══════════════════════════════════════════════════════════════ */
+function confluenciaGEX(gex, stoch, opts={}){
+  if(!gex) return null;
+  const cercaPct = opts.cercaPct ?? 1.2;      // % para considerar "en" un nivel
+  const S = gex.spot;
+  const K = stoch && isFinite(stoch.k) ? stoch.k : NaN;
+  const sobreventa = isFinite(K) && K<=20;
+  const sobrecompra = isFinite(K) && K>=80;
+  const dist = (nivel) => isFinite(nivel) ? (S/nivel-1)*100 : NaN;
+
+  const dMuroPut = dist(gex.muroPut);        // >0 si el precio está por encima del muro
+  const dMuroCall = dist(gex.muroCall);      // <0 si está por debajo
+  const dIman = dist(gex.imanK);
+  const enMuroPut = isFinite(dMuroPut) && Math.abs(dMuroPut)<=cercaPct;
+  const enMuroCall = isFinite(dMuroCall) && Math.abs(dMuroCall)<=cercaPct;
+  const gammaPos = gex.regimen==='positivo';
+
+  let caso='ninguno', calidad=0, titulo='', porque='', accion='', direccion='neutro';
+
+  if(!gammaPos){
+    // Régimen de amplificación: los giros FALLAN aquí. Aviso explícito.
+    caso='amplificacion'; calidad=1; direccion='tendencia';
+    titulo='⚠️ Zona de amplificación — no operes giros';
+    porque='Los dealers están cortos de gamma: compran cuando sube y venden cuando baja. '+
+      'Eso significa que los movimientos se aceleran y ATRAVIESAN los niveles en vez de rebotar en ellos. '+
+      'Intentar cazar el giro aquí es justo lo que arruina cuentas: el precio sigue de largo.';
+    accion='Si operas, hazlo A FAVOR del movimiento (direccional o straddle), nunca en contra. '+
+      'Los soportes y resistencias no aguantan en este régimen.';
+    if(sobreventa) porque+=' Ojo: el Stoch RSI marca sobreventa, pero con gamma negativo eso NO es señal de compra — puede seguir cayendo.';
+    if(sobrecompra) porque+=' Ojo: el Stoch RSI marca sobrecompra, pero con gamma negativo puede seguir subiendo.';
+  }
+  else if(enMuroPut && sobreventa){
+    caso='suelo'; calidad=3; direccion='alcista';
+    titulo='🟢 SUELO MECÁNICO — el mejor giro alcista';
+    porque='El precio está en el muro de puts ('+gex.muroPut+'), donde se concentra el gamma de las puts. '+
+      'Con gamma positivo, los dealers COMPRAN acciones ahí para cubrirse — es compra obligatoria, no opinión. '+
+      'Y el Stoch RSI en '+K.toFixed(0)+' dice que el vendedor está agotado. Coinciden el motor mecánico y el timing.';
+    accion='Setup de CALL. El objetivo natural es el imán ('+gex.imanK+')'+
+      (isFinite(gex.muroCall)?' y después el muro de calls ('+gex.muroCall+')':'')+
+      '. Invalidación: si pierde el muro de puts con claridad, fuera — puede haber cambio de régimen.';
+  }
+  else if(enMuroCall && sobrecompra){
+    caso='techo'; calidad=3; direccion='bajista';
+    titulo='🔴 TECHO MECÁNICO — el mejor giro bajista';
+    porque='El precio está en el muro de calls ('+gex.muroCall+'). Con gamma positivo, los dealers VENDEN '+
+      'acciones ahí para cubrirse — venta obligatoria. Y el Stoch RSI en '+K.toFixed(0)+' dice que el comprador '+
+      'está agotado. Motor mecánico y timing a la vez.';
+    accion='Setup de PUT. Objetivo natural: el imán ('+gex.imanK+')'+
+      (isFinite(gex.muroPut)?' y después el muro de puts ('+gex.muroPut+')':'')+
+      '. Invalidación: si rompe el muro de calls al alza, fuera.';
+  }
+  else if(enMuroPut){
+    caso='suelo_parcial'; calidad=2; direccion='alcista';
+    titulo='🟢 En muro de puts (falta agotamiento)';
+    porque='El precio está en el muro de puts ('+gex.muroPut+'), donde los dealers compran mecánicamente. '+
+      'El soporte estructural está, pero el Stoch RSI ('+(isFinite(K)?K.toFixed(0):'—')+') aún no marca agotamiento: '+
+      'puede seguir bajando un poco antes de girar.';
+    accion='Vigílalo. Si el Stoch RSI cae por debajo de 20 estando aquí, se convierte en el setup completo de CALL.';
+  }
+  else if(enMuroCall){
+    caso='techo_parcial'; calidad=2; direccion='bajista';
+    titulo='🔴 En muro de calls (falta agotamiento)';
+    porque='El precio está en el muro de calls ('+gex.muroCall+'), donde los dealers venden mecánicamente. '+
+      'La resistencia estructural está, pero el Stoch RSI ('+(isFinite(K)?K.toFixed(0):'—')+') aún no marca sobrecompra.';
+    accion='Vigílalo. Si el Stoch RSI sube por encima de 80 estando aquí, se convierte en el setup completo de PUT.';
+  }
+  else if(isFinite(dIman) && Math.abs(dIman)>0.8){
+    caso='iman'; calidad=2; direccion = dIman<0 ? 'alcista':'bajista';
+    titulo = dIman<0 ? '🟢 Tirón hacia el imán (arriba)' : '🔴 Tirón hacia el imán (abajo)';
+    porque='Gamma positivo: los dealers amortiguan y el precio tiende a imanarse al strike de mayor gamma ('+
+      gex.imanK+'), que está un '+Math.abs(dIman).toFixed(1)+'% '+(dIman<0?'POR ENCIMA':'POR DEBAJO')+'. '+
+      'Esa atracción es mecánica: cuanto más se aleja, más fuerte tiran las coberturas.'+
+      (sobreventa&&dIman<0?' Además el Stoch RSI marca sobreventa, lo que refuerza el rebote.':'')+
+      (sobrecompra&&dIman>0?' Además el Stoch RSI marca sobrecompra, lo que refuerza la caída.':'');
+    accion='Movimiento esperado modesto ('+Math.abs(dIman).toFixed(1)+'% hasta el imán). Direccional corto de plazo, '+
+      'sin esperar grandes recorridos: en gamma positivo el precio se frena, no vuela.';
+  }
+  else {
+    caso='fijado'; calidad=1; direccion='neutro';
+    titulo='⚪ Precio fijado en el imán — sin recorrido';
+    porque='Gamma positivo y el precio ya está pegado al strike de mayor gamma ('+gex.imanK+'). '+
+      'Las coberturas de los dealers lo mantienen ahí: cada intento de subir se vende y cada caída se compra.';
+    accion='Aquí comprar opciones es tirar dinero (el theta te come sin movimiento). Si acaso, es zona de VENDER primas.';
+  }
+
+  return { caso, calidad, titulo, porque, accion, direccion,
+           dMuroPut, dMuroCall, dIman, enMuroPut, enMuroCall,
+           stochK:K, sobreventa, sobrecompra, gammaPos };
+}
+
+function calcularGEX(rows, spot, opts={}){
+  if(!rows || !rows.length || !isFinite(spot) || spot<=0) return null;
+  const mult = opts.mult ?? 100;
+
+  const porStrike = new Map();
+  let gexTotal = 0;
+  for(const r of rows){
+    if(!isFinite(r.K) || !isFinite(r.gamma) || !isFinite(r.oi) || r.oi<=0) continue;
+    const dolares = r.gamma * r.oi * mult * spot * spot * 0.01;
+    const v = dolares * ((r.type==='C') ? 1 : -1);
+    porStrike.set(r.K, (porStrike.get(r.K)||0) + v);
+    gexTotal += v;
+  }
+  if(!porStrike.size) return null;
+  const strikes=[...porStrike.keys()].sort((a,b)=>a-b);
+
+  let imanK=null, imanV=0;
+  for(const [K,v] of porStrike){ if(Math.abs(v)>Math.abs(imanV)){ imanV=v; imanK=K; } }
+
+  let muroCall=null, muroCallV=0, muroPut=null, muroPutV=0;
+  for(const [K,v] of porStrike){
+    if(K>spot && v>muroCallV){ muroCallV=v; muroCall=K; }
+    if(K<spot && v<muroPutV){ muroPutV=v; muroPut=K; }
+  }
+
+  const rango = strikes[strikes.length-1]-strikes[0];
+  const ancho = Math.max(rango*0.06, spot*0.02);
+  const gexEn = (S) => {
+    let t=0;
+    for(const r of rows){
+      if(!isFinite(r.K)||!isFinite(r.oi)||r.oi<=0) continue;
+      const g0 = isFinite(r.gamma)?r.gamma:0;
+      const peso = Math.exp(-Math.pow((S-r.K)/ancho,2)/2);
+      t += g0*peso*r.oi*mult*S*S*0.01 * ((r.type==='C')?1:-1);
+    }
+    return t;
+  };
+  let flip=null;
+  const lo=Math.max(strikes[0], spot*0.85), hi=Math.min(strikes[strikes.length-1], spot*1.15);
+  let prevS=lo, prevV=gexEn(lo);
+  for(let i=1;i<=60;i++){
+    const S=lo+(hi-lo)*i/60, v=gexEn(S);
+    if(isFinite(prevV)&&isFinite(v)&&prevV*v<0){
+      flip = prevS + (S-prevS)*Math.abs(prevV)/(Math.abs(prevV)+Math.abs(v));
+      break;
+    }
+    prevS=S; prevV=v;
+  }
+
+  const regimen = gexTotal>0 ? 'positivo' : 'negativo';
+  let lectura, sesgo;
+  if(regimen==='positivo'){
+    if(imanK && Math.abs(imanK/spot-1)>0.002){
+      sesgo = imanK>spot ? 'alcista' : 'bajista';
+      lectura = 'Dealers largos de gamma: amortiguan el movimiento. El precio tiende a imanarse al strike '+imanK+
+                ', que está '+(imanK>spot?'POR ENCIMA':'POR DEBAJO')+' → sesgo '+sesgo+' hacia ese nivel, con reversión a la media. '+
+                'Malo para comprar opciones (poco movimiento), bueno para venderlas.';
+    } else {
+      sesgo='neutro';
+      lectura = 'Dealers largos de gamma y el precio ya está clavado en el imán ('+imanK+'). Régimen de fijación: '+
+                'espera rango estrecho. Es el peor momento para comprar opciones.';
+    }
+  } else {
+    sesgo='amplificacion';
+    lectura = 'Dealers CORTOS de gamma: AMPLIFICAN. Compran en subidas y venden en caídas, así que los movimientos '+
+              'se aceleran y llegan más lejos de lo que parece. No te pongas en contra de la tendencia. '+
+              'Aquí es donde las opciones compradas (direccional o straddle) rinden de verdad.';
+  }
+
+  return { gexTotal, porStrike, strikes, imanK, imanV, muroCall, muroCallV, muroPut, muroPutV,
+           flip, regimen, sesgo, lectura, spot,
+           distFlipPct: flip? (spot/flip-1)*100 : NaN };
+}
+
 function montarStraddle(rows, spot, opts={}){
   const tipo = opts.tipo || 'straddle';        // 'straddle' (mismo strike) | 'strangle' (separados)
   const anchoStrangle = opts.anchoStrangle ?? 0.03;  // 3% fuera del dinero para el strangle
@@ -6210,6 +6396,191 @@ function renderGammaBarata(filas, dias){
     cab.style.display='block';
     cab.innerHTML='<b>'+buenas+' valor(es) con prima barata a '+dias+' días.</b> En esos, históricamente el movimiento superó lo que cuesta la prima. Pincha para ver su cadena.';
   }
+}
+
+/* Analiza el desequilibrio de gamma de cada favorito con la cadena real */
+async function scanGEX(){
+  if(!CN.url||!CN.key){
+    const m=$('gxMsg'); m.style.display='block';
+    m.innerHTML='Necesito el acceso a datos configurado (Mi cuenta → Configurar acceso).'; return;
+  }
+  const favs=getFavs();
+  if(!favs.length){
+    const m=$('gxMsg'); m.style.display='block';
+    m.innerHTML='Añade tickers a <b>Favoritos</b> arriba primero.'; return;
+  }
+  $('gxBtn').disabled=true; $('gxBtn').textContent='Analizando…';
+  $('gxEmpty').style.display='none';
+  $('gxOut').style.display='none';
+  $('gxMsg').style.display='block';
+
+  const resultados=[];
+  try{
+    for(let i=0;i<favs.length;i++){
+      const sym=favs[i];
+      $('gxMsg').textContent='Cargando cadena de '+sym+' ('+(i+1)+'/'+favs.length+')…';
+      try{
+        const r=await gexDeTicker(sym);
+        resultados.push(r);
+      }catch(e){ resultados.push({sym, err:e.message||String(e)}); }
+    }
+    renderGEX(resultados);
+    $('gxMsg').style.display='none';
+  }catch(e){
+    $('gxMsg').style.display='block'; $('gxMsg').innerHTML='Error: '+(e.message||e);
+  }
+  $('gxBtn').disabled=false; $('gxBtn').textContent='Analizar desequilibrio';
+}
+
+/* Carga la cadena de un ticker, pide gammas y OI por streaming y calcula el GEX */
+async function gexDeTicker(sym){
+  const ch=await api('chain',{symbol:sym});
+  const it=(ch&&ch.data&&ch.data.items?ch.data.items:(ch&&ch.items?ch.items:[]));
+  const exps=(it[0]&&it[0].expirations)||[];
+  if(!exps.length) return {sym, err:'sin vencimientos'};
+
+  // Los vencimientos cercanos son los que mandan en el corto plazo:
+  // cogemos los 2 primeros con strikes (típicamente semana actual y siguiente).
+  const usar=exps.filter(e=>(e.strikes||[]).length).slice(0,2);
+  if(!usar.length) return {sym, err:'sin strikes'};
+
+  // precio de referencia
+  let spot=NaN;
+  try{
+    const q=await api('quotes',{symbol:sym});
+    const d=(q&&q.data&&q.data.items?q.data.items:(q&&q.items?q.items:[]))[0];
+    if(d){ const b=parseFloat(d.bid), a=parseFloat(d.ask), l=parseFloat(d.last);
+      spot = (isFinite(b)&&isFinite(a)&&a>0)?(b+a)/2:(isFinite(l)?l:NaN); }
+  }catch(e){}
+  if(!isFinite(spot)||spot<=0) return {sym, err:'sin precio del subyacente'};
+
+  // strikes cercanos (±15%) de esos vencimientos
+  const meta={}; const syms=[];
+  for(const e of usar){
+    for(const s of (e.strikes||[])){
+      const K=+s['strike-price'];
+      if(!isFinite(K) || Math.abs(K/spot-1)>0.15) continue;
+      if(s['call-streamer-symbol']){ meta[s['call-streamer-symbol']]={K,type:'C'}; syms.push(s['call-streamer-symbol']); }
+      if(s['put-streamer-symbol']){ meta[s['put-streamer-symbol']]={K,type:'P'}; syms.push(s['put-streamer-symbol']); }
+    }
+  }
+  if(!syms.length) return {sym, err:'no hay strikes cerca del precio'};
+
+  // open interest por REST (viene en la cadena compacta) y gammas por streaming
+  let ois={};
+  try{
+    const oiR=await api('chain-compact',{symbol:sym});
+    const items=(oiR&&oiR.data&&oiR.data.items?oiR.data.items:[]);
+    for(const it2 of items){
+      const arr=it2['open-interest']||it2.items||[];
+      if(Array.isArray(arr)) for(const o of arr){ if(o.symbol) ois[o.symbol]=+o['open-interest']; }
+    }
+  }catch(e){}
+
+  const dx=new DXLink();
+  await dx.connect(CN.url, CN.key);
+  const gre={}, sumRaw={};
+  dx.onGreeks=(s,g)=>{ gre[s]=g; };
+  dx.onSummary=(s,d)=>{ if(d && isFinite(d.openInterest)) sumRaw[s]=d.openInterest; };
+  dx.subscribe(syms);
+  await new Promise(r=>setTimeout(r, 4000));
+  dx.disconnect();
+
+  const rows=[];
+  for(const s of syms){
+    const m=meta[s]; if(!m) continue;
+    const g=gre[s];
+    const oi = isFinite(sumRaw[s])?sumRaw[s]:(isFinite(ois[s])?ois[s]:NaN);
+    if(!g || !isFinite(g.gamma) || !isFinite(oi) || oi<=0) continue;
+    rows.push({K:m.K, type:m.type, gamma:g.gamma, oi});
+  }
+  if(rows.length<6) return {sym, err:'faltan datos de gamma/OI ('+rows.length+' contratos)'};
+
+  const gex=calcularGEX(rows, spot);
+  if(!gex) return {sym, err:'no se pudo calcular'};
+
+  // Timing: Stoch RSI diario del valor (el "cuándo" que complementa al "dónde" del GEX)
+  let stoch=null;
+  try{
+    const dx2=new DXLink();
+    await dx2.connect(CN.url, CN.key);
+    const velas=[];
+    dx2.onCandle=(s,c)=>{ velas.push(c); };
+    dx2.subscribeCandles(sym, 120, 'd');
+    await new Promise(r=>setTimeout(r, 3000));
+    dx2.disconnect();
+    const closes=velas.sort((a,b)=>a.time-b.time).map(c=>c.close).filter(x=>isFinite(x)&&x>0);
+    if(closes.length>=40) stoch=stochRSI(closes,14,14,3,3);
+  }catch(e){}
+
+  const conf = confluenciaGEX(gex, stoch);
+  const meta2=STOCK_META[sym]||[sym,'—'];
+  return {sym, nombre:meta2[0], contratos:rows.length, stoch, conf, ...gex};
+}
+
+function renderGEX(res){
+  const out=$('gxOut'); out.style.display='block';
+  const fmtM = v => {
+    const a=Math.abs(v);
+    if(a>=1e9) return (v/1e9).toFixed(2)+'B';
+    if(a>=1e6) return (v/1e6).toFixed(1)+'M';
+    if(a>=1e3) return (v/1e3).toFixed(0)+'K';
+    return v.toFixed(0);
+  };
+  // ordenar: primero los setups de más calidad (giros mecánicos completos)
+  const orden=[...res].sort((a,b)=>{
+    if(a.err&&b.err) return 0; if(a.err) return 1; if(b.err) return -1;
+    return ((b.conf&&b.conf.calidad)||0)-((a.conf&&a.conf.calidad)||0);
+  });
+
+  out.innerHTML = orden.map(r=>{
+    if(r.err) return `<div class="gx-card"><div class="gx-title"><b>${r.sym}</b> <span class="mute">— ${r.err}</span></div></div>`;
+    const neg = r.regimen==='negativo';
+    const cls = neg?'dn':'up';
+    const etq = neg?'🔴 AMPLIFICAN (tendencia)':'🟢 AMORTIGUAN (rango)';
+    const c=r.conf;
+    const cCls = c ? (c.calidad>=3?(c.direccion==='alcista'?'up':'dn'):c.calidad===1?'mute':'') : 'mute';
+    const arr=[...r.porStrike.entries()].sort((a,b)=>a[0]-b[0]);
+    const maxAbs=Math.max(...arr.map(([,v])=>Math.abs(v)))||1;
+    const barras=arr.map(([K,v])=>{
+      const w=Math.abs(v)/maxAbs*100, pos=v>0;
+      const esSpot=Math.abs(K/r.spot-1)<0.005;
+      const esMuroC=K===r.muroCall, esMuroP=K===r.muroPut, esIman=K===r.imanK;
+      let tag='';
+      if(esIman) tag=' <span class="gx-tag">imán</span>';
+      else if(esMuroC) tag=' <span class="gx-tag up">muro C</span>';
+      else if(esMuroP) tag=' <span class="gx-tag dn">muro P</span>';
+      return `<div class="gx-row${esSpot?' gx-now':''}">
+        <span class="gx-k">${K}${esSpot?' ◀':''}</span>
+        <span class="gx-track"><span class="gx-fill ${pos?'up':'dn'}" style="width:${w.toFixed(1)}%"></span></span>
+        <span class="gx-v ${pos?'up':'dn'}">${fmtM(v)}${tag}</span></div>`;
+    }).join('');
+
+    const estrellas = c ? '★'.repeat(c.calidad)+'☆'.repeat(3-c.calidad) : '';
+    return `<div class="gx-card">
+      <div class="gx-title"><b>${r.sym}</b> <span class="mute">${r.nombre} · ${r.spot.toFixed(2)}${r.stoch?' · Stoch RSI '+r.stoch.k.toFixed(0):''}</span></div>
+      ${c?`<div class="gx-setup ${cCls}">
+        <div class="gx-setup-h">${c.titulo} <span class="gx-stars">${estrellas}</span></div>
+        <div class="gx-setup-b"><b>Por qué:</b> ${c.porque}</div>
+        <div class="gx-setup-b"><b>Qué hacer:</b> ${c.accion}</div>
+      </div>`:''}
+      <div class="gx-regime ${cls}">${etq} · GEX neto ${fmtM(r.gexTotal)} $ por cada 1%</div>
+      <div class="gx-levels">
+        ${r.flip?`<div><span class="gx-lbl">Gamma flip (cambio de régimen)</span><span class="gx-val">${r.flip.toFixed(2)}</span><span class="mute"> · el precio está ${r.distFlipPct>=0?'+':''}${r.distFlipPct.toFixed(1)}%</span></div>`:''}
+        ${r.imanK?`<div><span class="gx-lbl">Imán (más gamma)</span><span class="gx-val">${r.imanK}</span>${c&&isFinite(c.dIman)?`<span class="mute"> · a ${Math.abs(c.dIman).toFixed(1)}%</span>`:''}</div>`:''}
+        ${r.muroCall?`<div><span class="gx-lbl">Muro de calls (resistencia)</span><span class="gx-val up">${r.muroCall}</span>${c&&isFinite(c.dMuroCall)?`<span class="mute"> · a ${Math.abs(c.dMuroCall).toFixed(1)}%</span>`:''}</div>`:''}
+        ${r.muroPut?`<div><span class="gx-lbl">Muro de puts (soporte)</span><span class="gx-val dn">${r.muroPut}</span>${c&&isFinite(c.dMuroPut)?`<span class="mute"> · a ${Math.abs(c.dMuroPut).toFixed(1)}%</span>`:''}</div>`:''}
+      </div>
+      <div class="gx-bars">${barras}</div>
+      <div class="mute" style="font-size:11px;margin-top:8px">${r.contratos} contratos · vencimientos más cercanos (son los que mandan en el corto plazo)</div>
+    </div>`;
+  }).join('');
+
+  const buenos=res.filter(r=>!r.err&&r.conf&&r.conf.calidad>=3).length;
+  const m=$('gxMsg'); m.style.display='block';
+  m.innerHTML = buenos
+    ? '<b>'+buenos+' setup(s) de giro mecánico completo.</b> Precio en un muro de gamma + agotamiento del Stoch RSI a la vez: el nivel tiene compra o venta obligatoria de los dealers detrás. Están arriba del todo.'
+    : 'Ningún giro mecánico completo ahora mismo. Mira los de 2 estrellas: son niveles válidos a los que les falta el agotamiento — si el Stoch RSI llega al extremo estando ahí, se completa el setup.';
 }
 
 async function scanStochRSI(){
