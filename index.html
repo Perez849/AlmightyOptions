@@ -326,6 +326,7 @@ details[open]>.adv-summary::before{content:"▾ "}
 .gx-stars{font-size:12px;color:var(--ink3);letter-spacing:1px}
 .gx-tag{font-size:9px;padding:1px 4px;border-radius:3px;background:var(--rule2);color:var(--ink3);vertical-align:middle}
 .gx-tag.up{color:var(--bull,#3fb950)}.gx-tag.dn{color:var(--bear,#f85149)}
+.gx-warn{font-family:var(--body);font-size:12px;padding:8px 10px;border-radius:6px;margin-bottom:10px;background:rgba(248,81,73,.10);border:1px solid var(--bear,#f85149);color:var(--ink2)}
 .gx-card{margin:14px 0;padding:14px;background:var(--card2,rgba(255,255,255,.03));border:1px solid var(--rule2);border-radius:10px}
 .gx-title{font-size:15px;margin-bottom:8px}
 .gx-regime{font-family:var(--body);font-size:13px;font-weight:700;padding:8px 10px;border-radius:6px;margin-bottom:10px;border:1px solid var(--rule2)}
@@ -5459,8 +5460,14 @@ function confluenciaGEX(gex, stoch, opts={}){
   const cercaPct = opts.cercaPct ?? 1.2;      // % para considerar "en" un nivel
   const S = gex.spot;
   const K = stoch && isFinite(stoch.k) ? stoch.k : NaN;
+  /* Umbrales: el escáner masivo usa K≤5 / K>90 (extremos puros, para filtrar
+     entre 576 valores). Aquí, sobre un valor concreto y combinado con un nivel
+     de gamma, 20/80 es lo razonable — pero distinguimos "extremo" para marcar
+     los casos de máxima calidad. */
   const sobreventa = isFinite(K) && K<=20;
   const sobrecompra = isFinite(K) && K>=80;
+  const extremoBajo = isFinite(K) && K<=5;
+  const extremoAlto = isFinite(K) && K>=95;
   const dist = (nivel) => isFinite(nivel) ? (S/nivel-1)*100 : NaN;
 
   const dMuroPut = dist(gex.muroPut);        // >0 si el precio está por encima del muro
@@ -5489,7 +5496,9 @@ function confluenciaGEX(gex, stoch, opts={}){
     titulo='🟢 SUELO MECÁNICO — el mejor giro alcista';
     porque='El precio está en el muro de puts ('+gex.muroPut+'), donde se concentra el gamma de las puts. '+
       'Con gamma positivo, los dealers COMPRAN acciones ahí para cubrirse — es compra obligatoria, no opinión. '+
-      'Y el Stoch RSI en '+K.toFixed(0)+' dice que el vendedor está agotado. Coinciden el motor mecánico y el timing.';
+      'Y el Stoch RSI en '+K.toFixed(0)+' dice que el vendedor está agotado'+
+      (extremoBajo?' (extremo puro: por debajo de 5, el mismo umbral del escáner masivo)':'')+
+      '. Coinciden el motor mecánico y el timing.';
     accion='Setup de CALL. El objetivo natural es el imán ('+gex.imanK+')'+
       (isFinite(gex.muroCall)?' y después el muro de calls ('+gex.muroCall+')':'')+
       '. Invalidación: si pierde el muro de puts con claridad, fuera — puede haber cambio de régimen.';
@@ -5548,19 +5557,25 @@ function calcularGEX(rows, spot, opts={}){
   const mult = opts.mult ?? 100;
 
   const porStrike = new Map();
+  const porStrikeAbs = new Map();   // gamma total sin signo: para localizar el imán de verdad
   let gexTotal = 0;
   for(const r of rows){
     if(!isFinite(r.K) || !isFinite(r.gamma) || !isFinite(r.oi) || r.oi<=0) continue;
     const dolares = r.gamma * r.oi * mult * spot * spot * 0.01;
     const v = dolares * ((r.type==='C') ? 1 : -1);
     porStrike.set(r.K, (porStrike.get(r.K)||0) + v);
+    porStrikeAbs.set(r.K, (porStrikeAbs.get(r.K)||0) + Math.abs(dolares));
     gexTotal += v;
   }
   if(!porStrike.size) return null;
   const strikes=[...porStrike.keys()].sort((a,b)=>a-b);
 
-  let imanK=null, imanV=0;
-  for(const [K,v] of porStrike){ if(Math.abs(v)>Math.abs(imanV)){ imanV=v; imanK=K; } }
+  /* IMÁN = strike con más gamma TOTAL (calls + puts en valor absoluto).
+     Antes usaba el mayor |GEX neto|, y eso fallaba: en un strike con muchas calls
+     Y muchas puts, el neto se cancela y quedaba invisible, cuando en realidad es
+     donde MÁS coberturas hay — o sea, el imán más fuerte. */
+  let imanK=null, imanAbs=0, imanV=0;
+  for(const [K,a] of porStrikeAbs){ if(a>imanAbs){ imanAbs=a; imanK=K; imanV=porStrike.get(K)||0; } }
 
   let muroCall=null, muroCallV=0, muroPut=null, muroPutV=0;
   for(const [K,v] of porStrike){
@@ -6469,8 +6484,15 @@ async function gexDeTicker(sym){
 
   // Los vencimientos cercanos son los que mandan en el corto plazo:
   // cogemos los 2 primeros con strikes (típicamente semana actual y siguiente).
-  const usar=exps.filter(e=>(e.strikes||[]).length).slice(0,2);
-  if(!usar.length) return {sym, err:'sin strikes'};
+  /* Vencimientos a incluir: TODOS los de hasta ~45 días.
+     Antes cogía solo los 2 primeros, y eso dejaba fuera el vencimiento MENSUAL,
+     que suele concentrar la mayor parte del open interest — el mapa salía sesgado.
+     Más allá de 45 días el gamma es tan bajo que apenas mueve las coberturas. */
+  const usar=exps
+    .filter(e=>(e.strikes||[]).length && isFinite(+e['days-to-expiration']) && +e['days-to-expiration']<=45)
+    .sort((a,b)=>(+a['days-to-expiration'])-(+b['days-to-expiration']))
+    .slice(0,6);
+  if(!usar.length) return {sym, err:'sin vencimientos a menos de 45 días'};
 
   // precio de referencia
   let spot=NaN;
@@ -6540,6 +6562,18 @@ async function gexDeTicker(sym){
   const gex=calcularGEX(rows, spot);
   if(!gex) return {sym, err:'no se pudo calcular'};
 
+  /* CALIDAD DE LOS DATOS: sin esto no sabes si el mapa es fiable o ruido.
+     - cobertura: % de contratos pedidos que trajeron gamma Y open interest
+     - oiTotal: cuánto open interest hay en juego (si es ridículo, el GEX no manda)
+     - conIV: cuántos traen IV, que es lo que permite recalcular el gamma bien */
+  const oiTotal = rows.reduce((a,b)=>a+(b.oi||0),0);
+  const conIV = rows.filter(r=>isFinite(r.iv)&&r.iv>0).length;
+  const cobertura = syms.length? rows.length/syms.length : 0;
+  let fiabilidad='alta', avisoDatos='';
+  if(oiTotal < 2000){ fiabilidad='baja'; avisoDatos='Open interest muy bajo ('+oiTotal.toLocaleString()+'): en este valor las coberturas de los dealers no mueven el precio. El mapa es orientativo, no estructural.'; }
+  else if(cobertura < 0.5){ fiabilidad='media'; avisoDatos='Solo llegaron datos completos del '+(cobertura*100).toFixed(0)+'% de los contratos: faltan strikes y el mapa puede estar incompleto.'; }
+  else if(conIV < rows.length*0.5){ fiabilidad='media'; avisoDatos='Falta la volatilidad implícita en más de la mitad de los contratos: el nivel del gamma flip es menos preciso.'; }
+
   // Timing: Stoch RSI diario del valor (el "cuándo" que complementa al "dónde" del GEX)
   let stoch=null;
   try{
@@ -6547,7 +6581,7 @@ async function gexDeTicker(sym){
     await dx2.connect(CN.url, CN.key);
     const velas=[];
     dx2.onCandle=(s,c)=>{ velas.push(c); };
-    dx2.subscribeCandles(sym, 120, 'd');
+    dx2.subscribeCandles(sym, 300, 'd');   // igual que el escáner: con menos, el RSI Wilder no converge
     await new Promise(r=>setTimeout(r, 3000));
     dx2.disconnect();
     const closes=velas.sort((a,b)=>a.time-b.time).map(c=>c.close).filter(x=>isFinite(x)&&x>0);
@@ -6556,7 +6590,10 @@ async function gexDeTicker(sym){
 
   const conf = confluenciaGEX(gex, stoch);
   const meta2=STOCK_META[sym]||[sym,'—'];
-  return {sym, nombre:meta2[0], contratos:rows.length, stoch, conf, ...gex};
+  return {sym, nombre:meta2[0], contratos:rows.length, pedidos:syms.length,
+          oiTotal, conIV, cobertura, fiabilidad, avisoDatos,
+          vencimientos: usar.map(e=>+e['days-to-expiration']),
+          stoch, conf, ...gex};
 }
 
 function renderGEX(res){
@@ -6606,6 +6643,7 @@ function renderGEX(res){
         <div class="gx-setup-b"><b>Qué hacer:</b> ${c.accion}</div>
       </div>`:''}
       <div class="gx-regime ${cls}">${etq} · GEX neto ${fmtM(r.gexTotal)} $ por cada 1%</div>
+      ${r.avisoDatos?`<div class="gx-warn">⚠️ ${r.avisoDatos}</div>`:''}
       <div class="gx-levels">
         ${r.flip?`<div><span class="gx-lbl">Gamma flip (cambio de régimen)</span><span class="gx-val">${r.flip.toFixed(2)}</span><span class="mute"> · el precio está ${r.distFlipPct>=0?'+':''}${r.distFlipPct.toFixed(1)}%</span></div>`:''}
         ${r.imanK?`<div><span class="gx-lbl">Imán (más gamma)</span><span class="gx-val">${r.imanK}</span>${c&&isFinite(c.dIman)?`<span class="mute"> · a ${Math.abs(c.dIman).toFixed(1)}%</span>`:''}</div>`:''}
@@ -6613,7 +6651,10 @@ function renderGEX(res){
         ${r.muroPut?`<div><span class="gx-lbl">Muro de puts (soporte)</span><span class="gx-val dn">${r.muroPut}</span>${c&&isFinite(c.dMuroPut)?`<span class="mute"> · a ${Math.abs(c.dMuroPut).toFixed(1)}%</span>`:''}</div>`:''}
       </div>
       <div class="gx-bars">${barras}</div>
-      <div class="mute" style="font-size:11px;margin-top:8px">${r.contratos} contratos · vencimientos más cercanos (son los que mandan en el corto plazo)</div>
+      <div class="mute" style="font-size:11px;margin-top:8px">
+        ${r.contratos}/${r.pedidos||r.contratos} contratos con datos · OI total ${(r.oiTotal||0).toLocaleString()} ·
+        vencimientos a ${(r.vencimientos||[]).join(', ')} días · fiabilidad <b>${r.fiabilidad||'—'}</b>
+      </div>
     </div>`;
   }).join('');
 
