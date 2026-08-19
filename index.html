@@ -5568,31 +5568,53 @@ function calcularGEX(rows, spot, opts={}){
     if(K<spot && v<muroPutV){ muroPutV=v; muroPut=K; }
   }
 
-  const rango = strikes[strikes.length-1]-strikes[0];
-  const ancho = Math.max(rango*0.06, spot*0.02);
+  /* GEX a un precio hipotético S.
+     Antes usaba una campana inventada como aproximación del decaimiento del
+     gamma — y eso hacía que el flip NO fuera coherente con el GEX actual
+     (salían cosas imposibles como "precio bajo el flip pero gamma positivo").
+     Ahora recalcula el gamma REAL con Black-Scholes a ese precio, usando la
+     IV y el vencimiento de cada contrato. Si falta la IV de algún contrato,
+     se reutiliza su gamma observada escalada, que es lo mejor disponible. */
   const gexEn = (S) => {
     let t=0;
     for(const r of rows){
       if(!isFinite(r.K)||!isFinite(r.oi)||r.oi<=0) continue;
-      const g0 = isFinite(r.gamma)?r.gamma:0;
-      const peso = Math.exp(-Math.pow((S-r.K)/ancho,2)/2);
-      t += g0*peso*r.oi*mult*S*S*0.01 * ((r.type==='C')?1:-1);
+      let g;
+      const tYears = isFinite(r.dte) ? Math.max(r.dte,0.5)/365 : NaN;
+      if(isFinite(r.iv) && r.iv>0 && isFinite(tYears)){
+        try{
+          const gr = greeks(r.type, S, r.K, tYears, 0.045, 0, r.iv);
+          g = (gr && isFinite(gr.gamma)) ? gr.gamma : NaN;
+        }catch(e){ g = NaN; }
+      }
+      if(!isFinite(g)) g = isFinite(r.gamma)?r.gamma:0;   // respaldo
+      t += g*r.oi*mult*S*S*0.01 * ((r.type==='C')?1:-1);
     }
     return t;
   };
+  /* Buscamos el flip barriendo un rango amplio. Usamos SIEMPRE gexEn, la misma
+     función con la que decidimos el régimen, para que no puedan contradecirse. */
   let flip=null;
-  const lo=Math.max(strikes[0], spot*0.85), hi=Math.min(strikes[strikes.length-1], spot*1.15);
+  const lo=spot*0.80, hi=spot*1.20;
+  const pasos=120;
   let prevS=lo, prevV=gexEn(lo);
-  for(let i=1;i<=60;i++){
-    const S=lo+(hi-lo)*i/60, v=gexEn(S);
+  const cruces=[];
+  for(let i=1;i<=pasos;i++){
+    const S=lo+(hi-lo)*i/pasos, v=gexEn(S);
     if(isFinite(prevV)&&isFinite(v)&&prevV*v<0){
-      flip = prevS + (S-prevS)*Math.abs(prevV)/(Math.abs(prevV)+Math.abs(v));
-      break;
+      cruces.push(prevS + (S-prevS)*Math.abs(prevV)/(Math.abs(prevV)+Math.abs(v)));
     }
     prevS=S; prevV=v;
   }
+  // si hay varios cruces, nos quedamos con el más cercano al precio actual
+  if(cruces.length) flip = cruces.reduce((a,b)=> Math.abs(b-spot)<Math.abs(a-spot)?b:a);
 
-  const regimen = gexTotal>0 ? 'positivo' : 'negativo';
+  /* EL RÉGIMEN SE DECIDE CON gexEn(spot), no con la suma cruda de gammas.
+     Así el signo del GEX y la posición respecto al flip SIEMPRE son coherentes:
+     si el precio está por debajo del flip, el GEX sale negativo, y al revés. */
+  const gexSpot = gexEn(spot);
+  const gexRef = isFinite(gexSpot) && gexSpot!==0 ? gexSpot : gexTotal;
+  const regimen = gexRef>0 ? 'positivo' : 'negativo';
   let lectura, sesgo;
   if(regimen==='positivo'){
     if(imanK && Math.abs(imanK/spot-1)>0.002){
@@ -5612,7 +5634,8 @@ function calcularGEX(rows, spot, opts={}){
               'Aquí es donde las opciones compradas (direccional o straddle) rinden de verdad.';
   }
 
-  return { gexTotal, porStrike, strikes, imanK, imanV, muroCall, muroCallV, muroPut, muroPutV,
+  return { gexTotal: gexRef, gexCrudo: gexTotal, porStrike, strikes, imanK, imanV,
+           muroCall, muroCallV, muroPut, muroPutV,
            flip, regimen, sesgo, lectura, spot,
            distFlipPct: flip? (spot/flip-1)*100 : NaN };
 }
@@ -6462,11 +6485,12 @@ async function gexDeTicker(sym){
   // strikes cercanos (±15%) de esos vencimientos
   const meta={}; const syms=[];
   for(const e of usar){
+    const dteE = +e['days-to-expiration'];
     for(const s of (e.strikes||[])){
       const K=+s['strike-price'];
       if(!isFinite(K) || Math.abs(K/spot-1)>0.15) continue;
-      if(s['call-streamer-symbol']){ meta[s['call-streamer-symbol']]={K,type:'C'}; syms.push(s['call-streamer-symbol']); }
-      if(s['put-streamer-symbol']){ meta[s['put-streamer-symbol']]={K,type:'P'}; syms.push(s['put-streamer-symbol']); }
+      if(s['call-streamer-symbol']){ meta[s['call-streamer-symbol']]={K,type:'C',dte:dteE}; syms.push(s['call-streamer-symbol']); }
+      if(s['put-streamer-symbol']){ meta[s['put-streamer-symbol']]={K,type:'P',dte:dteE}; syms.push(s['put-streamer-symbol']); }
     }
   }
   if(!syms.length) return {sym, err:'no hay strikes cerca del precio'};
@@ -6500,7 +6524,8 @@ async function gexDeTicker(sym){
     if(g && isFinite(g.gamma)) conGamma++;
     if(isFinite(oi) && oi>0) conOI++;
     if(!g || !isFinite(g.gamma) || !isFinite(oi) || oi<=0) continue;
-    rows.push({K:m.K, type:m.type, gamma:g.gamma, oi});
+    rows.push({K:m.K, type:m.type, gamma:g.gamma, oi,
+               iv: isFinite(g.volatility)?g.volatility:NaN, dte: m.dte});
   }
   if(rows.length<6){
     // Diagnóstico concreto: decir QUÉ falta, no un error genérico
