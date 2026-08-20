@@ -327,6 +327,7 @@ details[open]>.adv-summary::before{content:"▾ "}
 .gx-tag{font-size:9px;padding:1px 4px;border-radius:3px;background:var(--rule2);color:var(--ink3);vertical-align:middle}
 .gx-tag.up{color:var(--bull,#3fb950)}.gx-tag.dn{color:var(--bear,#f85149)}
 .gx-warn{font-family:var(--body);font-size:12px;padding:8px 10px;border-radius:6px;margin-bottom:10px;background:rgba(248,81,73,.10);border:1px solid var(--bear,#f85149);color:var(--ink2)}
+.warn{color:var(--warn,#d29922)}
 .sec-cross{margin-left:3px;font-size:11px}
 .sec-cross.up{color:var(--bull,#3fb950)}.sec-cross.dn{color:var(--bear,#f85149)}
 .gx-card{margin:14px 0;padding:14px;background:var(--card2,rgba(255,255,255,.03));border:1px solid var(--rule2);border-radius:10px}
@@ -667,9 +668,17 @@ summary:hover{color:var(--ink)}
       <div class="caveat" id="secMsg" style="display:none"></div>
       <div id="secOut" style="display:none"><div class="scrollx"><table class="quotes" id="secTable"></table></div>
         <div class="historia" style="font-size:12px;margin-top:10px">
-          <b>K/D</b> = Stoch RSI (verde si K&gt;D, o sea girando al alza). <b>MACD</b> = el histograma;
-          <b>▲</b> si crece, <b>▼</b> si decrece; en verde cuando está sobre cero (tendencia alcista de fondo).
-          <b>⚡</b> marca un cruce reciente del MACD. Pincha una fila para abrir su cadena de opciones.
+          <b>Stoch RSI</b>: el número va de 0 a 100. <span class="up">Verde por debajo de 20</span> = sobrevendido,
+          <span class="dn">rojo por encima de 80</span> = sobrecomprado. Debajo, <b>▲ gira</b> si K va por encima de D
+          (empieza a subir) o <b>▼ cae</b> si no.<br>
+          <b>MACD</b>: en vez del número en bruto (que no se puede comparar entre ETFs de distinto precio),
+          te doy el <b>estado</b>: <span class="up">alcista</span> = tendencia y momento a favor;
+          <span class="warn">pierde fuerza</span> = alcista de fondo pero corrigiendo;
+          <span class="warn">girando</span> = bajista de fondo pero rebotando;
+          <span class="dn">bajista</span> = todo en contra. Debajo, su tamaño <b>en % del precio</b>, que sí es
+          comparable. <b>⚡</b> = acaba de cruzar.<br>
+          <b>Fuerza</b>: pondera las tres temporalidades dando más peso al <b>semanal</b> (la tendencia real
+          del sector) que al 4h (ruido de dos días). Pincha una fila para abrir su cadena.
         </div>
       </div>
       <div class="empty" id="secEmpty">
@@ -5665,17 +5674,43 @@ function analizaTF(closes){
   const sr = stochRSI(closes,14,14,3,3);
   const mc = macd(closes,12,26,9);
   if(!sr && !mc) return null;
-  // puntuación: +1 por cada señal alcista, -1 por bajista
-  let pts=0, n=0;
-  if(sr){ n++; if(sr.k>sr.d) pts++; else pts--; }
-  if(mc){ n++; if(mc.hist>0) pts++; else pts--;
-          n++; if(mc.sobreCero) pts++; else pts--; }
-  const score = n? pts/n : 0;
+  const px = closes[closes.length-1];
+
+  /* EL MACD EN BRUTO NO SE PUEDE COMPARAR entre ETFs: un histograma de -0,39
+     en un ETF de 40$ es enorme, y en uno de 600$ es ruido. Lo normalizamos a
+     % DEL PRECIO, que sí es comparable y además se entiende: "el MACD vale un
+     0,8% del precio" dice algo; "-0,39" no dice nada. */
+  const histPct = (mc && isFinite(mc.hist) && px>0) ? mc.hist/px*100 : NaN;
+  const lineaPct = (mc && isFinite(mc.linea) && px>0) ? mc.linea/px*100 : NaN;
+
+  /* ESTADO DEL MACD en palabras, que es lo único accionable:
+     lo que importa es (a) si está sobre o bajo cero -> tendencia de fondo, y
+     (b) si el histograma es positivo -> impulso a favor ahora mismo. */
+  let estado='—';
+  if(mc){
+    if(mc.sobreCero && mc.hist>0) estado='alcista';        // tendencia y momento a favor
+    else if(mc.sobreCero && mc.hist<=0) estado='perdiendo'; // alcista de fondo pero corrigiendo
+    else if(!mc.sobreCero && mc.hist>0) estado='girando';   // bajista de fondo pero rebotando
+    else estado='bajista';                                  // todo en contra
+  }
+
+  /* SCORE con pesos sensatos, no un voto por señal:
+     · La tendencia de fondo (MACD sobre/bajo cero) es lo que más pesa.
+     · El impulso actual (signo del histograma) pesa la mitad.
+     · El Stoch RSI girando es solo un matiz de corto plazo. */
+  let score = 0;
+  if(mc){
+    score += (mc.sobreCero ? 1 : -1) * 0.5;
+    score += (mc.hist > 0 ? 1 : -1) * 0.3;
+  }
+  if(sr && isFinite(sr.k) && isFinite(sr.d)) score += (sr.k>sr.d ? 1 : -1) * 0.2;
+
   return { k:sr?sr.k:NaN, d:sr?sr.d:NaN,
            macdLinea:mc?mc.linea:NaN, macdSignal:mc?mc.signal:NaN,
-           hist:mc?mc.hist:NaN, cruce:mc?mc.cruce:'—',
+           hist:mc?mc.hist:NaN, histPct, lineaPct, estado,
+           cruce:mc?mc.cruce:'—',
            creciendo:mc?mc.creciendo:null, sobreCero:mc?mc.sobreCero:null,
-           score, velas:closes.length };
+           score, precio:px, velas:closes.length };
 }
 
 function calcularGEX(rows, spot, opts={}){
@@ -6844,9 +6879,15 @@ async function scanSectorial(){
           d:  b? analizaTF(cl(b.d))  : null,
           w:  b? analizaTF(cl(b.w))  : null,
           precio: b && cl(b.d).length ? cl(b.d).slice(-1)[0] : NaN };
-        // alineación: media de los scores de las tres temporalidades
-        const sc=[res.h4,res.d,res.w].filter(x=>x&&isFinite(x.score)).map(x=>x.score);
-        res.alineacion = sc.length ? sc.reduce((a,b2)=>a+b2,0)/sc.length : NaN;
+        /* FUERZA del sector: el semanal manda. Antes las tres temporalidades
+           pesaban igual, así que el 4h (ruido de dos días) decidía tanto como
+           el semanal (la tendencia real del sector). Eso estaba mal. */
+        const partes=[[res.w,3],[res.d,2],[res.h4,1]].filter(([x])=>x&&isFinite(x.score));
+        const pesoTot=partes.reduce((a,[,w])=>a+w,0);
+        res.alineacion = pesoTot ? partes.reduce((a,[x,w])=>a+x.score*w,0)/pesoTot : NaN;
+        // contamos señales alcistas para poder explicar el porqué
+        res.senales = [res.h4,res.d,res.w].filter(x=>x&&x.score>0).length;
+        res.senalesTot = [res.h4,res.d,res.w].filter(x=>x).length;
         SEC.results.push(res);
         hechos++;
       }
@@ -6890,16 +6931,28 @@ function renderSectorial(final){
     R.sort((a,b)=>puntua(b)-puntua(a));
   }
 
+  /* Una celda por temporalidad. En vez de números crípticos, el ESTADO en
+     palabras (que es lo accionable) y el Stoch RSI, que sí es un número con
+     escala fija 0-100 y por tanto sí se entiende y se compara. */
+  const ETIQ = { alcista:'alcista', perdiendo:'pierde fuerza', girando:'girando', bajista:'bajista', '—':'—' };
+  const CLASE = { alcista:'up', perdiendo:'warn', girando:'warn', bajista:'dn', '—':'mute' };
   const cel = (t) => {
     if(!t) return '<td class="mute" colspan="2">—</td>';
-    const kd = isFinite(t.k)
-      ? `<b class="${t.k>t.d?'up':'dn'}">${t.k.toFixed(0)}</b><span class="mute">/${isFinite(t.d)?t.d.toFixed(0):'—'}</span>`
+    // Stoch RSI: número claro con color según zona
+    const kCls = !isFinite(t.k) ? 'mute' : t.k<=20 ? 'up' : t.k>=80 ? 'dn' : 'mute';
+    const kTxt = isFinite(t.k)
+      ? `<b class="${kCls}">${t.k.toFixed(0)}</b>${isFinite(t.d)? `<span class="mute" style="font-size:10px">/${t.d.toFixed(0)}</span>`:''}`
+        + (isFinite(t.k)&&isFinite(t.d) ? `<br><span class="mute" style="font-size:10px">${t.k>t.d?'▲ gira':'▼ cae'}</span>` : '')
       : '—';
-    const flecha = t.creciendo===true?'▲':t.creciendo===false?'▼':'';
-    const mc = isFinite(t.hist)
-      ? `<span class="${t.sobreCero?'up':'dn'}">${t.hist>=0?'+':''}${t.hist.toFixed(2)}${flecha}</span>${t.cruce!=='ninguno'&&t.cruce!=='—'?`<span class="sec-cross ${t.cruce==='alcista'?'up':'dn'}" title="cruce ${t.cruce}">⚡</span>`:''}`
+    // MACD: estado en palabras + su tamaño relativo al precio (comparable entre ETFs)
+    const cruceIco = (t.cruce==='alcista') ? '<span class="sec-cross up" title="acaba de cruzar al alza">⚡</span>'
+                   : (t.cruce==='bajista') ? '<span class="sec-cross dn" title="acaba de cruzar a la baja">⚡</span>' : '';
+    const mcTxt = t.estado && t.estado!=='—'
+      ? `<b class="${CLASE[t.estado]}">${ETIQ[t.estado]}</b>${cruceIco}`
+        + (isFinite(t.histPct) ? `<br><span class="mute" style="font-size:10px">${t.histPct>=0?'+':''}${t.histPct.toFixed(2)}% del precio</span>` : '')
       : '—';
-    return `<td class="num" style="font-size:12px">${kd}</td><td class="num" style="font-size:12px">${mc}</td>`;
+    return `<td class="num" style="font-size:12px;line-height:1.35">${kTxt}</td>`
+         + `<td class="num" style="font-size:11.5px;line-height:1.35">${mcTxt}</td>`;
   };
 
   $('secTable').innerHTML =
@@ -6909,10 +6962,14 @@ function renderSectorial(final){
       const a=r.alineacion;
       const aCls = !isFinite(a)?'mute':a>0.3?'up':a<-0.3?'dn':'mute';
       const aTxt = !isFinite(a)?'—':(a>0.6?'muy fuerte':a>0.3?'fuerte':a>-0.3?'mixto':a>-0.6?'débil':'muy débil');
+      // el semanal es lo que define la tendencia del sector: lo decimos explícito
+      const base = r.w ? (r.w.estado==='alcista'?'semanal alcista':r.w.estado==='bajista'?'semanal bajista':'semanal '+ETIQ[r.w.estado]) : '';
       return `<tr onclick="srGoChain('${r.sym}')">
         <td class="tk"><b>${r.sym}</b><br><span class="mute" style="font-size:10.5px">${r.nombre}</span></td>
         ${cel(r.h4)}${cel(r.d)}${cel(r.w)}
-        <td class="num ${aCls}" style="font-size:11.5px"><b>${aTxt}</b></td>
+        <td class="num ${aCls}" style="font-size:11.5px;line-height:1.35"><b>${aTxt}</b>
+          <br><span class="mute" style="font-size:10px">${isFinite(r.senales)?r.senales+'/'+r.senalesTot+' a favor':''}</span>
+          <br><span class="mute" style="font-size:10px">${base}</span></td>
       </tr>`;
     }).join('')+'</tbody>';
 
