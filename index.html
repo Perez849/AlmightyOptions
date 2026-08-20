@@ -327,6 +327,8 @@ details[open]>.adv-summary::before{content:"▾ "}
 .gx-tag{font-size:9px;padding:1px 4px;border-radius:3px;background:var(--rule2);color:var(--ink3);vertical-align:middle}
 .gx-tag.up{color:var(--bull,#3fb950)}.gx-tag.dn{color:var(--bear,#f85149)}
 .gx-warn{font-family:var(--body);font-size:12px;padding:8px 10px;border-radius:6px;margin-bottom:10px;background:rgba(248,81,73,.10);border:1px solid var(--bear,#f85149);color:var(--ink2)}
+.sec-cross{margin-left:3px;font-size:11px}
+.sec-cross.up{color:var(--bull,#3fb950)}.sec-cross.dn{color:var(--bear,#f85149)}
 .gx-card{margin:14px 0;padding:14px;background:var(--card2,rgba(255,255,255,.03));border:1px solid var(--rule2);border-radius:10px}
 .gx-title{font-size:15px;margin-bottom:8px}
 .gx-regime{font-family:var(--body);font-size:13px;font-weight:700;padding:8px 10px;border-radius:6px;margin-bottom:10px;border:1px solid var(--rule2)}
@@ -638,6 +640,46 @@ summary:hover{color:var(--ink)}
         actúa de imán, y los muros de calls y puts que hacen de resistencia y soporte reales.
       </div>
     </section>
+    <section class="blk" style="margin-top:22px">
+      <h2>🗺️ Análisis sectorial<span class="sub">dónde entra y sale el dinero · 4h · diario · semanal</span></h2>
+      <div class="historia" style="font-size:13.5px;margin-bottom:12px">
+        <p>Para cada ETF sectorial: <b>Stoch RSI (3,3,14,14)</b> y <b>MACD (12,26,9)</b> en las tres
+        temporalidades. Sirve para no operar a ciegas: un valor fuerte dentro de un sector que se
+        desmorona lo tiene mucho más difícil, y al revés — el viento a favor del sector es la mitad del trabajo.</p>
+        <p style="margin-top:6px;font-size:12.5px"><b>Cómo leerlo:</b> lo más potente es la <b>alineación</b>.
+        Cuando las tres temporalidades apuntan al mismo lado, la tendencia sectorial es sólida. Cuando el
+        semanal es alcista y el 4h está en sobreventa, tienes una entrada a favor de la tendencia mayor —
+        que es la forma clásica y sensata de usar el Stoch RSI.</p>
+      </div>
+      <div class="btns" style="margin-bottom:6px">
+        <button class="btn solid" id="secBtn" onclick="scanSectorial()">Analizar sectores</button>
+        <select id="secOrden" class="btn quiet" style="padding:8px" onchange="renderSectorial(true)">
+          <option value="fuerza">Ordenar: más fuertes primero</option>
+          <option value="debil">Ordenar: más débiles primero</option>
+          <option value="giro">Ordenar: giros al alza (4h sobrevendido + semanal alcista)</option>
+          <option value="nombre">Ordenar: por nombre</option>
+        </select>
+      </div>
+      <div class="sr-progress" id="secProg" style="display:none">
+        <div class="sr-bar"><div class="sr-fill" id="secFill"></div></div>
+        <div class="sr-ptxt" id="secPtxt"></div>
+      </div>
+      <div class="caveat" id="secMsg" style="display:none"></div>
+      <div id="secOut" style="display:none"><div class="scrollx"><table class="quotes" id="secTable"></table></div>
+        <div class="historia" style="font-size:12px;margin-top:10px">
+          <b>K/D</b> = Stoch RSI (verde si K&gt;D, o sea girando al alza). <b>MACD</b> = el histograma;
+          <b>▲</b> si crece, <b>▼</b> si decrece; en verde cuando está sobre cero (tendencia alcista de fondo).
+          <b>⚡</b> marca un cruce reciente del MACD. Pincha una fila para abrir su cadena de opciones.
+        </div>
+      </div>
+      <div class="empty" id="secEmpty">
+        <strong>Mapa de sectores</strong>
+        Pulsa <b>Analizar sectores</b> y te calculo el Stoch RSI y el MACD de más de 30 ETFs sectoriales
+        (tecnología, energía, materiales, semiconductores, mineras de oro, biotech, bancos regionales,
+        uranio, solar…) en 4 horas, diario y semanal.
+      </div>
+    </section>
+
 
 
 
@@ -5552,6 +5594,90 @@ function confluenciaGEX(gex, stoch, opts={}){
            stochK:K, sobreventa, sobrecompra, gammaPos };
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   ANÁLISIS SECTORIAL · ETFs por sector en 4h, diario y semanal
+   Stoch RSI (3,3,14,14) + MACD (12,26,9) en cada temporalidad.
+   Sirve para ver DÓNDE está entrando o saliendo el dinero antes de
+   operar un valor suelto: un valor fuerte en un sector que se cae
+   lo tiene mucho más difícil, y al revés.
+   ═══════════════════════════════════════════════════════════════ */
+const SECTOR_ETFS = [
+  // núcleo sectorial (SPDR + iShares que pidió el usuario)
+  ['IYW','Tecnología (iShares)'],       ['XLK','Tecnología (SPDR)'],
+  ['IYM','Materiales básicos'],          ['IYE','Energía (iShares)'],
+  ['XLE','Energía (SPDR)'],              ['XLF','Financiero'],
+  ['XLV','Salud'],                       ['XLI','Industrial'],
+  ['XLY','Consumo discrecional'],        ['XLP','Consumo básico'],
+  ['XLU','Utilities'],                   ['XLB','Materiales (SPDR)'],
+  ['XLRE','Inmobiliario'],               ['XLC','Comunicación'],
+  // nichos que suelen mover antes que el índice
+  ['SMH','Semiconductores'],             ['SOXX','Semiconductores (iShares)'],
+  ['GDX','Mineras de oro'],              ['GDXJ','Mineras de oro júnior'],
+  ['XBI','Biotecnología'],               ['KRE','Bancos regionales'],
+  ['ITB','Constructoras de vivienda'],   ['XME','Metales y minería'],
+  ['OIH','Servicios petroleros'],        ['XRT','Retail'],
+  ['JETS','Aerolíneas'],                 ['TAN','Solar'],
+  ['URA','Uranio'],                      ['IYT','Transporte'],
+  ['ARKK','Innovación / alto beta'],     ['IBIT','Bitcoin al contado'],
+  // referencias de mercado, para comparar
+  ['SPY','S&P 500 (referencia)'],        ['QQQ','Nasdaq 100 (referencia)'],
+  ['IWM','Small caps (referencia)'],
+];
+
+/* MACD (12, 26, 9) — igual que TradingView: EMAs sobre el cierre. */
+function emaSerie(vals, len){
+  if(!vals.length) return [];
+  const k = 2/(len+1);
+  const out = new Array(vals.length).fill(NaN);
+  // primer valor: media simple de los primeros `len`
+  if(vals.length < len) return out;
+  let s=0; for(let i=0;i<len;i++) s+=vals[i];
+  out[len-1] = s/len;
+  for(let i=len;i<vals.length;i++) out[i] = vals[i]*k + out[i-1]*(1-k);
+  return out;
+}
+function macd(closes, fast=12, slow=26, signal=9){
+  if(!closes || closes.length < slow+signal+2) return null;
+  const eF = emaSerie(closes, fast), eS = emaSerie(closes, slow);
+  const linea = closes.map((_,i)=> (isFinite(eF[i])&&isFinite(eS[i])) ? eF[i]-eS[i] : NaN);
+  const validos = linea.filter(x=>isFinite(x));
+  if(validos.length < signal+1) return null;
+  const sig = emaSerie(validos, signal);
+  const n = validos.length;
+  const m = validos[n-1], s = sig[n-1];
+  const mPrev = validos[n-2], sPrev = sig[n-2];
+  if(!isFinite(m)||!isFinite(s)) return null;
+  const hist = m - s, histPrev = (isFinite(mPrev)&&isFinite(sPrev)) ? mPrev-sPrev : NaN;
+  // cruce reciente: la señal más accionable del MACD
+  let cruce = 'ninguno';
+  if(isFinite(histPrev)){
+    if(histPrev<=0 && hist>0) cruce = 'alcista';
+    else if(histPrev>=0 && hist<0) cruce = 'bajista';
+  }
+  return { linea:m, signal:s, hist, histPrev, cruce,
+           creciendo: isFinite(histPrev) ? hist>histPrev : null,
+           sobreCero: m>0 };
+}
+
+/* Resume una temporalidad: Stoch RSI + MACD + un veredicto simple */
+function analizaTF(closes){
+  if(!closes || closes.length<40) return null;
+  const sr = stochRSI(closes,14,14,3,3);
+  const mc = macd(closes,12,26,9);
+  if(!sr && !mc) return null;
+  // puntuación: +1 por cada señal alcista, -1 por bajista
+  let pts=0, n=0;
+  if(sr){ n++; if(sr.k>sr.d) pts++; else pts--; }
+  if(mc){ n++; if(mc.hist>0) pts++; else pts--;
+          n++; if(mc.sobreCero) pts++; else pts--; }
+  const score = n? pts/n : 0;
+  return { k:sr?sr.k:NaN, d:sr?sr.d:NaN,
+           macdLinea:mc?mc.linea:NaN, macdSignal:mc?mc.signal:NaN,
+           hist:mc?mc.hist:NaN, cruce:mc?mc.cruce:'—',
+           creciendo:mc?mc.creciendo:null, sobreCero:mc?mc.sobreCero:null,
+           score, velas:closes.length };
+}
+
 function calcularGEX(rows, spot, opts={}){
   if(!rows || !rows.length || !isFinite(spot) || spot<=0) return null;
   const mult = opts.mult ?? 100;
@@ -6663,6 +6789,141 @@ function renderGEX(res){
   m.innerHTML = buenos
     ? '<b>'+buenos+' setup(s) de giro mecánico completo.</b> Precio en un muro de gamma + agotamiento del Stoch RSI a la vez: el nivel tiene compra o venta obligatoria de los dealers detrás. Están arriba del todo.'
     : 'Ningún giro mecánico completo ahora mismo. Mira los de 2 estrellas: son niveles válidos a los que les falta el agotamiento — si el Stoch RSI llega al extremo estando ahí, se completa el setup.';
+}
+
+/* Escáner sectorial: Stoch RSI + MACD en 4h, diario y semanal */
+let SEC = { running:false, dx:null, results:[] };
+
+async function scanSectorial(){
+  if(SEC.running) return;
+  if(!CN.url||!CN.key){
+    const m=$('secMsg'); m.style.display='block';
+    m.innerHTML='Necesito el acceso a datos configurado (Mi cuenta → Configurar acceso).'; return;
+  }
+  SEC.running=true; SEC.results=[];
+  $('secEmpty').style.display='none';
+  $('secMsg').style.display='none';
+  $('secOut').style.display='none';
+  $('secProg').style.display='block';
+  $('secBtn').disabled=true; $('secBtn').textContent='Analizando…';
+
+  try{
+    const dx=new DXLink(); SEC.dx=dx;
+    await dx.connect(CN.url, CN.key);
+    const LOTE=8;
+    const total=SECTOR_ETFS.length;
+    let hechos=0;
+
+    for(let i=0;i<total && SEC.running;i+=LOTE){
+      const lote=SECTOR_ETFS.slice(i,i+LOTE);
+      const buck={};   // sym -> {h4:[], d:[], w:[]}
+      dx.onCandle=(s,c)=>{
+        const base=s.split('{')[0];
+        const tf=(s.match(/\{=(\w+)\}/)||[])[1]||'d';
+        const key = tf==='4h' ? 'h4' : tf==='w' ? 'w' : 'd';
+        if(!buck[base]) buck[base]={h4:[],d:[],w:[]};
+        buck[base][key].push(c);
+      };
+      // Histórico necesario para que el RSI Wilder converja en cada temporalidad:
+      //  · 4h  → ~140 velas de 4h ≈ 100 días naturales (pedimos 150 por margen)
+      //  · d   → 300 días naturales (≈205 sesiones), ya verificado
+      //  · w   → ~140 velas semanales ≈ 3 años (pedimos 1400 días)
+      lote.forEach(([s])=>{
+        dx.subscribeCandles(s, 150, '4h');
+        dx.subscribeCandles(s, 300, 'd');
+        dx.subscribeCandles(s, 1400, 'w');
+      });
+      await new Promise(r=>setTimeout(r, 6000));
+
+      for(const [sym,nombre] of lote){
+        const b=buck[sym];
+        const cl = arr => (arr||[]).slice().sort((a,b2)=>a.time-b2.time)
+                     .map(c=>c.close).filter(x=>isFinite(x)&&x>0);
+        const res = { sym, nombre,
+          h4: b? analizaTF(cl(b.h4)) : null,
+          d:  b? analizaTF(cl(b.d))  : null,
+          w:  b? analizaTF(cl(b.w))  : null,
+          precio: b && cl(b.d).length ? cl(b.d).slice(-1)[0] : NaN };
+        // alineación: media de los scores de las tres temporalidades
+        const sc=[res.h4,res.d,res.w].filter(x=>x&&isFinite(x.score)).map(x=>x.score);
+        res.alineacion = sc.length ? sc.reduce((a,b2)=>a+b2,0)/sc.length : NaN;
+        SEC.results.push(res);
+        hechos++;
+      }
+      lote.forEach(([s])=>{ try{
+        dx.unsubscribeCandles(s,'4h'); dx.unsubscribeCandles(s,'d'); dx.unsubscribeCandles(s,'w');
+      }catch(e){} });
+      const pct=Math.round(hechos/total*100);
+      $('secFill').style.width=pct+'%';
+      $('secPtxt').textContent=hechos+' / '+total+' ETFs';
+      renderSectorial();
+    }
+    try{ dx.disconnect(); }catch(e){}
+  }catch(e){
+    $('secMsg').style.display='block'; $('secMsg').innerHTML='Error: '+(e.message||e);
+  }
+  SEC.running=false;
+  $('secProg').style.display='none';
+  $('secBtn').disabled=false; $('secBtn').textContent='Analizar sectores';
+  renderSectorial(true);
+}
+
+function renderSectorial(final){
+  if(!SEC.results.length) return;
+  $('secOut').style.display='block';
+  const orden=($('secOrden')&&$('secOrden').value)||'fuerza';
+  const R=[...SEC.results];
+  if(orden==='fuerza') R.sort((a,b)=>(b.alineacion||-9)-(a.alineacion||-9));
+  else if(orden==='debil') R.sort((a,b)=>(a.alineacion||9)-(b.alineacion||9));
+  else if(orden==='nombre') R.sort((a,b)=>a.sym.localeCompare(b.sym));
+  else if(orden==='giro'){
+    // giro al alza: semanal alcista + 4h sobrevendido girando
+    const puntua = r => {
+      if(!r.h4||!r.w) return -99;
+      let p=0;
+      if(r.w.score>0) p+=2;                       // tendencia mayor alcista
+      if(isFinite(r.h4.k)&&r.h4.k<25) p+=2;       // corto plazo sobrevendido
+      if(isFinite(r.h4.k)&&isFinite(r.h4.d)&&r.h4.k>r.h4.d) p+=1;  // ya girando
+      if(r.h4.cruce==='alcista') p+=1;
+      return p;
+    };
+    R.sort((a,b)=>puntua(b)-puntua(a));
+  }
+
+  const cel = (t) => {
+    if(!t) return '<td class="mute" colspan="2">—</td>';
+    const kd = isFinite(t.k)
+      ? `<b class="${t.k>t.d?'up':'dn'}">${t.k.toFixed(0)}</b><span class="mute">/${isFinite(t.d)?t.d.toFixed(0):'—'}</span>`
+      : '—';
+    const flecha = t.creciendo===true?'▲':t.creciendo===false?'▼':'';
+    const mc = isFinite(t.hist)
+      ? `<span class="${t.sobreCero?'up':'dn'}">${t.hist>=0?'+':''}${t.hist.toFixed(2)}${flecha}</span>${t.cruce!=='ninguno'&&t.cruce!=='—'?`<span class="sec-cross ${t.cruce==='alcista'?'up':'dn'}" title="cruce ${t.cruce}">⚡</span>`:''}`
+      : '—';
+    return `<td class="num" style="font-size:12px">${kd}</td><td class="num" style="font-size:12px">${mc}</td>`;
+  };
+
+  $('secTable').innerHTML =
+    '<thead><tr><th rowspan="2">ETF</th><th colspan="2">4 horas</th><th colspan="2">Diario</th><th colspan="2">Semanal</th><th rowspan="2">Fuerza</th></tr>'+
+    '<tr><th style="font-size:10px">K/D</th><th style="font-size:10px">MACD</th><th style="font-size:10px">K/D</th><th style="font-size:10px">MACD</th><th style="font-size:10px">K/D</th><th style="font-size:10px">MACD</th></tr></thead><tbody>'+
+    R.map(r=>{
+      const a=r.alineacion;
+      const aCls = !isFinite(a)?'mute':a>0.3?'up':a<-0.3?'dn':'mute';
+      const aTxt = !isFinite(a)?'—':(a>0.6?'muy fuerte':a>0.3?'fuerte':a>-0.3?'mixto':a>-0.6?'débil':'muy débil');
+      return `<tr onclick="srGoChain('${r.sym}')">
+        <td class="tk"><b>${r.sym}</b><br><span class="mute" style="font-size:10.5px">${r.nombre}</span></td>
+        ${cel(r.h4)}${cel(r.d)}${cel(r.w)}
+        <td class="num ${aCls}" style="font-size:11.5px"><b>${aTxt}</b></td>
+      </tr>`;
+    }).join('')+'</tbody>';
+
+  if(final){
+    const fuertes=R.filter(r=>isFinite(r.alineacion)&&r.alineacion>0.3).length;
+    const debiles=R.filter(r=>isFinite(r.alineacion)&&r.alineacion<-0.3).length;
+    const m=$('secMsg'); m.style.display='block';
+    m.innerHTML='<b>'+fuertes+' sectores fuertes · '+debiles+' débiles</b> de '+R.length+' analizados. '+
+      'Prueba el orden <b>"giros al alza"</b>: te pone arriba los que tienen el semanal alcista y el 4h sobrevendido — '+
+      'entrar a favor de la tendencia mayor tras una corrección del corto plazo es la forma con más sentido de usar esto.';
+  }
 }
 
 async function scanStochRSI(){
