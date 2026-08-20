@@ -328,6 +328,11 @@ details[open]>.adv-summary::before{content:"▾ "}
 .gx-tag.up{color:var(--bull,#3fb950)}.gx-tag.dn{color:var(--bear,#f85149)}
 .gx-warn{font-family:var(--body);font-size:12px;padding:8px 10px;border-radius:6px;margin-bottom:10px;background:rgba(248,81,73,.10);border:1px solid var(--bear,#f85149);color:var(--ink2)}
 .warn{color:var(--warn,#d29922)}
+.sec-trad td{font-family:var(--body);font-size:11.5px;color:var(--ink2);line-height:1.5;padding:8px 10px 12px;background:rgba(255,255,255,.02);border-bottom:1px solid var(--rule2)}
+.sec-trad div{margin-bottom:3px}
+.sec-op{display:inline-block;padding:5px 8px;border-radius:5px;font-weight:600;background:rgba(255,255,255,.04);border:1px solid var(--rule2)}
+.sec-op.up{border-color:var(--bull,#3fb950)}.sec-op.dn{border-color:var(--bear,#f85149)}.sec-op.warn{border-color:var(--warn,#d29922)}
+.sec-main td{border-bottom:none}
 .sec-cross{margin-left:3px;font-size:11px}
 .sec-cross.up{color:var(--bull,#3fb950)}.sec-cross.dn{color:var(--bear,#f85149)}
 .gx-card{margin:14px 0;padding:14px;background:var(--card2,rgba(255,255,255,.03));border:1px solid var(--rule2);border-radius:10px}
@@ -668,15 +673,19 @@ summary:hover{color:var(--ink)}
       <div class="caveat" id="secMsg" style="display:none"></div>
       <div id="secOut" style="display:none"><div class="scrollx"><table class="quotes" id="secTable"></table></div>
         <div class="historia" style="font-size:12px;margin-top:10px">
-          <b>Stoch RSI</b>: el número va de 0 a 100. <span class="up">Verde por debajo de 20</span> = sobrevendido,
-          <span class="dn">rojo por encima de 80</span> = sobrecomprado. Debajo, <b>▲ gira</b> si K va por encima de D
-          (empieza a subir) o <b>▼ cae</b> si no.<br>
-          <b>MACD</b>: en vez del número en bruto (que no se puede comparar entre ETFs de distinto precio),
-          te doy el <b>estado</b>: <span class="up">alcista</span> = tendencia y momento a favor;
-          <span class="warn">pierde fuerza</span> = alcista de fondo pero corrigiendo;
-          <span class="warn">girando</span> = bajista de fondo pero rebotando;
-          <span class="dn">bajista</span> = todo en contra. Debajo, su tamaño <b>en % del precio</b>, que sí es
-          comparable. <b>⚡</b> = acaba de cruzar.<br>
+          <b>¿Qué es el MACD, en cristiano?</b> Compara una media rápida del precio (12) con una lenta (26).
+          Si la rápida va por encima, el precio acelera hacia arriba. De ahí salen dos cosas distintas:<br>
+          · <b>La línea</b> (sobre o bajo cero) = <i>dónde estás</i>: la tendencia de fondo. Cambia despacio.<br>
+          · <b>El histograma</b> (lo que ves en %) = <i>hacia dónde vas</i>: el impulso de ahora. Cambia mucho antes,
+          por eso es el que avisa.<br>
+          Cruzando los dos salen cuatro situaciones: <span class="up">alcista</span> (todo a favor),
+          <span class="warn">pierde fuerza</span> (alcista de fondo pero enfriándose),
+          <span class="warn">girando</span> (bajista de fondo pero rebotando) y
+          <span class="dn">bajista</span> (todo en contra). Las dos de en medio son las transiciones: ahí se giran las cosas.<br>
+          El <b>%</b> dice si eso es un rasguño o algo serio: por debajo de 0,25% son dudas; por encima de 1%, un giro con ganas.
+          Va en % del precio para poder comparar un ETF de 40$ con otro de 600$.<br>
+          <b>Stoch RSI</b>: de 0 a 100. <span class="up">Bajo 20</span> = sobrevendido,
+          <span class="dn">sobre 80</span> = sobrecomprado. <b>⚡</b> = el MACD acaba de cruzar.
           <b>Fuerza</b>: pondera las tres temporalidades dando más peso al <b>semanal</b> (la tendencia real
           del sector) que al 4h (ruido de dos días). Pincha una fila para abrir su cadena.
         </div>
@@ -6936,6 +6945,51 @@ function renderSectorial(final){
      escala fija 0-100 y por tanto sí se entiende y se compara. */
   const ETIQ = { alcista:'alcista', perdiendo:'pierde fuerza', girando:'girando', bajista:'bajista', '—':'—' };
   const CLASE = { alcista:'up', perdiendo:'warn', girando:'warn', bajista:'dn', '—':'mute' };
+
+  /* TRADUCCIÓN A ESPAÑOL DE VERDAD.
+     Un "-0,16%" no le dice nada a nadie. Lo que hace falta es la frase:
+     qué está pasando y qué implica. Eso es lo que devuelve esto. */
+  const traduce = (t, tf) => {
+    if(!t || t.estado==='—') return '';
+    const mag = Math.abs(t.histPct);
+    // ¿el impulso es un rasguño o algo serio?
+    const fuerza = !isFinite(mag) ? '' : mag<0.25 ? 'leve' : mag<1 ? 'claro' : 'fuerte';
+    const per = tf==='4h' ? 'en el corto plazo' : tf==='d' ? 'en el día a día' : 'en la tendencia de fondo';
+    const cruceTxt = t.cruce==='alcista' ? ' Y acaba de cruzar al alza: el giro es de ahora mismo.'
+                   : t.cruce==='bajista' ? ' Y acaba de cruzar a la baja: el giro es de ahora mismo.' : '';
+    let base;
+    switch(t.estado){
+      case 'alcista':
+        base = `Sube y con gas ${per}. La tendencia va a favor y el impulso acompaña`+
+               (fuerza==='fuerte'?', con mucha fuerza.':fuerza==='leve'?', aunque el empuje es flojo.':'.');
+        break;
+      case 'perdiendo':
+        base = `Subió, y ahora está perdiendo gas ${per}. No es bajista todavía —la tendencia de fondo sigue `+
+               `siendo alcista— pero está corrigiendo`+
+               (fuerza==='fuerte'?' con ganas: ojo, puede girarse del todo.':fuerza==='leve'?' muy poquito: puede ser solo un respiro.':'.');
+        break;
+      case 'girando':
+        base = `Venía cayendo, pero está rebotando ${per}. El fondo sigue siendo bajista, así que puede ser `+
+               `solo un rebote`+
+               (fuerza==='fuerte'?', aunque el empuje es fuerte y podría ser el suelo.':fuerza==='leve'?' de poca cosa.':'.');
+        break;
+      default:
+        base = `Cae y sin frenos ${per}. Tendencia e impulso, los dos en contra`+
+               (fuerza==='fuerte'?': caída con fuerza.':fuerza==='leve'?', aunque suavemente.':'.');
+    }
+    return base + cruceTxt;
+  };
+
+  /* Traducción del Stoch RSI, que también es un número pelado */
+  const traduceStoch = (t) => {
+    if(!t || !isFinite(t.k)) return '';
+    const gira = isFinite(t.d) && t.k>t.d;
+    if(t.k<=5)  return gira? 'Sobreventa extrema y ya girando al alza: agotamiento vendedor.' : 'Sobreventa extrema, pero aún cayendo: puede seguir un poco más.';
+    if(t.k<=20) return gira? 'Sobrevendido y empezando a girar: los vendedores aflojan.' : 'Sobrevendido y todavía bajando.';
+    if(t.k>=95) return gira? 'Sobrecompra extrema y aún subiendo: euforia, cuidado.' : 'Sobrecompra extrema y ya girándose a la baja: agotamiento comprador.';
+    if(t.k>=80) return gira? 'Sobrecomprado y todavía subiendo.' : 'Sobrecomprado y empezando a girarse abajo.';
+    return gira? 'En zona media, subiendo.' : 'En zona media, bajando.';
+  };
   const cel = (t) => {
     if(!t) return '<td class="mute" colspan="2">—</td>';
     // Stoch RSI: número claro con color según zona
@@ -6964,13 +7018,35 @@ function renderSectorial(final){
       const aTxt = !isFinite(a)?'—':(a>0.6?'muy fuerte':a>0.3?'fuerte':a>-0.3?'mixto':a>-0.6?'débil':'muy débil');
       // el semanal es lo que define la tendencia del sector: lo decimos explícito
       const base = r.w ? (r.w.estado==='alcista'?'semanal alcista':r.w.estado==='bajista'?'semanal bajista':'semanal '+ETIQ[r.w.estado]) : '';
-      return `<tr onclick="srGoChain('${r.sym}')">
+      /* LECTURA EN CRISTIANO: la frase que resume qué está pasando en ese sector.
+         El semanal manda la tendencia, el 4h dice si hay una entrada ahora. */
+      const lecturaW = traduce(r.w,'w'), lecturaD = traduce(r.d,'d'), lectura4 = traduce(r.h4,'4h');
+      const stoch4 = traduceStoch(r.h4);
+      // ¿hay una oportunidad de entrada a favor de la tendencia mayor?
+      let oportunidad='';
+      if(r.w && r.h4 && (r.w.estado==='alcista'||r.w.estado==='perdiendo') && isFinite(r.h4.k) && r.h4.k<=25){
+        oportunidad = `<span class="sec-op up">💡 El fondo es alcista y el corto plazo está sobrevendido: `+
+          `es el tipo de entrada que tiene sentido — comprar la corrección dentro de una tendencia al alza.</span>`;
+      } else if(r.w && r.h4 && r.w.estado==='bajista' && isFinite(r.h4.k) && r.h4.k>=75){
+        oportunidad = `<span class="sec-op dn">💡 El fondo es bajista y el corto plazo está sobrecomprado: `+
+          `es el rebote típico para buscar cortos, no para comprar.</span>`;
+      } else if(r.w && r.h4 && r.w.estado==='bajista' && isFinite(r.h4.k) && r.h4.k<=20){
+        oportunidad = `<span class="sec-op warn">⚠️ Sobrevendido pero con la tendencia de fondo en contra: `+
+          `comprar aquí es ir contra corriente. Los rebotes suelen ser cortos.</span>`;
+      }
+      return `<tr onclick="srGoChain('${r.sym}')" class="sec-main">
         <td class="tk"><b>${r.sym}</b><br><span class="mute" style="font-size:10.5px">${r.nombre}</span></td>
         ${cel(r.h4)}${cel(r.d)}${cel(r.w)}
         <td class="num ${aCls}" style="font-size:11.5px;line-height:1.35"><b>${aTxt}</b>
-          <br><span class="mute" style="font-size:10px">${isFinite(r.senales)?r.senales+'/'+r.senalesTot+' a favor':''}</span>
-          <br><span class="mute" style="font-size:10px">${base}</span></td>
-      </tr>`;
+          <br><span class="mute" style="font-size:10px">${isFinite(r.senales)?r.senales+'/'+r.senalesTot+' a favor':''}</span></td>
+      </tr>
+      <tr class="sec-trad"><td colspan="8">
+        ${lecturaW?`<div><b>Semanal (la tendencia real):</b> ${lecturaW}</div>`:''}
+        ${lecturaD?`<div><b>Diario:</b> ${lecturaD}</div>`:''}
+        ${lectura4?`<div><b>4 horas:</b> ${lectura4}</div>`:''}
+        ${stoch4?`<div><b>Stoch RSI 4h:</b> ${stoch4}</div>`:''}
+        ${oportunidad?`<div style="margin-top:5px">${oportunidad}</div>`:''}
+      </td></tr>`;
     }).join('')+'</tbody>';
 
   if(final){
