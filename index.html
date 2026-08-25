@@ -757,11 +757,6 @@ summary:hover{color:var(--ink)}
           <option value="QQQ">QQQ</option>
           <option value="IWM">IWM</option>
         </select>
-        <select id="labAla" class="btn quiet" style="padding:8px">
-          <option value="0.9" selected>Alas a ~0,9% (≈50 pts SPX)</option>
-          <option value="0.55">Alas a ~0,55% (≈30 pts)</option>
-          <option value="1.8">Alas a ~1,8% (≈100 pts)</option>
-        </select>
       </div>
       <div class="caveat" id="labMsg" style="display:none"></div>
       <div id="labOut" style="display:none"><div id="labTable"></div>
@@ -5999,7 +5994,7 @@ function lab0DTE(velas, vixVelas, opts={}){
     }
     if(isFinite(costePct)) costePct += costeExtra;
     filas.push({
-      fecha:f, dow:dia(v.time), open:v.open, close:v.close,
+      fecha:f, dow:dia(v.time), open:v.open, close:v.close, high:v.high, low:v.low,
       movCierre, recorrido, vix, vixPrev,
       vixCambio: (isFinite(vix)&&isFinite(vixPrev)&&vixPrev>0) ? (vix/vixPrev-1)*100 : NaN,
       rsi: rsiSerie[i],
@@ -6243,6 +6238,38 @@ function pnl0DTE(estrategia, m, sigmaDia, costes){
   return (pnl - costes*patas)*100;   // en % del subyacente
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   VARIANTES CON STOP-LOSS · lo que de verdad cambia el perfil
+
+   El problema de vender prima no es que pierda de media: es que
+   acierta el 85% y el día malo se lleva medio año. Eso no se
+   arregla eligiendo strikes — se arregla CORTANDO ese día.
+
+   Se modela de forma realista usando el máximo y el mínimo del día:
+   si el subyacente llegó a moverse en contra más de `stopSigma`
+   desviaciones, se asume que la posición se cerró ahí, pagando el
+   valor que tendría la estructura en ese punto (aproximado por el
+   intrínseco más un resto de valor temporal). No es exacto —la hora
+   del toque importa— pero captura el efecto principal: la cola se
+   corta a cambio de convertir algunos días ganadores en perdedores.
+   ═══════════════════════════════════════════════════════════════ */
+function pnl0DTEconStop(estrategia, m, mMax, mMin, sigmaDia, costes, stopSigma){
+  // sin stop, comportamiento normal
+  if(!isFinite(stopSigma) || stopSigma<=0) return pnl0DTE(estrategia,m,sigmaDia,costes);
+  const adverso = Math.max(Math.abs(mMax), Math.abs(mMin));   // peor excursión del día
+  if(adverso <= stopSigma*sigmaDia) return pnl0DTE(estrategia,m,sigmaDia,costes);
+  // Se tocó el stop: se cierra en ese nivel. Usamos el movimiento del stop
+  // con el signo de la excursión dominante, y añadimos un resto de valor
+  // temporal (al cerrar antes del vencimiento aún queda prima por pagar).
+  const signo = Math.abs(mMax) >= Math.abs(mMin) ? 1 : -1;
+  const mStop = signo*stopSigma*sigmaDia;
+  const base = pnl0DTE(estrategia, mStop, sigmaDia, costes);
+  // penalización por cerrar antes de tiempo (queda valor temporal en contra)
+  const resto = 0.25*sigmaDia*100;
+  const esVendedor = estrategia.includes('corto')||estrategia.includes('credito');
+  return base - (esVendedor? resto : 0) - costes*100;   // una vuelta extra de costes al cerrar
+}
+
 /* Catálogo con la RAZÓN por la que cada una podría funcionar */
 const ESTRATEGIAS_0DTE = [
   { id:'strangle_corto_1s', nombre:'Strangle corto 1σ',
@@ -6265,6 +6292,15 @@ const ESTRATEGIAS_0DTE = [
     tesis:'Comprar volatilidad pura. En teoría pierde de media (paga la prima de riesgo), salvo que se acierte el momento.' },
   { id:'mariposa_larga', nombre:'Mariposa larga ATM',
     tesis:'Apuesta a que el índice se queda clavado cerca de la apertura. Barata; gana si el día es plano.' },
+  // ── Variantes con gestión de la pérdida ──
+  { id:'strangle_corto_1s', stop:1.5, nombre:'Strangle corto 1σ + STOP a 1,5σ',
+    tesis:'La misma venta de prima, pero cortando el día malo. Sacrifica algunos días ganadores (los que tocan el stop y luego vuelven) a cambio de eliminar la cola que arruina. Es la diferencia entre una estrategia y una bomba de relojería.' },
+  { id:'strangle_corto_1s', stop:2, nombre:'Strangle corto 1σ + STOP a 2σ',
+    tesis:'Stop más ancho: se toca menos veces, así que se pierden menos días buenos, pero cuando salta la pérdida ya es mayor. El equilibrio entre las dos cosas es la pregunta empírica.' },
+  { id:'straddle_corto', stop:1.5, nombre:'Straddle corto ATM + STOP a 1,5σ',
+    tesis:'La estructura que más prima cobra, con la cola cortada. Si la venta de prima funciona, esta debería ser la mejor versión.' },
+  { id:'condor_corto', stop:1.5, nombre:'Iron condor corto + STOP a 1,5σ',
+    tesis:'Doble protección: alas compradas y stop. Cobra poco, pero el peor día debería ser realmente pequeño.' },
 ];
 
 /* Mide cada estrategia del catálogo sobre los datos reales, con
@@ -6276,13 +6312,17 @@ function medirEstrategias0DTE(filas, opts={}){
   if(datos.length<200) return null;
   const corte=Math.floor(datos.length*fracIS);
 
-  const evaluar=(arr,id,filtro)=>{
+  const evaluar=(arr,id,filtro,stop)=>{
     const sel=filtro?arr.filter(filtro):arr;
     if(sel.length<30) return null;
     const pnls=sel.map(d=>{
       const sd=d.vix/100/Math.sqrt(252);
       const m=(d.close-d.open)/d.open;
-      return pnl0DTE(id,m,sd,costes);
+      // excursiones intradía: cuánto llegó a moverse a favor y en contra
+      const mMax=(d.high-d.open)/d.open, mMin=(d.low-d.open)/d.open;
+      return (isFinite(stop)&&stop>0)
+        ? pnl0DTEconStop(id,m,mMax,mMin,sd,costes,stop)
+        : pnl0DTE(id,m,sd,costes);
     }).filter(x=>isFinite(x));
     if(pnls.length<30) return null;
     const n=pnls.length, media=pnls.reduce((a,b)=>a+b,0)/n;
@@ -6302,9 +6342,9 @@ function medirEstrategias0DTE(filas, opts={}){
 
   const res=[];
   for(const e of ESTRATEGIAS_0DTE){
-    const todo=evaluar(datos,e.id,null);
-    const is=evaluar(datos.slice(0,corte),e.id,null);
-    const oos=evaluar(datos.slice(corte),e.id,null);
+    const todo=evaluar(datos,e.id,null,e.stop);
+    const is=evaluar(datos.slice(0,corte),e.id,null,e.stop);
+    const oos=evaluar(datos.slice(corte),e.id,null,e.stop);
     if(!todo) continue;
     // mejor condición para esa estrategia (probando unas pocas, no miles)
     const condiciones=[
@@ -6316,8 +6356,8 @@ function medirEstrategias0DTE(filas, opts={}){
       ['sin lunes', d=>d.dow!==1],
     ];
     const porCondicion=condiciones.map(([nm,fn])=>{
-      const r=evaluar(datos,e.id,fn);
-      const rOOS=evaluar(datos.slice(corte),e.id,fn);
+      const r=evaluar(datos,e.id,fn,e.stop);
+      const rOOS=evaluar(datos.slice(corte),e.id,fn,e.stop);
       return r?{nombre:nm, ...r, oosMedia:rOOS?rOOS.media:NaN, oosN:rOOS?rOOS.n:0}:null;
     }).filter(Boolean);
     res.push({ ...e, todo, is, oos, porCondicion });
@@ -7805,7 +7845,7 @@ async function scanLab0DTE(){
         'Sin VIX, esta medición no es posible — y prefiero decírtelo a inventarme el coste.';
       $('labBtn').disabled=false; $('labBtn').textContent='Medir'; return;
     }
-    const filas=lab0DTE(velas, vix, {usarIC:true, alaPct:+(($('labAla')&&$('labAla').value)||0.9), costeExtra:0.02});
+    const filas=lab0DTE(velas, vix);   // solo prepara los datos; el P&L lo calcula cada estructura
     LAB={filas, sym};
     renderLab0DTE();
     m.style.display='none';
@@ -7816,6 +7856,25 @@ async function scanLab0DTE(){
 function renderLab0DTE(){
   const filas=LAB.filas; if(!filas) return;
   $('labOut').style.display='block';
+  // Resumen de los datos descargados. El análisis de verdad está en el
+  // catálogo de estructuras, que se ejecuta justo debajo.
+  const conVix=filas.filter(f=>isFinite(f.vix));
+  const vixs=conVix.map(f=>f.vix);
+  $('labTable').innerHTML = `<div class="bt-grid" style="grid-template-columns:repeat(4,1fr)">
+     <div class="bt-cell"><div class="bt-num">${filas.length}</div><div class="bt-lbl">sesiones<br>analizadas</div></div>
+     <div class="bt-cell"><div class="bt-num">${filas[0].fecha.slice(0,7)}</div><div class="bt-lbl">desde</div></div>
+     <div class="bt-cell"><div class="bt-num">${filas[filas.length-1].fecha.slice(0,7)}</div><div class="bt-lbl">hasta</div></div>
+     <div class="bt-cell"><div class="bt-num">${vixs.length?(Math.min(...vixs).toFixed(0)+'-'+Math.max(...vixs).toFixed(0)):'—'}</div><div class="bt-lbl">rango<br>del VIX</div></div>
+   </div>
+   <div class="historia" style="font-size:12.5px;margin-top:10px">Datos listos. Abajo tienes el catálogo de
+   estructuras: cada una valorada con Black-Scholes sobre el VIX de cada día, con el skew de las puts
+   modelado, y liquidada al cierre con el movimiento real.</div>`;
+  correrEstrategias0DTE();     // el catálogo es el análisis principal
+  return;
+}
+
+function _labTablaVieja(){
+  const filas=LAB.filas;
   const pct=x=>(x>=0?'+':'')+x.toFixed(3)+'%';
   // conjuntos a comparar: base y cada filtro por separado, para ver cuál aporta
   const pruebas=[
