@@ -697,6 +697,87 @@ summary:hover{color:var(--ink)}
         uranio, solar…) en 4 horas, diario y semanal.
       </div>
     </section>
+    <section class="blk" style="margin-top:22px">
+      <h2>🔗 Prima de volatilidad<span class="sub">IV en vivo vs predicción de AlphaForge</span></h2>
+      <div class="historia" style="font-size:13.5px;margin-bottom:12px">
+        <p>AlphaForge predice la volatilidad <b>realizada</b> (lo que el valor se va a mover de verdad).
+        Aquí la resto de la <b>implícita</b> (lo que el mercado cobra ahora por las opciones). Si el mercado
+        cobra más de lo que el valor se va a mover, el seguro está caro y toca <b>vender volatilidad</b>;
+        si cobra menos, está barato y toca <b>comprarla</b>.</p>
+        <p class="caveat" style="margin-top:8px"><b>Lo que hay que saber antes de usar esto:</b>
+        que un modelo bata al estándar académico (HAR) <b>no significa que bata a la implícita</b>, que es
+        el precio contra el que operas. Según el propio documento de AlphaForge, esa validación
+        <b>todavía no se ha hecho</b>. Hasta entonces esto es una hipótesis con buena pinta, no una señal
+        para arriesgar dinero.</p>
+        <p style="margin-top:6px;font-size:12.5px">Por eso cada fila te dice <b>por qué NO</b> operarla:
+        si la diferencia cae dentro del error del propio modelo, si la predicción está caducada, si el
+        modelo no se validó para ese plazo, o si la horquilla se come la ventaja. Solo lo que supera
+        los cuatro filtros aparece como operable.</p>
+      </div>
+      <div class="btns" style="margin-bottom:6px">
+        <button class="btn solid" id="vrpBtn" onclick="scanVRP()">Comparar IV vs predicción</button>
+      </div>
+      <div class="caveat" id="vrpMsg" style="display:none"></div>
+      <div id="vrpOut" style="display:none"><div id="vrpTable"></div>
+        <div class="historia" style="font-size:12px;margin-top:10px">
+          <b>Diferencia</b> = IV − RV predicha, en puntos de volatilidad. Positiva = el seguro está caro.
+          <b>Ruido del modelo</b> = su error típico: una diferencia menor que esto no es señal.
+          Se compara en el plazo <b>mensual</b> (~30 días), que es donde el propio análisis dice que la
+          ventaja sobrevive a los costes; en semanales la horquilla (~2 pts) se lo come todo.
+        </div>
+      </div>
+      <div class="empty" id="vrpEmpty">
+        <strong>Prima de volatilidad</strong>
+        Compara la volatilidad implícita que cobra el mercado con la que AlphaForge predice.
+        Si el fichero de predicción no está publicado todavía, esta sección te lo dirá y el resto
+        del monitor seguirá funcionando igual.
+      </div>
+    </section>
+    <section class="blk" style="margin-top:22px">
+      <h2>🧪 Laboratorio 0DTE<span class="sub">¿compensa de verdad comprar prima intradía?</span></h2>
+      <div class="historia" style="font-size:13.5px;margin-bottom:12px">
+        <p>Comprar un straddle 0DTE se reduce a <b>una pregunta medible</b>: ¿el índice se movió ese día
+        más de lo que costó la prima? Y las dos cosas se pueden calcular sin tener histórico de cadenas:
+        lo que se movió sale de las velas, y lo que costaba sale del VIX
+        (prima ATM 0DTE ≈ 0,7979·VIX·√(1/252)).</p>
+        <p style="margin-top:6px">Con eso mido sobre <b>años de datos reales</b> cuántas veces el movimiento
+        superó al coste — y, lo más importante, <b>si los filtros que propone una estrategia</b> (VIX bajando,
+        RSI en rango, día de la semana) <b>seleccionan de verdad días de más movimiento</b> o solo lo parecen
+        por haber probado muchas combinaciones.</p>
+        <p class="caveat" style="margin-top:8px"><b>Qué es y qué no es:</b> mide el movimiento del subyacente
+        contra el coste estimado de la prima. No replica la ejecución real (horquilla de cuatro patas,
+        deslizamiento, hora exacta de entrada). Un resultado positivo aquí es condición <b>necesaria</b>
+        para que la estrategia funcione, no suficiente. Un resultado negativo, en cambio, es bastante
+        concluyente: si ni siquiera el movimiento supera a la prima, no hay nada que rascar.</p>
+      </div>
+      <div class="btns" style="margin-bottom:6px">
+        <button class="btn solid" id="labBtn" onclick="scanLab0DTE()">Medir</button>
+        <select id="labSym" class="btn quiet" style="padding:8px">
+          <option value="SPY">SPY (≈SPX/10)</option>
+          <option value="QQQ">QQQ</option>
+          <option value="IWM">IWM</option>
+        </select>
+        <select id="labAla" class="btn quiet" style="padding:8px">
+          <option value="0.9" selected>Alas a ~0,9% (≈50 pts SPX)</option>
+          <option value="0.55">Alas a ~0,55% (≈30 pts)</option>
+          <option value="1.8">Alas a ~1,8% (≈100 pts)</option>
+        </select>
+      </div>
+      <div class="caveat" id="labMsg" style="display:none"></div>
+      <div id="labOut" style="display:none"><div id="labTable"></div>
+        <div class="btns" style="margin-top:16px">
+          <button class="btn solid" id="gridBtn" onclick="correrGrid0DTE()">Buscar entre miles de combinaciones</button>
+        </div>
+        <div id="gridOut" style="display:none;margin-top:12px"><div id="gridTable"></div></div>
+      </div>
+      <div class="empty" id="labEmpty">
+        <strong>Laboratorio 0DTE</strong>
+        Mide, con años de datos reales, si comprar prima 0DTE tiene esperanza positiva — y si los filtros
+        de una estrategia concreta aportan algo demostrable o son ruido ajustado a posteriori.
+      </div>
+    </section>
+
+
 
 
 
@@ -5735,6 +5816,354 @@ function analizaTF(closes){
            score, precio:px, velas:closes.length };
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   PUENTE CON ALPHAFORGE · predicción de volatilidad realizada
+   Compara la IV EN VIVO de tastytrade con una predicción de RV
+   validada fuera de muestra. Si la implícita está muy por encima
+   de la realizada esperada, el seguro está caro (vender vol);
+   si está por debajo, está barato (comprar vol).
+
+   TRES CORRECCIONES sobre el snippet original del traspaso:
+   1. Las unidades del plazo: tastytrade da days-to-expiration en
+      días NATURALES, y los horizontes del JSON están en SESIONES.
+      30 naturales ≈ 21 sesiones. Sin convertir, se elige mal el
+      horizonte y se comparan plazos distintos.
+   2. La caducidad se COMPROBABA pero no se aplicaba: el snippet
+      devolvía 'desfase' y seguía adelante. Aquí, si la predicción
+      no es de hoy o de ayer (hábil), se descarta.
+   3. El veredicto 'REVISAR' no se filtraba. Se marca como dudoso.
+   ═══════════════════════════════════════════════════════════════ */
+const RV_URL = "https://perez849.github.io/alphaforge/data/rv_forecast.json";
+let RVF = null, RVF_META = null, RVF_ESTADO = 'sin cargar';
+
+async function cargarRVF(){
+  try{
+    const r = await fetch(RV_URL + "?" + Date.now());
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d = await r.json();
+    RVF = d.forecasts || null;
+    RVF_META = { generated:d.generated, units:d.units, estimator:d.estimator,
+                 esEjemplo: !!d.AVISO_EJEMPLO };
+    RVF_ESTADO = RVF ? 'cargado' : 'vacío';
+  }catch(e){
+    RVF = null; RVF_META = null; RVF_ESTADO = 'no disponible';
+  }
+  if(typeof renderVRP==='function') renderVRP();
+  return RVF_ESTADO;
+}
+
+/* Días naturales → sesiones de mercado (252/365) */
+function naturalesASesiones(dias){
+  return isFinite(dias) ? Math.max(1, Math.round(dias*252/365)) : NaN;
+}
+
+/* ¿La predicción está fresca? Vale hoy o el último día hábil. */
+function rvfFresco(asof){
+  if(!asof) return {ok:false, dias:NaN};
+  const f = new Date(asof+'T00:00:00Z');
+  const hoy = new Date();
+  const hoyUTC = new Date(Date.UTC(hoy.getUTCFullYear(),hoy.getUTCMonth(),hoy.getUTCDate()));
+  const dias = Math.round((hoyUTC-f)/86400000);
+  // margen: hasta 3 días naturales cubre un lunes con predicción del viernes
+  return { ok: dias>=0 && dias<=3, dias };
+}
+
+function vrpSignal(ticker, ivLive, dteNaturales, opts={}){
+  if(!RVF || !RVF[ticker]) return null;
+  const entry = RVF[ticker];
+  const hs = entry.horizons || {};
+  const claves = Object.keys(hs);
+  if(!claves.length) return null;
+
+  // FRESCURA: si caducó, no se usa (la advertencia 3 del traspaso)
+  const fresco = rvfFresco(entry.asof);
+  if(!fresco.ok) return { caducado:true, asof:entry.asof, diasDesfase:fresco.dias };
+
+  // PLAZO: convertir días naturales a sesiones antes de elegir horizonte
+  const sesiones = naturalesASesiones(dteNaturales);
+  const h = claves.reduce((a,b)=> Math.abs(+b-sesiones) < Math.abs(+a-sesiones) ? b : a);
+  const f = hs[h];
+  if(!f || !isFinite(f.rv_pred)) return null;
+
+  // La IV puede venir en % (26.1) o en tanto por uno (0.261): normalizamos
+  let iv = ivLive;
+  if(isFinite(iv) && iv > 3) iv /= 100;
+  if(!isFinite(iv) || iv<=0) return null;
+
+  const edge = iv - f.rv_pred;                       // >0 = seguro caro
+  const ruido = f.rv_pred * (f.sigma_log_error||0);  // error propio del modelo
+  /* FIABLE debe exigir TODOS los filtros, no solo el ruido. Antes solo miraba
+     el error del modelo, así que una predicción caducada, un NO-GO o incluso
+     el fichero de EJEMPLO con cifras inventadas podían salir como operables.
+     Eso es justo lo que no puede pasar cuando hay dinero de por medio. */
+  const superaRuido = Math.abs(edge) > ruido;
+  const esEjemploF = !!(RVF_META && RVF_META.esEjemplo);
+  const fiable = superaRuido
+              && fresco.ok
+              && f.veredicto !== 'NO-GO'
+              && f.veredicto !== 'REVISAR'
+              && !esEjemploF;
+
+  /* CALIDAD DEL PRODUCTO (advertencia 2 del traspaso): con una ventaja de
+     0,5-1,5 puntos de vol, la horquilla decide. Solo los vencimientos
+     mensuales de índices salen a cuenta; semanales o strikes alejados
+     pierden siempre. Lo avisamos según el ticker y el plazo. */
+  const esIndice = ['SPY','QQQ','IWM','DIA'].includes(ticker);
+  const esMensual = isFinite(dteNaturales) && dteNaturales>=21 && dteNaturales<=45;
+  let viabilidad, horquillaAviso;
+  if(esIndice && esMensual){ viabilidad='buena'; horquillaAviso='Índice y vencimiento mensual: la horquilla (~0,3 pts) deja margen.'; }
+  else if(esMensual){ viabilidad='justa'; horquillaAviso='Acción con vencimiento mensual: la horquilla (~0,8 pts) se come buena parte de la ventaja.'; }
+  else { viabilidad='mala'; horquillaAviso='Vencimiento no mensual: la horquilla (~2 pts) se come TODA la ventaja. Aquí no sale a cuenta operarlo.'; }
+
+  return {
+    caducado:false, superaRuido, esEjemplo:esEjemploF,
+    horizonte:+h, sesiones, dteNaturales,
+    rvPred:f.rv_pred, rvHar:f.rv_har,
+    ivUsada:iv,
+    edgePts: 100*edge, ruidoPts: 100*ruido, fiable,
+    lado: edge>0 ? 'vender volatilidad' : 'comprar volatilidad',
+    calidad: f.mejora_sobre_har, dmP: f.dm_pvalue,
+    veredictoModelo: f.veredicto,
+    dudoso: f.veredicto==='REVISAR',
+    noGo: f.veredicto==='NO-GO',
+    asof: entry.asof, diasDesfase: fresco.dias,
+    viabilidad, horquillaAviso,
+    esEjemplo: RVF_META && RVF_META.esEjemplo,
+  };
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LABORATORIO 0DTE · ¿compensa comprar prima intradía?
+
+   LA IDEA QUE LO HACE MEDIBLE SIN HISTÓRICO DE CADENAS:
+   comprar un straddle 0DTE gana si el índice se mueve, ese día, más
+   de lo que costó la prima. Y las dos cosas se pueden calcular:
+     · lo que se movió  → velas diarias (las tenemos)
+     · lo que costó     → la prima ATM ≈ 0,7979·S·σ·√T, con σ = VIX
+       (para 0DTE, T = 1/252, así que el coste ≈ 0,0503·VIX en %)
+
+   Así se puede medir, sobre AÑOS de datos reales, cuántas veces el
+   movimiento superó al coste. Y lo más importante: si los FILTROS
+   que propone una estrategia (VIX bajando, RSI en rango, día de la
+   semana) seleccionan de verdad días de más movimiento, o no.
+   Eso último es lo que separa una ventaja real de un backtest
+   ajustado a posteriori.
+   ═══════════════════════════════════════════════════════════════ */
+function lab0DTE(velas, vixVelas, opts={}){
+  const usarIC = opts.usarIC ?? true;      // condor: vender alas a X puntos
+  const alaPct = opts.alaPct ?? 0.9;       // ancho del ala en % del subyacente (50 pts sobre ~5500 ≈ 0,9%)
+  const costeExtra = opts.costeExtra ?? 0.02;  // comisiones+deslizamiento en % del subyacente
+  if(!velas || velas.length<60) return null;
+
+  // VIX por fecha (si lo hay)
+  const vixPor = new Map();
+  if(vixVelas) for(const v of vixVelas){
+    const d=new Date(v.time).toISOString().slice(0,10);
+    if(isFinite(v.close)) vixPor.set(d, v.close);
+  }
+
+  const dia = t => new Date(t).getUTCDay();       // 0=dom .. 6=sáb
+  const fecha = t => new Date(t).toISOString().slice(0,10);
+  const closes = velas.map(v=>v.close);
+  const rsiSerie = rsiWilder(closes, 14);
+
+  const filas=[];
+  for(let i=1;i<velas.length;i++){
+    const v=velas[i], f=fecha(v.time);
+    if(!isFinite(v.open)||!isFinite(v.close)||!isFinite(v.high)||!isFinite(v.low)||v.open<=0) continue;
+    const vix = vixPor.get(f);
+    const vixPrev = vixPor.get(fecha(velas[i-1].time));
+    // movimiento del día desde la apertura (la entrada real es a las 9:32)
+    const movCierre = Math.abs(v.close/v.open-1)*100;      // |cierre - apertura| en %
+    const recorrido = (v.high-v.low)/v.open*100;           // rango del día en %
+    // coste de la prima: straddle ATM a 0DTE ≈ 0,7979·σ·√(1/252)
+    let costePct = NaN;
+    if(isFinite(vix) && vix>0) costePct = 0.7979*(vix/100)*Math.sqrt(1/252)*100;
+    // el iron condor largo (comprar straddle + vender alas) cuesta menos:
+    // las alas devuelven parte de la prima. Aproximamos el ahorro por el
+    // valor de las alas, que a 0DTE es pequeño pero no nulo.
+    if(usarIC && isFinite(costePct)){
+      // valor aproximado de las alas vendidas (OTM a alaPct): decae rápido
+      const z = alaPct/(isFinite(vix)? (vix/100)*Math.sqrt(1/252)*100 : 1);
+      const valorAla = Math.max(0, costePct*Math.exp(-0.5*z*z)*0.35);
+      costePct = Math.max(costePct - valorAla, costePct*0.45);
+    }
+    if(isFinite(costePct)) costePct += costeExtra;
+    filas.push({
+      fecha:f, dow:dia(v.time), open:v.open, close:v.close,
+      movCierre, recorrido, vix, vixPrev,
+      vixCambio: (isFinite(vix)&&isFinite(vixPrev)&&vixPrev>0) ? (vix/vixPrev-1)*100 : NaN,
+      rsi: rsiSerie[i],
+      costePct,
+      // ¿ganó el comprador de prima ese día? (el straddle vale |mov| al vencer)
+      gana: isFinite(costePct) ? (movCierre > costePct) : null,
+      pnlPct: isFinite(costePct) ? (Math.min(movCierre, usarIC?alaPct:99) - costePct) : NaN,
+    });
+  }
+  return filas;
+}
+
+/* Evalúa un conjunto de filtros sobre las filas y compara con la base */
+function evalFiltros0DTE(filas, filtro){
+  const conDatos = filas.filter(f=>isFinite(f.costePct)&&isFinite(f.movCierre));
+  if(!conDatos.length) return null;
+  const sel = conDatos.filter(filtro);
+  const stats = arr => {
+    if(!arr.length) return {n:0};
+    const n=arr.length;
+    const gan=arr.filter(x=>x.gana).length;
+    const movMedio=arr.reduce((a,b)=>a+b.movCierre,0)/n;
+    const costeMedio=arr.reduce((a,b)=>a+b.costePct,0)/n;
+    const pnl=arr.reduce((a,b)=>a+b.pnlPct,0)/n;
+    const ganancias=arr.filter(x=>x.pnlPct>0), perdidas=arr.filter(x=>x.pnlPct<=0);
+    return { n, winRate:gan/n, movMedio, costeMedio, pnlMedio:pnl,
+             avgWin: ganancias.length?ganancias.reduce((a,b)=>a+b.pnlPct,0)/ganancias.length:0,
+             avgLoss: perdidas.length?perdidas.reduce((a,b)=>a+b.pnlPct,0)/perdidas.length:0,
+             pnlTotal: arr.reduce((a,b)=>a+b.pnlPct,0) };
+  };
+  const base = stats(conDatos), filtrado = stats(sel);
+  // ¿el filtro selecciona días de más movimiento? Ese es el test clave.
+  const mejoraMov = filtrado.n ? filtrado.movMedio - base.movMedio : NaN;
+  const mejoraWin = filtrado.n ? filtrado.winRate - base.winRate : NaN;
+  /* Significancia aproximada: error estándar de una proporción.
+     Con pocas operaciones, una diferencia de win rate no significa nada. */
+  const se = filtrado.n ? Math.sqrt(base.winRate*(1-base.winRate)/filtrado.n) : NaN;
+  const z = (isFinite(se)&&se>0) ? mejoraWin/se : NaN;
+  return { base, filtrado, mejoraMov, mejoraWin, z,
+           significativo: isFinite(z) && Math.abs(z)>1.96 };
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LABORATORIO COMBINATORIO 0DTE
+   Prueba miles de combinaciones de filtros — pero con la única
+   metodología que hace que eso signifique algo:
+
+   1. PARTICIÓN TEMPORAL: busca en el primer 60% de los datos y
+      valida en el 40% final, que NUNCA se usa para elegir. Si una
+      estrategia solo funciona en la parte donde la buscamos, es
+      ajuste de curva, no ventaja.
+   2. CORRECCIÓN POR TEST MÚLTIPLE: con N pruebas, unas N×5% saldrán
+      "significativas" por azar. Se calcula cuántas se esperan por
+      casualidad y se compara con cuántas sobreviven de verdad.
+   3. SE MUESTRA TODO, no solo lo mejor: la distribución completa de
+      resultados dice más que el campeón, que siempre existe.
+   ═══════════════════════════════════════════════════════════════ */
+function gridSearch0DTE(filas, opts={}){
+  const fracIS = opts.fracIS ?? 0.6;         // 60% para buscar, 40% para validar
+  const minDias = opts.minDias ?? 40;        // mínimo de días para considerar una combinación
+  const datos = filas.filter(f=>isFinite(f.costePct)&&isFinite(f.movCierre)&&isFinite(f.pnlPct));
+  if(datos.length<200) return null;
+  const corte = Math.floor(datos.length*fracIS);
+  const IS = datos.slice(0,corte), OOS = datos.slice(corte);
+
+  /* Dimensiones a combinar. Cada una incluye "sin filtro" para que la
+     búsqueda pueda descartarla. El producto son varios miles de combos. */
+  const D = {
+    dow: [
+      ['cualquier día', ()=>true],
+      ['mar-jue', x=>[2,3,4].includes(x.dow)],
+      ['mar-vie', x=>[2,3,4,5].includes(x.dow)],
+      ['lun-mié', x=>[1,2,3].includes(x.dow)],
+      ['solo viernes', x=>x.dow===5],
+      ['solo lunes', x=>x.dow===1],
+      ['sin lunes', x=>x.dow!==1],
+      ['sin viernes', x=>x.dow!==5],
+    ],
+    vixNivel: [
+      ['VIX cualquiera', ()=>true],
+      ['VIX < 14', x=>x.vix<14], ['VIX < 16', x=>x.vix<16], ['VIX < 18', x=>x.vix<18],
+      ['VIX 14-20', x=>x.vix>=14&&x.vix<=20], ['VIX > 18', x=>x.vix>18], ['VIX > 22', x=>x.vix>22],
+    ],
+    vixCambio: [
+      ['cambio de VIX indiferente', ()=>true],
+      ['VIX baja >0,5%', x=>x.vixCambio<-0.5],
+      ['VIX baja >2%', x=>x.vixCambio<-2],
+      ['VIX baja >4%', x=>x.vixCambio<-4],
+      ['VIX sube >0,5%', x=>x.vixCambio>0.5],
+      ['VIX sube >2%', x=>x.vixCambio>2],
+      ['VIX sube >4%', x=>x.vixCambio>4],
+      ['VIX estable (±1%)', x=>Math.abs(x.vixCambio)<1],
+    ],
+    rsi: [
+      ['RSI indiferente', ()=>true],
+      ['RSI 30-70', x=>x.rsi>30&&x.rsi<70],
+      ['RSI 40-60', x=>x.rsi>40&&x.rsi<60],
+      ['RSI < 40', x=>x.rsi<40],
+      ['RSI > 60', x=>x.rsi>60],
+      ['RSI < 30 (sobreventa)', x=>x.rsi<30],
+      ['RSI > 70 (sobrecompra)', x=>x.rsi>70],
+    ],
+    lado: [
+      ['COMPRAR prima', 'compra'],
+      ['VENDER prima', 'venta'],
+    ],
+  };
+
+  const combos=[];
+  for(const [nd,fd] of D.dow)
+  for(const [nv,fv] of D.vixNivel)
+  for(const [nc,fc] of D.vixCambio)
+  for(const [nr,fr] of D.rsi)
+  for(const [nl,lado] of D.lado){
+    combos.push({
+      nombre:[nd,nv,nc,nr].filter(s=>!s.includes('cualquier')&&!s.includes('indiferente')).join(' + ')||'sin filtros',
+      lado, etiquetaLado:nl,
+      test: x => fd(x)&&fv(x)&&fc(x)&&fr(x)
+    });
+  }
+
+  const evaluar = (arr, c) => {
+    const sel = arr.filter(c.test);
+    if(sel.length<minDias) return null;
+    // vender prima = el P&L se invierte (cobras la prima, pagas el movimiento)
+    const signo = c.lado==='venta' ? -1 : 1;
+    const pnls = sel.map(x=>x.pnlPct*signo);
+    const n=pnls.length;
+    const media=pnls.reduce((a,b)=>a+b,0)/n;
+    const sd=Math.sqrt(pnls.reduce((a,b)=>a+(b-media)*(b-media),0)/Math.max(n-1,1));
+    const t = sd>0 ? media/(sd/Math.sqrt(n)) : 0;      // estadístico t
+    const wins=pnls.filter(x=>x>0).length;
+    return { n, media, sd, t, winRate:wins/n, total:pnls.reduce((a,b)=>a+b,0) };
+  };
+
+  // 1) buscar en IS
+  const resIS=[];
+  for(const c of combos){
+    const r=evaluar(IS,c);
+    if(r) resIS.push({...c, is:r});
+  }
+  resIS.sort((a,b)=>b.is.t-a.is.t);
+
+  // 2) validar los mejores en OOS (que no se ha tocado)
+  const TOP=Math.min(30, resIS.length);
+  const validados=[];
+  for(let i=0;i<TOP;i++){
+    const c=resIS[i];
+    const o=evaluar(OOS,c);
+    validados.push({...c, oos:o});
+  }
+
+  // 3) estadística del conjunto: ¿cuántos se esperan por azar?
+  const nPruebas=resIS.length;
+  const esperadosPorAzar = nPruebas*0.05;                 // al 5% de significancia
+  const significativosIS = resIS.filter(r=>Math.abs(r.is.t)>1.96).length;
+  const bonferroni = nPruebas>0 ? 1.96 + Math.sqrt(2*Math.log(nPruebas)) : Infinity;  // umbral aprox. corregido
+  const sobrevivenBonf = resIS.filter(r=>Math.abs(r.is.t)>bonferroni).length;
+  // los que siguen ganando fuera de muestra
+  const confirmados = validados.filter(v=>v.oos && v.oos.media>0 && v.is.media>0);
+
+  return {
+    nCombos:combos.length, nEvaluados:nPruebas,
+    diasIS:IS.length, diasOOS:OOS.length,
+    esperadosPorAzar, significativosIS, bonferroni, sobrevivenBonf,
+    validados, confirmados: confirmados.length,
+    mejorIS: resIS[0]||null,
+    // referencia: qué habría pasado sin ningún filtro
+    baseCompra: evaluar(datos,{lado:'compra',test:()=>true}),
+    baseVenta: evaluar(datos,{lado:'venta',test:()=>true}),
+  };
+}
+
 function calcularGEX(rows, spot, opts={}){
   if(!rows || !rows.length || !isFinite(spot) || spot<=0) return null;
   const mult = opts.mult ?? 100;
@@ -7076,6 +7505,285 @@ function renderSectorial(final){
       'Prueba el orden <b>"giros al alza"</b>: te pone arriba los que tienen el semanal alcista y el 4h sobrevendido — '+
       'entrar a favor de la tendencia mayor tras una corrección del corto plazo es la forma con más sentido de usar esto.';
   }
+}
+
+/* Escáner de prima de volatilidad: IV en vivo vs predicción de AlphaForge */
+async function scanVRP(){
+  const msg=$('vrpMsg');
+  msg.style.display='block';
+  msg.textContent='Cargando la predicción de AlphaForge…';
+  $('vrpBtn').disabled=true; $('vrpBtn').textContent='Analizando…';
+  $('vrpEmpty').style.display='none';
+
+  const estado = await cargarRVF();
+  if(estado!=='cargado'){
+    msg.innerHTML='<b>No hay predicción disponible.</b> El fichero <code>rv_forecast.json</code> no se ha podido '+
+      'cargar desde AlphaForge ('+estado+'). Puede que aún no esté publicado. '+
+      'El resto del monitor funciona igual: esta sección es opcional.';
+    $('vrpBtn').disabled=false; $('vrpBtn').textContent='Comparar IV vs predicción';
+    return;
+  }
+  const tickers = Object.keys(RVF||{});
+  if(!tickers.length){
+    msg.innerHTML='La predicción se cargó pero no trae ningún ticker.';
+    $('vrpBtn').disabled=false; $('vrpBtn').textContent='Comparar IV vs predicción';
+    return;
+  }
+
+  // Nos quedamos con los que además estén en favoritos, o todos si no hay coincidencia
+  const favs=getFavs();
+  const usar = tickers.filter(t=>favs.includes(t));
+  const lista = usar.length? usar : tickers;
+
+  msg.textContent='Pidiendo la volatilidad implícita en vivo de '+lista.length+' valores…';
+  const filas=[];
+  for(const t of lista){
+    let iv=NaN, ivRank=NaN;
+    try{
+      const m=await api('metrics',{symbol:t});
+      const it=((m&&m.data&&m.data.items)?m.data.items:(m&&m.items?m.items:[]))[0];
+      if(it){
+        iv=parseFloat(it['implied-volatility-index']);
+        ivRank=parseFloat(it['implied-volatility-index-rank']);
+        if(isFinite(ivRank)&&ivRank>1.5) ivRank/=100;
+      }
+    }catch(e){}
+    if(!isFinite(iv)){ filas.push({sym:t, err:'sin IV en vivo del mercado'}); continue; }
+    // Comparamos en el plazo que de verdad se opera: mensual (~30 días naturales)
+    const s = vrpSignal(t, iv, 30);
+    if(!s){ filas.push({sym:t, err:'sin horizonte comparable en la predicción'}); continue; }
+    filas.push({sym:t, ivRank, ...s});
+  }
+  renderVRP(filas);
+  msg.style.display='none';
+  $('vrpBtn').disabled=false; $('vrpBtn').textContent='Comparar IV vs predicción';
+}
+
+function renderVRP(filas){
+  $('vrpOut').style.display='block';
+  const ejemplo = filas.some(f=>f.esEjemplo);
+  let html='';
+  if(ejemplo){
+    html+='<div class="gx-warn">⚠️ El fichero cargado es el <b>EJEMPLO con cifras inventadas</b>. '+
+      'No operes nada con estos números: sirven solo para comprobar que la conexión funciona.</div>';
+  }
+  html+='<div class="scrollx"><table class="quotes"><thead><tr>'+
+    '<th>Valor</th><th>IV en vivo</th><th>RV predicha</th><th>Diferencia</th><th>Ruido del modelo</th><th>¿Operable?</th></tr></thead><tbody>';
+  for(const f of filas){
+    if(f.err){ html+=`<tr><td class="tk"><b>${f.sym}</b></td><td class="mute" colspan="5">${f.err}</td></tr>`; continue; }
+    const caro = f.edgePts>0;
+    const cls = !f.fiable ? 'mute' : caro ? 'up' : 'dn';
+    const verdict = f.fiable
+      ? `<b class="${cls}">${f.lado}</b>`
+      : `<span class="mute">no operable</span>`;
+    html+=`<tr>
+      <td class="tk"><b>${f.sym}</b><br><span class="mute" style="font-size:10.5px">${isFinite(f.ivRank)?'IV rank '+(f.ivRank*100).toFixed(0):''}</span></td>
+      <td class="num">${(f.ivUsada*100).toFixed(1)}%</td>
+      <td class="num">${(f.rvPred*100).toFixed(1)}%<br><span class="mute" style="font-size:10px">h=${f.horizonte} ses.</span></td>
+      <td class="num ${cls}"><b>${f.edgePts>=0?'+':''}${f.edgePts.toFixed(2)} pts</b></td>
+      <td class="num mute">±${f.ruidoPts.toFixed(2)} pts</td>
+      <td>${verdict}</td>
+    </tr>`;
+    // detalle: por qué sí o por qué no
+    const motivos=[];
+    if(f.caducado) motivos.push('La predicción es de hace '+f.diasDesfase+' días: <b>caducada</b>, no vale.');
+    if(f.noGo) motivos.push('El modelo <b>no se validó</b> para este plazo (NO-GO).');
+    if(f.dudoso) motivos.push('El modelo está marcado como <b>REVISAR</b>: la mejora sobre HAR no es significativa.');
+    if(f.esEjemplo) motivos.push('El fichero cargado es el <b>EJEMPLO con cifras inventadas</b>: no vale para operar.');
+    if(!f.superaRuido) motivos.push('La diferencia ('+f.edgePts.toFixed(2)+' pts) cae <b>dentro del error del propio modelo</b> (±'+f.ruidoPts.toFixed(2)+'): es ruido, no señal.');
+    else if(f.fiable) motivos.push('La diferencia <b>supera</b> el error del modelo (±'+f.ruidoPts.toFixed(2)+' pts) y pasa los filtros de caducidad y validación.');
+    motivos.push(f.horquillaAviso);
+    if(isFinite(f.calidad)) motivos.push('Mejora sobre HAR: '+(f.calidad*100).toFixed(1)+'%'+(isFinite(f.dmP)?' (p='+f.dmP.toFixed(4)+')':'')+'. Predicción del '+f.asof+'.');
+    html+=`<tr class="sec-trad"><td colspan="6">${motivos.map(m=>'<div>· '+m+'</div>').join('')}</td></tr>`;
+  }
+  html+='</tbody></table></div>';
+  $('vrpTable').innerHTML=html;
+
+  const operables=filas.filter(f=>!f.err&&f.fiable&&f.viabilidad==='buena').length;
+  const m=$('vrpMsg'); m.style.display='block';
+  m.innerHTML = operables
+    ? '<b>'+operables+' señal(es) operable(s)</b> — pasan el filtro de ruido, de caducidad y de horquilla.'
+    : '<b>Ninguna señal operable ahora mismo.</b> Es lo esperable la mayor parte del tiempo: la mayoría de diferencias '+
+      'caen dentro del error del modelo o en productos donde la horquilla se come la ventaja.';
+}
+
+/* Laboratorio 0DTE: descarga índice + VIX y mide si comprar prima compensa */
+let LAB={filas:null, sym:null};
+
+async function scanLab0DTE(){
+  if(!CN.url||!CN.key){ const m=$('labMsg'); m.style.display='block';
+    m.innerHTML='Necesito el acceso a datos configurado (Mi cuenta → Configurar acceso).'; return; }
+  const sym=($('labSym')&&$('labSym').value)||'SPY';
+  $('labBtn').disabled=true; $('labBtn').textContent='Midiendo…';
+  $('labEmpty').style.display='none';
+  const m=$('labMsg'); m.style.display='block';
+  m.textContent='Descargando años de histórico de '+sym+' y del VIX…';
+  try{
+    const dx=new DXLink();
+    await dx.connect(CN.url, CN.key);
+    const vel={}, vixV=[];
+    dx.onCandle=(s,c)=>{
+      const b=s.split('{')[0];
+      if(b==='VIX'||b==='.VIX'||b==='VIX.XO') vixV.push(c);
+      else (vel[b]=vel[b]||[]).push(c);
+    };
+    dx.subscribeCandles(sym, 1600, 'd');      // ~4,5 años (0DTE existe desde may-2022)
+    // el VIX puede venir con distintos símbolos según el feed: probamos varios
+    ['VIX','.VIX','VIX.XO'].forEach(s=>dx.subscribeCandles(s, 1600, 'd'));
+    await new Promise(r=>setTimeout(r, 9000));
+    dx.disconnect();
+
+    const velas=(vel[sym]||[]).sort((a,b)=>a.time-b.time).filter(c=>isFinite(c.close)&&c.close>0);
+    const vix=vixV.sort((a,b)=>a.time-b.time).filter(c=>isFinite(c.close)&&c.close>0);
+    if(velas.length<100){ m.innerHTML='No llegaron suficientes velas de '+sym+' ('+velas.length+').'; 
+      $('labBtn').disabled=false; $('labBtn').textContent='Medir'; return; }
+    if(!vix.length){
+      m.innerHTML='<b>No llegó el VIX.</b> Sin él no se puede estimar lo que costaba la prima cada día, '+
+        'que es la mitad del cálculo. El feed puede no servir índices de volatilidad con tu suscripción. '+
+        'Sin VIX, esta medición no es posible — y prefiero decírtelo a inventarme el coste.';
+      $('labBtn').disabled=false; $('labBtn').textContent='Medir'; return;
+    }
+    const filas=lab0DTE(velas, vix, {usarIC:true, alaPct:+(($('labAla')&&$('labAla').value)||0.9), costeExtra:0.02});
+    LAB={filas, sym};
+    renderLab0DTE();
+    m.style.display='none';
+  }catch(e){ m.style.display='block'; m.innerHTML='Error: '+(e.message||e); }
+  $('labBtn').disabled=false; $('labBtn').textContent='Medir';
+}
+
+function renderLab0DTE(){
+  const filas=LAB.filas; if(!filas) return;
+  $('labOut').style.display='block';
+  const pct=x=>(x>=0?'+':'')+x.toFixed(3)+'%';
+  // conjuntos a comparar: base y cada filtro por separado, para ver cuál aporta
+  const pruebas=[
+    ['TODOS los días (base)', ()=>true],
+    ['Solo martes a viernes', x=>[2,3,4,5].includes(x.dow)],
+    ['VIX bajando >0,75%', x=>isFinite(x.vixCambio)&&x.vixCambio<-0.75],
+    ['RSI entre 30 y 70', x=>isFinite(x.rsi)&&x.rsi>30&&x.rsi<70],
+    ['VIX bajo (<16)', x=>isFinite(x.vix)&&x.vix<16],
+    ['VIX alto (>22)', x=>isFinite(x.vix)&&x.vix>22],
+    ['TODOS los filtros de McRib', x=>[2,3,4,5].includes(x.dow)&&isFinite(x.vixCambio)&&x.vixCambio<-0.75&&isFinite(x.rsi)&&x.rsi>30&&x.rsi<70],
+  ];
+  let html='<div class="scrollx"><table class="quotes"><thead><tr>'+
+    '<th>Condición</th><th>Días</th><th>Acierto</th><th>Movió</th><th>Costó</th><th>P&L medio</th><th>¿Aporta?</th></tr></thead><tbody>';
+  let baseRef=null;
+  for(const [nombre,fn] of pruebas){
+    const r=evalFiltros0DTE(filas, fn);
+    if(!r||!r.filtrado.n){ html+=`<tr><td class="tk">${nombre}</td><td class="mute" colspan="6">sin días</td></tr>`; continue; }
+    if(!baseRef) baseRef=r.base;
+    const F=r.filtrado;
+    const pnlCls=F.pnlMedio>0.01?'up':F.pnlMedio<-0.01?'dn':'mute';
+    const pocos=F.n<100;
+    const aporta = nombre.includes('base') ? '<span class="mute">—</span>'
+      : pocos ? '<span class="mute">⚠ pocos días</span>'
+      : r.significativo ? (r.mejoraWin>0?'<b class="up">SÍ (+'+(r.mejoraWin*100).toFixed(1)+' pts)</b>':'<b class="dn">EMPEORA</b>')
+      : '<span class="mute">no (puede ser azar)</span>';
+    html+=`<tr>
+      <td class="tk" style="font-size:12px">${nombre}</td>
+      <td class="num ${pocos?'dn':''}">${F.n}</td>
+      <td class="num">${(F.winRate*100).toFixed(1)}%</td>
+      <td class="num">${F.movMedio.toFixed(3)}%</td>
+      <td class="num mute">${F.costeMedio.toFixed(3)}%</td>
+      <td class="num ${pnlCls}"><b>${pct(F.pnlMedio)}</b></td>
+      <td style="font-size:11.5px">${aporta}</td></tr>`;
+  }
+  html+='</tbody></table></div>';
+
+  // veredicto honesto
+  const base=evalFiltros0DTE(filas,()=>true);
+  const mc=evalFiltros0DTE(filas, x=>[2,3,4,5].includes(x.dow)&&isFinite(x.vixCambio)&&x.vixCambio<-0.75&&isFinite(x.rsi)&&x.rsi>30&&x.rsi<70);
+  let ver='';
+  if(base&&mc&&mc.filtrado.n){
+    const bien = mc.filtrado.pnlMedio>0.01 && mc.filtrado.n>=100 && mc.significativo;
+    ver = bien
+      ? `<div class="bt-verdict up">✅ Con estos filtros, comprar prima 0DTE habría tenido esperanza POSITIVA (${pct(mc.filtrado.pnlMedio)} por día, ${mc.filtrado.n} días). La mejora sobre operar todos los días es estadísticamente significativa.</div>`
+      : mc.filtrado.pnlMedio>0.01
+        ? `<div class="bt-verdict">➖ Esperanza positiva (${pct(mc.filtrado.pnlMedio)}) pero ${mc.filtrado.n<100?'con pocos días para fiarse':'sin significancia estadística: la mejora sobre la base puede ser azar'}.</div>`
+        : `<div class="bt-verdict dn">❌ Con estos filtros, comprar prima 0DTE habría tenido esperanza NEGATIVA (${pct(mc.filtrado.pnlMedio)} por día). Los filtros no seleccionan días de más movimiento del que se paga.</div>`;
+  }
+  $('labTable').innerHTML=html+ver+
+    `<div class="historia" style="font-size:12px;margin-top:10px">
+      <b>Movió</b> = cuánto se movió el índice de apertura a cierre. <b>Costó</b> = la prima estimada del
+      straddle ATM 0DTE (0,7979·VIX·√(1/252), menos el valor de las alas vendidas, más 0,02% de costes).
+      <b>P&L medio</b> = lo que habría quedado por día, en % del subyacente. <b>¿Aporta?</b> compara cada
+      condición con operar todos los días: si no es significativo, ese filtro no está añadiendo nada
+      demostrable y puede ser fruto de haber probado muchas combinaciones.
+    </div>`;
+}
+
+/* UI del laboratorio combinatorio */
+async function correrGrid0DTE(){
+  if(!LAB.filas){ const m=$('labMsg'); m.style.display='block';
+    m.innerHTML='Primero pulsa <b>Medir</b> para descargar los datos.'; return; }
+  $('gridBtn').disabled=true; $('gridBtn').textContent='Probando miles de combinaciones…';
+  await new Promise(r=>setTimeout(r,50));
+  const g=gridSearch0DTE(LAB.filas);
+  if(!g){ $('labMsg').style.display='block'; $('labMsg').innerHTML='No hay días suficientes para la búsqueda.';
+    $('gridBtn').disabled=false; $('gridBtn').textContent='Buscar entre miles de combinaciones'; return; }
+  renderGrid0DTE(g);
+  $('gridBtn').disabled=false; $('gridBtn').textContent='Buscar entre miles de combinaciones';
+}
+
+function renderGrid0DTE(g){
+  $('gridOut').style.display='block';
+  const pct=x=>(x>=0?'+':'')+x.toFixed(4)+'%';
+  const conf=g.confirmados, esperado=Math.round(g.validados.length/2);
+
+  let html=`<div class="bt-grid" style="grid-template-columns:repeat(4,1fr)">
+    <div class="bt-cell"><div class="bt-num">${g.nCombos.toLocaleString()}</div><div class="bt-lbl">combinaciones<br>probadas</div></div>
+    <div class="bt-cell"><div class="bt-num">${g.diasIS}</div><div class="bt-lbl">días para<br>buscar</div></div>
+    <div class="bt-cell"><div class="bt-num">${g.diasOOS}</div><div class="bt-lbl">días de validación<br>(intactos)</div></div>
+    <div class="bt-cell"><div class="bt-num ${conf>esperado*1.4?'up':conf<esperado*0.7?'dn':'mute'}">${conf}/${g.validados.length}</div><div class="bt-lbl">siguen ganando<br>fuera de muestra</div></div>
+  </div>`;
+
+  // el aviso metodológico, que es lo más importante de todo esto
+  html+=`<div class="gx-warn" style="border-color:var(--rule2)">
+    <b>Cómo leer esto sin engañarse.</b> Con ${g.nEvaluados.toLocaleString()} pruebas, unas
+    <b>${g.esperadosPorAzar.toFixed(0)}</b> saldrían "significativas" por puro azar aunque no hubiera
+    ninguna ventaja. Aquí salieron ${g.significativosIS} — pero ojo: las combinaciones <b>no son
+    independientes</b> (comparten días), así que ese número no se compara directamente.
+    Lo que sí vale: el umbral corregido por test múltiple es <b>t &gt; ${g.bonferroni.toFixed(2)}</b>,
+    y lo superan <b>${g.sobrevivenBonf}</b> combinaciones. Y sobre todo: cuántas
+    <b>siguen ganando en los ${g.diasOOS} días que la búsqueda nunca vio</b>. Si esa cifra ronda la
+    mitad (${esperado}), es lo que daría el azar y no hay nada.
+  </div>`;
+
+  // referencia base
+  if(g.baseCompra&&g.baseVenta){
+    html+=`<div class="historia" style="font-size:12.5px;margin:10px 0">
+      <b>Referencia sin ningún filtro</b> (todos los días):
+      comprar prima ${pct(g.baseCompra.media)} por día (acierto ${(g.baseCompra.winRate*100).toFixed(1)}%) ·
+      vender prima ${pct(g.baseVenta.media)} por día (acierto ${(g.baseVenta.winRate*100).toFixed(1)}%).
+      <b>Cualquier estrategia tiene que batir esto</b> para justificar su complejidad.
+    </div>`;
+  }
+
+  html+='<div class="scrollx"><table class="quotes"><thead><tr>'+
+    '<th>Combinación</th><th>Lado</th><th>Búsqueda</th><th>Validación<br>(nunca vista)</th><th>¿Aguanta?</th></tr></thead><tbody>';
+  for(const v of g.validados){
+    const o=v.oos;
+    const aguanta = o && o.media>0 && v.is.media>0;
+    const cls = !o? 'mute' : aguanta ? 'up' : 'dn';
+    const veredicto = !o ? '<span class="mute">sin días suficientes</span>'
+      : aguanta ? (o.n>=60 ? '<b class="up">✅ aguanta</b>' : '<span class="mute">aguanta, pocos días</span>')
+      : '<b class="dn">❌ se cae</b>';
+    html+=`<tr>
+      <td class="tk" style="font-size:11.5px">${v.nombre}</td>
+      <td style="font-size:11.5px" class="${v.lado==='venta'?'dn':'up'}">${v.etiquetaLado}</td>
+      <td class="num" style="font-size:11.5px">${pct(v.is.media)}<br><span class="mute" style="font-size:10px">t=${v.is.t.toFixed(2)} · ${v.is.n}d</span></td>
+      <td class="num ${cls}" style="font-size:11.5px">${o?pct(o.media):'—'}${o?`<br><span class="mute" style="font-size:10px">${(o.winRate*100).toFixed(0)}% · ${o.n}d</span>`:''}</td>
+      <td style="font-size:11.5px">${veredicto}</td></tr>`;
+  }
+  html+='</tbody></table></div>';
+
+  // veredicto final
+  const solidas=g.validados.filter(v=>v.oos&&v.oos.media>0&&v.is.media>0&&v.oos.n>=60);
+  html += solidas.length>esperado*1.4
+    ? `<div class="bt-verdict up">✅ ${solidas.length} combinaciones siguen ganando en datos que la búsqueda nunca vio, por encima de las ~${esperado} que daría el azar. Merece mirarlas de cerca — pero antes de operar, comprueba que la lógica tenga sentido económico y no sea una casualidad con buena pinta.</div>`
+    : `<div class="bt-verdict dn">❌ Solo ${solidas.length} aguantan fuera de muestra, cuando el azar daría ~${esperado}. No hay ventaja demostrable: lo que brilla en la búsqueda se cae al validarlo. Esto es exactamente lo que le pasa a la mayoría de estrategias 0DTE que circulan con backtests bonitos.</div>`;
+
+  $('gridTable').innerHTML=html;
 }
 
 async function scanStochRSI(){
