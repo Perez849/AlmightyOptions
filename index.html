@@ -769,6 +769,15 @@ summary:hover{color:var(--ink)}
           <button class="btn solid" id="gridBtn" onclick="correrGrid0DTE()">Buscar entre miles de combinaciones</button>
         </div>
         <div id="gridOut" style="display:none;margin-top:12px"><div id="gridTable"></div></div>
+        <div class="btns" style="margin-top:16px">
+          <button class="btn solid" onclick="correrEstrategias0DTE()">Medir mi catálogo de 10 estructuras</button>
+          <select id="estCoste" class="btn quiet" style="padding:8px">
+            <option value="0.0002">Costes: 0,02%/pata (optimista)</option>
+            <option value="0.0004" selected>Costes: 0,04%/pata (realista)</option>
+            <option value="0.0008">Costes: 0,08%/pata (pesimista)</option>
+          </select>
+        </div>
+        <div id="estOut" style="display:none;margin-top:12px"><div id="estTable"></div></div>
       </div>
       <div class="empty" id="labEmpty">
         <strong>Laboratorio 0DTE</strong>
@@ -6164,6 +6173,159 @@ function gridSearch0DTE(filas, opts={}){
   };
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   ESTRUCTURAS 0DTE · catálogo propio con su lógica económica
+
+   Cada opción se valora con Black-Scholes sobre S=1 (todo en % del
+   subyacente), T=1/252 y σ=VIX. Al vencimiento, con el movimiento
+   real del día, se calcula el pago exacto. Nada de aproximaciones.
+
+   AJUSTE DE SKEW: las puts 0DTE cotizan sistemáticamente más caras
+   que las calls equivalentes (seguro contra caídas). Sin modelarlo,
+   cualquier estrategia que venda puts saldría artificialmente mal y
+   cualquiera que las compre, artificialmente bien. Se aplica un
+   recargo a la IV de las puts fuera del dinero.
+   ═══════════════════════════════════════════════════════════════ */
+const SKEW_PUT = 0.18;    // +18% de IV en puts OTM (típico en índices a 0DTE)
+
+function precio0DTE(tipo, kSigma, sigmaDia, skew=SKEW_PUT){
+  // kSigma: distancia al dinero en desviaciones (negativo = por debajo)
+  const T = 1/252;
+  const K = 1 + kSigma*sigmaDia;
+  let iv = sigmaDia*Math.sqrt(252);                 // anualizada
+  // recargo de skew en puts por debajo del dinero
+  if(tipo==='P' && kSigma<0) iv *= (1 + skew*Math.min(Math.abs(kSigma),3)/2);
+  if(tipo==='C' && kSigma>0) iv *= (1 - 0.04*Math.min(kSigma,3)/2);   // ligero descuento en calls OTM
+  // OJO: bsm() espera 'C'/'P', NO 'call'/'put'. Pasarle 'call' hacía que la
+  // condición type==='C' fuera siempre falsa y devolvía la PUT cuando se pedía
+  // una CALL (y al revés): los precios salían cruzados.
+  const p = bsm(tipo, 1, K, T, 0.045, 0, iv);
+  return { precio: isFinite(p)?p:0, K };
+}
+
+/* Pago al vencimiento de cada estructura, dado el movimiento del día.
+   m = (cierre-apertura)/apertura  (con signo)
+   Devuelve el P&L en % del subyacente, ya con costes. */
+function pnl0DTE(estrategia, m, sigmaDia, costes){
+  const A = Math.abs(m);
+  const P = (t,k)=>precio0DTE(t,k,sigmaDia).precio;
+  const K = (k)=>1+k*sigmaDia;
+  const intr = (t,k)=> t==='C' ? Math.max(0,(1+m)-K(k)) : Math.max(0,K(k)-(1+m));
+  let pnl=0, patas=0;
+
+  switch(estrategia){
+    case 'strangle_corto_1s':       // vender 1σ a cada lado
+      pnl = (P('C',1)+P('P',-1)) - (intr('C',1)+intr('P',-1)); patas=2; break;
+    case 'strangle_corto_15s':
+      pnl = (P('C',1.5)+P('P',-1.5)) - (intr('C',1.5)+intr('P',-1.5)); patas=2; break;
+    case 'straddle_corto':          // vender el ATM: máxima prima, máximo riesgo
+      pnl = (P('C',0)+P('P',0)) - (intr('C',0)+intr('P',0)); patas=2; break;
+    case 'condor_corto':            // vender 1σ, comprar 2σ: riesgo acotado
+      pnl = (P('C',1)+P('P',-1)-P('C',2)-P('P',-2))
+          - (intr('C',1)+intr('P',-1)-intr('C',2)-intr('P',-2)); patas=4; break;
+    case 'straddle_largo':          // comprar el ATM: gana si se mueve mucho
+      pnl = (intr('C',0)+intr('P',0)) - (P('C',0)+P('P',0)); patas=2; break;
+    case 'condor_largo':            // comprar ATM, vender 1,5σ (la de McRib, como control)
+      pnl = (intr('C',0)+intr('P',0)-intr('C',1.5)-intr('P',-1.5))
+          - (P('C',0)+P('P',0)-P('C',1.5)-P('P',-1.5)); patas=4; break;
+    case 'mariposa_larga':          // comprar ATM, vender 2× a 1σ, comprar 2σ: gana si se clava
+      pnl = (intr('C',0)+intr('P',0)-intr('C',1)-intr('P',-1))
+          - (P('C',0)+P('P',0)-P('C',1)-P('P',-1)); patas=4; break;
+    case 'put_spread_credito':      // vender put -1σ, comprar -2σ: explota el skew
+      pnl = (P('P',-1)-P('P',-2)) - (intr('P',-1)-intr('P',-2)); patas=2; break;
+    case 'call_spread_credito':     // vender call +1σ, comprar +2σ
+      pnl = (P('C',1)-P('C',2)) - (intr('C',1)-intr('C',2)); patas=2; break;
+    case 'put_spread_lejano':       // vender put -2σ, comprar -3σ: cobrar el miedo
+      pnl = (P('P',-2)-P('P',-3)) - (intr('P',-2)-intr('P',-3)); patas=2; break;
+    default: return NaN;
+  }
+  // costes: horquilla + comisiones por pata
+  return (pnl - costes*patas)*100;   // en % del subyacente
+}
+
+/* Catálogo con la RAZÓN por la que cada una podría funcionar */
+const ESTRATEGIAS_0DTE = [
+  { id:'strangle_corto_1s', nombre:'Strangle corto 1σ',
+    tesis:'Cobra la prima de riesgo de volatilidad: la implícita es de media mayor que la realizada porque hay demanda estructural de cobertura. Gana casi siempre, pierde fuerte de vez en cuando.' },
+  { id:'strangle_corto_15s', nombre:'Strangle corto 1,5σ',
+    tesis:'Lo mismo pero más lejos del dinero: cobra menos y acierta más. Cambia frecuencia por tamaño de la pérdida.' },
+  { id:'straddle_corto', nombre:'Straddle corto ATM',
+    tesis:'La versión agresiva: máxima prima cobrada, sin ningún colchón. Prueba de si la prima de volatilidad compensa el riesgo puro.' },
+  { id:'condor_corto', nombre:'Iron condor corto (1σ/2σ)',
+    tesis:'Vende la prima pero compra alas: renuncia a parte del ingreso a cambio de que un día malo no se lleve el mes. Es la versión con riesgo acotado.' },
+  { id:'put_spread_credito', nombre:'Put spread de crédito -1σ/-2σ',
+    tesis:'Explota el skew: las puts cotizan más caras de lo que la realidad justifica porque todo el mundo compra seguro. Vender ese seguro con riesgo acotado.' },
+  { id:'put_spread_lejano', nombre:'Put spread lejano -2σ/-3σ',
+    tesis:'El mismo skew, más lejos: cobra el miedo extremo. Acierta casi siempre; la pregunta es si lo que cobra compensa el día que falla.' },
+  { id:'call_spread_credito', nombre:'Call spread de crédito +1σ/+2σ',
+    tesis:'El lado contrario del skew: las calls están menos infladas, así que en teoría paga peor. Sirve de contraste para saber si la ventaja viene del skew o de otra cosa.' },
+  { id:'condor_largo', nombre:'Iron condor largo (ATM/1,5σ)',
+    tesis:'Compra gamma con riesgo acotado: gana si el índice se mueve más de lo que costó. Es la estructura contraria a vender prima.' },
+  { id:'straddle_largo', nombre:'Straddle largo ATM',
+    tesis:'Comprar volatilidad pura. En teoría pierde de media (paga la prima de riesgo), salvo que se acierte el momento.' },
+  { id:'mariposa_larga', nombre:'Mariposa larga ATM',
+    tesis:'Apuesta a que el índice se queda clavado cerca de la apertura. Barata; gana si el día es plano.' },
+];
+
+/* Mide cada estrategia del catálogo sobre los datos reales, con
+   partición temporal (busca/valida) para no engañarse. */
+function medirEstrategias0DTE(filas, opts={}){
+  const costes = opts.costes ?? 0.0004;     // ~0,04% por pata (horquilla+comisión)
+  const fracIS = opts.fracIS ?? 0.6;
+  const datos = filas.filter(f=>isFinite(f.vix)&&f.vix>0&&isFinite(f.open)&&isFinite(f.close));
+  if(datos.length<200) return null;
+  const corte=Math.floor(datos.length*fracIS);
+
+  const evaluar=(arr,id,filtro)=>{
+    const sel=filtro?arr.filter(filtro):arr;
+    if(sel.length<30) return null;
+    const pnls=sel.map(d=>{
+      const sd=d.vix/100/Math.sqrt(252);
+      const m=(d.close-d.open)/d.open;
+      return pnl0DTE(id,m,sd,costes);
+    }).filter(x=>isFinite(x));
+    if(pnls.length<30) return null;
+    const n=pnls.length, media=pnls.reduce((a,b)=>a+b,0)/n;
+    const sd2=Math.sqrt(pnls.reduce((a,b)=>a+(b-media)*(b-media),0)/Math.max(n-1,1));
+    const t=sd2>0?media/(sd2/Math.sqrt(n)):0;
+    const wins=pnls.filter(x=>x>0).length;
+    const ordenados=[...pnls].sort((a,b)=>a-b);
+    // Sharpe anualizado y peor día: en venta de prima el peor día lo es todo
+    const sharpe=sd2>0?(media/sd2)*Math.sqrt(252):0;
+    // máxima racha perdedora acumulada
+    let acum=0,pico=0,maxDD=0;
+    for(const x of pnls){ acum+=x; pico=Math.max(pico,acum); maxDD=Math.min(maxDD,acum-pico); }
+    return { n, media, sd:sd2, t, winRate:wins/n, sharpe,
+             peorDia:ordenados[0], p05:ordenados[Math.floor(n*0.05)],
+             mejorDia:ordenados[n-1], total:acum, maxDD };
+  };
+
+  const res=[];
+  for(const e of ESTRATEGIAS_0DTE){
+    const todo=evaluar(datos,e.id,null);
+    const is=evaluar(datos.slice(0,corte),e.id,null);
+    const oos=evaluar(datos.slice(corte),e.id,null);
+    if(!todo) continue;
+    // mejor condición para esa estrategia (probando unas pocas, no miles)
+    const condiciones=[
+      ['siempre', null],
+      ['VIX < 16', d=>d.vix<16],
+      ['VIX > 20', d=>d.vix>20],
+      ['VIX bajando', d=>isFinite(d.vixCambio)&&d.vixCambio<-1],
+      ['VIX subiendo', d=>isFinite(d.vixCambio)&&d.vixCambio>1],
+      ['sin lunes', d=>d.dow!==1],
+    ];
+    const porCondicion=condiciones.map(([nm,fn])=>{
+      const r=evaluar(datos,e.id,fn);
+      const rOOS=evaluar(datos.slice(corte),e.id,fn);
+      return r?{nombre:nm, ...r, oosMedia:rOOS?rOOS.media:NaN, oosN:rOOS?rOOS.n:0}:null;
+    }).filter(Boolean);
+    res.push({ ...e, todo, is, oos, porCondicion });
+  }
+  res.sort((a,b)=>b.todo.media-a.todo.media);
+  return { res, diasIS:corte, diasOOS:datos.length-corte, total:datos.length, costes };
+}
+
 function calcularGEX(rows, spot, opts={}){
   if(!rows || !rows.length || !isFinite(spot) || spot<=0) return null;
   const mult = opts.mult ?? 100;
@@ -7784,6 +7946,86 @@ function renderGrid0DTE(g){
     : `<div class="bt-verdict dn">❌ Solo ${solidas.length} aguantan fuera de muestra, cuando el azar daría ~${esperado}. No hay ventaja demostrable: lo que brilla en la búsqueda se cae al validarlo. Esto es exactamente lo que le pasa a la mayoría de estrategias 0DTE que circulan con backtests bonitos.</div>`;
 
   $('gridTable').innerHTML=html;
+}
+
+/* UI: catálogo de estrategias medido */
+function correrEstrategias0DTE(){
+  if(!LAB.filas){ const m=$('labMsg'); m.style.display='block';
+    m.innerHTML='Primero pulsa <b>Medir</b> para descargar los datos.'; return; }
+  const r=medirEstrategias0DTE(LAB.filas,{costes:+(($('estCoste')&&$('estCoste').value)||0.0004)});
+  if(!r){ $('labMsg').style.display='block'; $('labMsg').innerHTML='No hay días suficientes.'; return; }
+  renderEstrategias0DTE(r);
+}
+
+function renderEstrategias0DTE(R){
+  $('estOut').style.display='block';
+  const pct=x=>(x>=0?'+':'')+x.toFixed(4)+'%';
+  let html=`<div class="historia" style="font-size:12.5px;margin-bottom:10px">
+    Cada estructura valorada con Black-Scholes sobre el VIX del día, con el skew de las puts modelado,
+    y liquidada al cierre con el movimiento real. Costes aplicados: <b>${(R.costes*100).toFixed(3)}% por pata</b>.
+    Búsqueda en ${R.diasIS} días · validación en ${R.diasOOS} días que no se usan para elegir.
+  </div>`;
+  html+='<div class="scrollx"><table class="quotes"><thead><tr>'+
+    '<th>Estrategia</th><th>P&L medio<br>por día</th><th>Acierto</th><th>Sharpe</th>'+
+    '<th>Peor día</th><th>Validación</th><th>t</th></tr></thead><tbody>';
+  for(const e of R.res){
+    const T=e.todo;
+    const cls=T.media>0.005?'up':T.media<-0.005?'dn':'mute';
+    const oosCls=e.oos? (e.oos.media>0?'up':'dn') : 'mute';
+    const coherente = e.oos && Math.sign(e.oos.media)===Math.sign(T.media);
+    html+=`<tr>
+      <td class="tk" style="font-size:12px"><b>${e.nombre}</b></td>
+      <td class="num ${cls}"><b>${pct(T.media)}</b></td>
+      <td class="num">${(T.winRate*100).toFixed(1)}%</td>
+      <td class="num ${T.sharpe>0.5?'up':T.sharpe<0?'dn':'mute'}">${T.sharpe.toFixed(2)}</td>
+      <td class="num dn">${T.peorDia.toFixed(2)}%</td>
+      <td class="num ${oosCls}">${e.oos?pct(e.oos.media):'—'}${coherente?' ✓':' ✗'}</td>
+      <td class="num mute">${T.t.toFixed(2)}</td>
+    </tr>
+    <tr class="sec-trad"><td colspan="7">
+      <div><b>Por qué podría funcionar:</b> ${e.tesis}</div>
+      <div style="margin-top:4px"><b>Lectura:</b> ${lecturaEstrategia(e)}</div>
+    </td></tr>`;
+  }
+  html+='</tbody></table></div>';
+  $('estTable').innerHTML=html;
+}
+
+function lecturaEstrategia(e){
+  const T=e.todo, pct=x=>(x>=0?'+':'')+x.toFixed(4)+'%';
+  const partes=[];
+  if(T.media>0.005){
+    partes.push(`Ganó ${pct(T.media)} de media por día con un acierto del ${(T.winRate*100).toFixed(0)}%.`);
+    if(T.sharpe<0.5) partes.push(`El Sharpe (${T.sharpe.toFixed(2)}) es flojo: gana, pero con mucha oscilación para lo que gana.`);
+  } else if(T.media<-0.005){
+    partes.push(`Perdió ${pct(T.media)} de media por día. Con estos costes no compensa.`);
+  } else {
+    partes.push('Prácticamente plana: lo que gana se lo comen los costes.');
+  }
+  if(e.oos){
+    const coh=Math.sign(e.oos.media)===Math.sign(T.media);
+    partes.push(coh
+      ? `Se comporta igual en los días de validación (${pct(e.oos.media)}), así que no es un artefacto del periodo.`
+      : `<b>Cuidado:</b> en los días de validación da ${pct(e.oos.media)}, signo contrario al del conjunto. Poco fiable.`);
+  }
+  /* AVISO DE PERFIL ASIMÉTRICO — se da SIEMPRE que aplique, gane o pierda.
+     Antes solo salía si la media superaba un umbral, así que justo las
+     estrategias de "acierto altísimo y ruina ocasional" (las más peligrosas,
+     porque son las que mejor pinta tienen) se quedaban sin aviso. */
+  if(T.winRate>0.75 && T.media>0 && T.peorDia < -Math.abs(T.media)*30){
+    partes.push(`<b>⚠️ Perfil peligroso:</b> acierta el ${(T.winRate*100).toFixed(0)}% pero un solo mal día (${T.peorDia.toFixed(2)}%) se lleva <b>${Math.round(Math.abs(T.peorDia/T.media))} días</b> de ganancias. Es recoger monedas delante de una apisonadora: la curva sube bonita hasta que llega el día malo.`);
+  } else if(T.winRate>0.75 && T.peorDia < -1){
+    partes.push(`<b>⚠️</b> Acierto alto (${(T.winRate*100).toFixed(0)}%) con un peor día de ${T.peorDia.toFixed(2)}%: el perfil es asimétrico aunque la media no lo parezca.`);
+  }
+  if(isFinite(T.maxDD) && T.maxDD<-3) partes.push(`Peor racha acumulada: ${T.maxDD.toFixed(1)}% del subyacente.`);
+  if(Math.abs(T.t)<2) partes.push(`El estadístico t (${T.t.toFixed(2)}) no llega a 2: el resultado no se distingue del azar.`);
+  // mejor condición
+  const mejor=[...(e.porCondicion||[])].sort((a,b)=>b.media-a.media)[0];
+  const siempre=(e.porCondicion||[]).find(c=>c.nombre==='siempre');
+  if(mejor&&siempre&&mejor.nombre!=='siempre'&&mejor.media>siempre.media*1.3&&mejor.n>=80){
+    partes.push(`Mejora filtrando por <b>${mejor.nombre}</b> (${pct(mejor.media)} vs ${pct(siempre.media)}), y fuera de muestra da ${isFinite(mejor.oosMedia)?pct(mejor.oosMedia):'—'}.`);
+  }
+  return partes.join(' ');
 }
 
 async function scanStochRSI(){
