@@ -335,6 +335,11 @@ details[open]>.adv-summary::before{content:"▾ "}
 .sec-main td{border-bottom:none}
 .sec-cross{margin-left:3px;font-size:11px}
 .sec-cross.up{color:var(--bull,#3fb950)}.sec-cross.dn{color:var(--bear,#f85149)}
+.consejos{margin-top:10px;display:flex;flex-direction:column;gap:7px}
+.consejo{display:flex;gap:8px;align-items:flex-start;font-family:var(--body);font-size:12.5px;line-height:1.5;padding:8px 10px;border-radius:6px;background:rgba(255,255,255,.03);border:1px solid var(--rule2)}
+.consejo.up{border-color:var(--bull,#3fb950)}.consejo.dn{border-color:var(--bear,#f85149)}.consejo.warn{border-color:var(--warn,#d29922)}
+.consejo.mute{opacity:.75}
+.consejo-ico{flex:0 0 auto;font-size:13px}
 .gx-card{margin:14px 0;padding:14px;background:var(--card2,rgba(255,255,255,.03));border:1px solid var(--rule2);border-radius:10px}
 .gx-title{font-size:15px;margin-bottom:8px}
 .gx-regime{font-family:var(--body);font-size:13px;font-weight:700;padding:8px 10px;border-radius:6px;margin-bottom:10px;border:1px solid var(--rule2)}
@@ -567,228 +572,111 @@ summary:hover{color:var(--ink)}
 
   <!-- ═══════════ HOY · escáner Stoch RSI ═══════════ -->
   <div class="view on" id="v-today">
+
     <section class="blk">
-      <h2>Escáner Stoch RSI<span class="sub">sobreventa y sobrecompra en ~1000 valores USA</span></h2>
-      <div class="historia" style="font-size:13.5px;margin-bottom:14px">
-        <p>Calcula el <b>Stoch RSI (3, 3, 14, 14, close)</b> —igual que TradingView— sobre un universo enorme
-        de acciones americanas (S&P 500 + Nasdaq 100 + midcaps líquidas). Te señala como <b class="up">oportunidad
-        de compra</b> las que están en sobreventa extrema (<b>K ≤ 5</b>) y como <b class="dn">oportunidad de venta</b>
-        las de sobrecompra extrema (<b>K &gt; 90</b>). Pincha cualquiera para abrir su cadena de opciones.</p>
-        <p style="margin-top:8px;font-size:12.5px"><b>Para comparar con TradingView:</b> el número grande incluye
-        la vela de hoy (que con el mercado abierto está sin cerrar y cambia a cada tick). Debajo, en pequeño,
-        va el valor <b>cerr</b> = calculado solo con velas cerradas. Ese es el que cuadra exactamente con
-        TradingView si miras la vela anterior. Que <b>K y D se separen mucho es normal</b>: D es la media de los
-        tres últimos K, así que en los giros bruscos K se dispara y D va por detrás.</p>
-      </div>
-      <div class="proxy-meter" id="proxyMeter"></div>
-      <div class="btns" style="margin-bottom:6px">
-        <button class="btn solid" id="srScanBtn" onclick="scanStochRSI()">Escanear el mercado</button>
-        <button class="btn quiet sm" onclick="stopStochRSI()" id="srStopBtn" style="display:none">Detener</button>
-      </div>
-      <div class="sr-progress" id="srProg" style="display:none">
-        <div class="sr-bar"><div class="sr-fill" id="srFill"></div></div>
-        <div class="sr-ptxt" id="srPtxt"></div>
-      </div>
-      <div class="caveat" id="srMsg" style="display:none"></div>
-    </section>
-
-    <div id="srOut" style="display:none">
-      <section class="blk">
-        <h2>🟢 Oportunidades de compra<span class="sub" id="srBuyCount"></span></h2>
-        <div class="historia" style="font-size:13px;margin-bottom:10px">Sobreventa extrema: el RSI está en la parte baja de su rango. <b>Funciona mejor comprando a favor de la tendencia de fondo</b> — sobreventa dentro de una tendencia alcista.</div>
-        <div class="scrollx"><table class="quotes" id="srBuy"></table></div>
-      </section>
-      <section class="blk">
-        <h2>🔴 Oportunidades de venta<span class="sub" id="srSellCount"></span></h2>
-        <div class="historia" style="font-size:13px;margin-bottom:10px">Sobrecompra extrema: el RSI está en la parte alta de su rango. Señal de agotamiento — más fiable en contra de rebotes dentro de una tendencia bajista.</div>
-        <div class="scrollx"><table class="quotes" id="srSell"></table></div>
-      </section>
-    </div>
-
-    <div class="empty" id="srEmpty">
-      <strong>Radar Stoch RSI</strong>
-      Pulsa <b>Escanear el mercado</b> y el monitor descargará el histórico de cada valor y calculará
-      su Stoch RSI en directo. Tarda un poco (son cientos de valores), pero te deja solo lo que importa:
-      los extremos de sobreventa y sobrecompra listos para operar.
-    </div>
-    <section class="blk" style="margin-top:22px">
-      <h2>⚖️ Desequilibrio de gamma (GEX)<span class="sub">lo que los dealers están OBLIGADOS a hacer</span></h2>
+      <h2>Mesa de venta de volatilidad<span class="sub">las tres ineficiencias, medidas y filtradas</span></h2>
       <div class="historia" style="font-size:13.5px;margin-bottom:12px">
-        <p>Esto no es un indicador más. Los indicadores (RSI, MACD, medias) son todos funciones del
-        precio pasado — mezclarlos no añade información nueva. Esto es un <b>desequilibrio estructural</b>:
-        quien te vende las opciones tiene que cubrirse comprando o vendiendo acciones, y esa operativa
-        es <b>mecánica</b>. No la elige: su posición se la impone.</p>
+        <p>Esto no busca adivinar la dirección. Explota tres cosas que el mercado hace de forma
+        estructural y medible:</p>
         <p style="margin-top:6px">
-        <b class="dn">GEX negativo</b> → los dealers <b>amplifican</b>: compran en subidas y venden en caídas.
-        Los movimientos se aceleran y llegan más lejos. Es el régimen donde comprar opciones funciona.<br>
-        <b class="up">GEX positivo</b> → los dealers <b>amortiguan</b>: el precio se imana al strike de más gamma
-        y se queda en rango. Malo para comprar, bueno para vender primas.</p>
-        <p class="caveat" style="margin-top:8px"><b>Honestidad:</b> el posicionamiento de los dealers se
-        <b>estima</b> — el dato público no dice quién tiene cada lado. Y el GEX describe el <b>régimen y los
-        niveles clave</b>, no una flecha mágica de dirección. Pero es la única "descompensación" real que
-        puedes calcular con tus datos, y sí condiciona el corto plazo.</p>
+        <b>1. La prima de riesgo de volatilidad.</b> La implícita cotiza de media por encima de la
+        realizada porque hay demanda constante de protección. Vender es cobrar ese seguro.<br>
+        <b>2. El skew de las puts.</b> Desde 1987 las puts fuera del dinero están estructuralmente
+        caras frente a las del dinero. La zona de <b>delta 0,15-0,30</b> es donde esa sobrevaloración
+        compensa mejor la probabilidad real de que te asignen.<br>
+        <b>3. La ejecución.</b> La mayor parte del rendimiento se destruye en la horquilla. Si la
+        ventaja teórica no supera holgadamente los costes, la operación se rechaza.</p>
+        <p class="caveat" style="margin-top:8px"><b>Y lo que arruina a quien opera esto sin cabeza:</b>
+        el sesgo negativo. Ganancias pequeñas y constantes, pérdidas grandes y repentinas. El edge
+        existe pero no se materializa si un pico de volatilidad te liquida antes. Por eso aquí el
+        tamaño se calcula con Kelly fraccionado, no a ojo.</p>
       </div>
 
       <div class="fav-block">
         <div class="fav-lbl">Tus favoritos <span class="mute">(los que analiza)</span></div>
         <div class="fav-row" id="favRow"></div>
       </div>
+      <div class="proxy-meter" id="proxyMeter"></div>
+    </section>
 
-      <div class="btns" style="margin-bottom:6px">
-        <button class="btn solid" id="gxBtn" onclick="scanGEX()">Analizar desequilibrio</button>
-      </div>
-      <div class="caveat" id="gxMsg" style="display:none"></div>
-      <div id="gxOut" style="display:none"></div>
-      <div class="empty" id="gxEmpty">
-        <strong>Mapa de gamma</strong>
-        Añade tickers arriba y pulsa <b>Analizar desequilibrio</b>. Para cada valor te digo si los dealers
-        amplifican o amortiguan, dónde está el nivel que cambia el régimen (gamma flip), el strike que
-        actúa de imán, y los muros de calls y puts que hacen de resistencia y soporte reales.
-      </div>
-    </section>
-    <section class="blk" style="margin-top:22px">
-      <h2>🗺️ Análisis sectorial<span class="sub">dónde entra y sale el dinero · 4h · diario · semanal</span></h2>
-      <div class="historia" style="font-size:13.5px;margin-bottom:12px">
-        <p>Para cada ETF sectorial: <b>Stoch RSI (3,3,14,14)</b> y <b>MACD (12,26,9)</b> en las tres
-        temporalidades. Sirve para no operar a ciegas: un valor fuerte dentro de un sector que se
-        desmorona lo tiene mucho más difícil, y al revés — el viento a favor del sector es la mitad del trabajo.</p>
-        <p style="margin-top:6px;font-size:12.5px"><b>Cómo leerlo:</b> lo más potente es la <b>alineación</b>.
-        Cuando las tres temporalidades apuntan al mismo lado, la tendencia sectorial es sólida. Cuando el
-        semanal es alcista y el 4h está en sobreventa, tienes una entrada a favor de la tendencia mayor —
-        que es la forma clásica y sensata de usar el Stoch RSI.</p>
+    <!-- 1 · VRP -->
+    <section class="blk">
+      <h2>① Prima de riesgo de volatilidad<span class="sub">¿dónde cobra el mercado de más?</span></h2>
+      <div class="historia" style="font-size:12.5px;margin-bottom:10px">
+        Compara la implícita que cobra el mercado con la realizada que estimo del histórico
+        (mezcla de 20, 60 y 120 sesiones, porque la volatilidad es persistente pero revierte).
+        La diferencia, en puntos de volatilidad, es lo que te pagan por asumir el riesgo.
       </div>
       <div class="btns" style="margin-bottom:6px">
-        <button class="btn solid" id="secBtn" onclick="scanSectorial()">Analizar sectores</button>
-        <select id="secOrden" class="btn quiet" style="padding:8px" onchange="renderSectorial(true)">
-          <option value="fuerza">Ordenar: más fuertes primero</option>
-          <option value="debil">Ordenar: más débiles primero</option>
-          <option value="giro">Ordenar: giros al alza (4h sobrevendido + semanal alcista)</option>
-          <option value="nombre">Ordenar: por nombre</option>
-        </select>
+        <button class="btn solid" id="vrpsBtn" onclick="scanVRPSinclair()">Medir la prima</button>
       </div>
-      <div class="sr-progress" id="secProg" style="display:none">
-        <div class="sr-bar"><div class="sr-fill" id="secFill"></div></div>
-        <div class="sr-ptxt" id="secPtxt"></div>
-      </div>
-      <div class="caveat" id="secMsg" style="display:none"></div>
-      <div id="secOut" style="display:none"><div class="scrollx"><table class="quotes" id="secTable"></table></div>
-        <div class="historia" style="font-size:12px;margin-top:10px">
-          <b>¿Qué es el MACD, en cristiano?</b> Compara una media rápida del precio (12) con una lenta (26).
-          Si la rápida va por encima, el precio acelera hacia arriba. De ahí salen dos cosas distintas:<br>
-          · <b>La línea</b> (sobre o bajo cero) = <i>dónde estás</i>: la tendencia de fondo. Cambia despacio.<br>
-          · <b>El histograma</b> (lo que ves en %) = <i>hacia dónde vas</i>: el impulso de ahora. Cambia mucho antes,
-          por eso es el que avisa.<br>
-          Cruzando los dos salen cuatro situaciones: <span class="up">alcista</span> (todo a favor),
-          <span class="warn">pierde fuerza</span> (alcista de fondo pero enfriándose),
-          <span class="warn">girando</span> (bajista de fondo pero rebotando) y
-          <span class="dn">bajista</span> (todo en contra). Las dos de en medio son las transiciones: ahí se giran las cosas.<br>
-          El <b>%</b> dice si eso es un rasguño o algo serio: por debajo de 0,25% son dudas; por encima de 1%, un giro con ganas.
-          Va en % del precio para poder comparar un ETF de 40$ con otro de 600$.<br>
-          <b>Stoch RSI</b>: de 0 a 100. <span class="up">Bajo 20</span> = sobrevendido,
-          <span class="dn">sobre 80</span> = sobrecomprado. <b>⚡</b> = el MACD acaba de cruzar.
-          <b>Fuerza</b>: pondera las tres temporalidades dando más peso al <b>semanal</b> (la tendencia real
-          del sector) que al 4h (ruido de dos días). Pincha una fila para abrir su cadena.
-        </div>
-      </div>
-      <div class="empty" id="secEmpty">
-        <strong>Mapa de sectores</strong>
-        Pulsa <b>Analizar sectores</b> y te calculo el Stoch RSI y el MACD de más de 30 ETFs sectoriales
-        (tecnología, energía, materiales, semiconductores, mineras de oro, biotech, bancos regionales,
-        uranio, solar…) en 4 horas, diario y semanal.
-      </div>
-    </section>
-    <section class="blk" style="margin-top:22px">
-      <h2>🔗 Prima de volatilidad<span class="sub">IV en vivo vs predicción de AlphaForge</span></h2>
-      <div class="historia" style="font-size:13.5px;margin-bottom:12px">
-        <p>AlphaForge predice la volatilidad <b>realizada</b> (lo que el valor se va a mover de verdad).
-        Aquí la resto de la <b>implícita</b> (lo que el mercado cobra ahora por las opciones). Si el mercado
-        cobra más de lo que el valor se va a mover, el seguro está caro y toca <b>vender volatilidad</b>;
-        si cobra menos, está barato y toca <b>comprarla</b>.</p>
-        <p class="caveat" style="margin-top:8px"><b>Lo que hay que saber antes de usar esto:</b>
-        que un modelo bata al estándar académico (HAR) <b>no significa que bata a la implícita</b>, que es
-        el precio contra el que operas. Según el propio documento de AlphaForge, esa validación
-        <b>todavía no se ha hecho</b>. Hasta entonces esto es una hipótesis con buena pinta, no una señal
-        para arriesgar dinero.</p>
-        <p style="margin-top:6px;font-size:12.5px">Por eso cada fila te dice <b>por qué NO</b> operarla:
-        si la diferencia cae dentro del error del propio modelo, si la predicción está caducada, si el
-        modelo no se validó para ese plazo, o si la horquilla se come la ventaja. Solo lo que supera
-        los cuatro filtros aparece como operable.</p>
-      </div>
-      <div class="btns" style="margin-bottom:6px">
-        <button class="btn solid" id="vrpBtn" onclick="scanVRP()">Comparar IV vs predicción</button>
-      </div>
-      <div class="caveat" id="vrpMsg" style="display:none"></div>
-      <div id="vrpOut" style="display:none"><div id="vrpTable"></div>
-        <div class="historia" style="font-size:12px;margin-top:10px">
-          <b>Diferencia</b> = IV − RV predicha, en puntos de volatilidad. Positiva = el seguro está caro.
-          <b>Ruido del modelo</b> = su error típico: una diferencia menor que esto no es señal.
-          Se compara en el plazo <b>mensual</b> (~30 días), que es donde el propio análisis dice que la
-          ventaja sobrevive a los costes; en semanales la horquilla (~2 pts) se lo come todo.
-        </div>
-      </div>
-      <div class="empty" id="vrpEmpty">
+      <div class="caveat" id="vrpsMsg" style="display:none"></div>
+      <div id="vrpsOut" style="display:none"><div class="scrollx"><table class="quotes" id="vrpsTable"></table></div></div>
+      <div class="empty" id="vrpsEmpty">
         <strong>Prima de volatilidad</strong>
-        Compara la volatilidad implícita que cobra el mercado con la que AlphaForge predice.
-        Si el fichero de predicción no está publicado todavía, esta sección te lo dirá y el resto
-        del monitor seguirá funcionando igual.
+        Te ordeno tus favoritos por dónde la implícita está más por encima de la realizada.
+        Ahí es donde vender opciones tiene el viento a favor.
       </div>
     </section>
-    <section class="blk" style="margin-top:22px">
-      <h2>🧪 Laboratorio 0DTE<span class="sub">¿compensa de verdad comprar prima intradía?</span></h2>
-      <div class="historia" style="font-size:13.5px;margin-bottom:12px">
-        <p>Comprar un straddle 0DTE se reduce a <b>una pregunta medible</b>: ¿el índice se movió ese día
-        más de lo que costó la prima? Y las dos cosas se pueden calcular sin tener histórico de cadenas:
-        lo que se movió sale de las velas, y lo que costaba sale del VIX
-        (prima ATM 0DTE ≈ 0,7979·VIX·√(1/252)).</p>
-        <p style="margin-top:6px">Con eso mido sobre <b>años de datos reales</b> cuántas veces el movimiento
-        superó al coste — y, lo más importante, <b>si los filtros que propone una estrategia</b> (VIX bajando,
-        RSI en rango, día de la semana) <b>seleccionan de verdad días de más movimiento</b> o solo lo parecen
-        por haber probado muchas combinaciones.</p>
-        <p class="caveat" style="margin-top:8px"><b>Qué es y qué no es:</b> mide el movimiento del subyacente
-        contra el coste estimado de la prima. No replica la ejecución real (horquilla de cuatro patas,
-        deslizamiento, hora exacta de entrada). Un resultado positivo aquí es condición <b>necesaria</b>
-        para que la estrategia funcione, no suficiente. Un resultado negativo, en cambio, es bastante
-        concluyente: si ni siquiera el movimiento supera a la prima, no hay nada que rascar.</p>
+
+    <!-- 2 · SKEW -->
+    <section class="blk">
+      <h2>② Skew de puts<span class="sub">la zona rica de la curva (delta 0,15-0,30)</span></h2>
+      <div class="historia" style="font-size:12.5px;margin-bottom:10px">
+        Para un valor concreto, mide cuántos puntos de volatilidad paga cada put por encima de la
+        del dinero. Marca la zona de delta 0,15-0,30 y te dice qué contrato tiene la mejor relación
+        entre lo que cobra de más y la probabilidad real de acabar dentro.
       </div>
       <div class="btns" style="margin-bottom:6px">
-        <button class="btn solid" id="labBtn" onclick="scanLab0DTE()">Medir</button>
-        <select id="labSym" class="btn quiet" style="padding:8px">
-          <option value="SPY">SPY (≈SPX/10)</option>
-          <option value="QQQ">QQQ</option>
-          <option value="IWM">IWM</option>
-        </select>
-      </div>
-      <div class="caveat" id="labMsg" style="display:none"></div>
-      <div id="labOut" style="display:none"><div id="labTable"></div>
-        <div class="btns" style="margin-top:16px">
-          <button class="btn solid" id="gridBtn" onclick="correrGrid0DTE()">Buscar entre miles de combinaciones</button>
+        <div class="fld" style="display:inline-block;margin-right:8px">
+          <input id="skSym" placeholder="NVDA" maxlength="8" style="text-transform:uppercase;width:110px">
         </div>
-        <div id="gridOut" style="display:none;margin-top:12px"><div id="gridTable"></div></div>
-        <div class="btns" style="margin-top:16px">
-          <button class="btn solid" onclick="correrEstrategias0DTE()">Medir mi catálogo de 10 estructuras</button>
-          <select id="estCoste" class="btn quiet" style="padding:8px">
-            <option value="0.0002">Costes: 0,02%/pata (optimista)</option>
-            <option value="0.0004" selected>Costes: 0,04%/pata (realista)</option>
-            <option value="0.0008">Costes: 0,08%/pata (pesimista)</option>
-          </select>
-        </div>
-        <div id="estOut" style="display:none;margin-top:12px"><div id="estTable"></div></div>
+        <button class="btn solid" id="skBtn" onclick="scanSkewSinclair()">Analizar el skew</button>
       </div>
-      <div class="empty" id="labEmpty">
-        <strong>Laboratorio 0DTE</strong>
-        Mide, con años de datos reales, si comprar prima 0DTE tiene esperanza positiva — y si los filtros
-        de una estrategia concreta aportan algo demostrable o son ruido ajustado a posteriori.
+      <div class="caveat" id="skMsg" style="display:none"></div>
+      <div id="skOut" style="display:none"></div>
+      <div class="empty" id="skEmpty">
+        <strong>Curva de skew</strong>
+        Escribe un ticker y te enseño cuánto se paga de más por cada put según su delta,
+        y dónde está el punto donde más compensa vender.
       </div>
     </section>
 
-
-
-
-
-
-
-
-
+    <!-- 3 · EJECUCIÓN + TAMAÑO -->
+    <section class="blk">
+      <h2>③ Filtro de ejecución y tamaño<span class="sub">¿la ventaja sobrevive a la fricción?</span></h2>
+      <div class="historia" style="font-size:12.5px;margin-bottom:10px">
+        La ventaja teórica es el precio de mercado (valorado a la implícita) menos el valor justo
+        (valorado a la realizada esperada). De ahí se resta media horquilla y comisión.
+        Si lo que queda no es al menos <b>2 veces</b> el coste, se rechaza. Después, el tamaño:
+        Kelly fraccionado, que es lo único que impide que un pico de volatilidad se lleve la cuenta.
+      </div>
+      <div class="grid3" style="margin-bottom:10px">
+        <div class="fld"><label>Ticker</label><input id="exSym" placeholder="NVDA" style="text-transform:uppercase"></div>
+        <div class="fld"><label>Strike</label><input id="exK" type="number" step="0.5" placeholder="180"></div>
+        <div class="fld"><label>Días a vencimiento</label><input id="exDte" type="number" placeholder="30"></div>
+      </div>
+      <div class="grid3" style="margin-bottom:10px">
+        <div class="fld"><label>Capital de la cuenta ($)</label><input id="exCap" type="number" placeholder="50000" value="50000"></div>
+        <div class="fld"><label>Fracción de Kelly</label>
+          <select id="exFrac">
+            <option value="0.5">1/2 (agresivo)</option>
+            <option value="0.25" selected>1/4 (Sinclair)</option>
+            <option value="0.125">1/8 (conservador)</option>
+          </select></div>
+        <div class="fld"><label>Comisión por contrato ($)</label><input id="exCom" type="number" step="0.05" value="0.65"></div>
+      </div>
+      <div class="btns" style="margin-bottom:6px">
+        <button class="btn solid" id="exBtn" onclick="evaluarOperacion()">Evaluar la operación</button>
+      </div>
+      <div class="caveat" id="exMsg" style="display:none"></div>
+      <div id="exOut" style="display:none"></div>
+      <div class="empty" id="exEmpty">
+        <strong>Antes de mandar la orden</strong>
+        Introduce la venta de put que estés considerando y te digo si la ventaja teórica sobrevive
+        a la horquilla, y cuántos contratos tocan según tu capital.
+      </div>
+    </section>
   </div>
 
   <!-- ═══════════ MI CUENTA ═══════════ -->
@@ -6366,6 +6254,280 @@ function medirEstrategias0DTE(filas, opts={}){
   return { res, diasIS:corte, diasOOS:datos.length-corte, total:datos.length, costes };
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   MARCO DE SINCLAIR · las tres ineficiencias, medidas
+   ───────────────────────────────────────────────────────────────
+   1. VRP: la implícita cotiza de media por encima de la realizada.
+      Vender opciones es cobrar ese seguro. No es arbitraje: es la
+      compensación por asumir el riesgo de cola.
+   2. SKEW: desde 1987 las puts OTM están estructuralmente caras
+      frente a las ATM. La zona de delta 0,15-0,30 es donde la
+      sobrevaloración compensa mejor la probabilidad real.
+   3. EJECUCIÓN: la mayor parte del rendimiento se destruye en la
+      horquilla. Si la ventaja teórica no supera holgadamente los
+      costes, la operación se rechaza, por buena que parezca.
+
+   Y lo que impide que el edge se materialice: el sesgo negativo.
+   Ganancias pequeñas y constantes, pérdidas grandes y repentinas.
+   Se controla con tamaño (Kelly fraccionado), no con esperanza.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── 1. VRP: cuánto cobra el mercado por encima de lo que se mueve ── */
+function calcVRP(closes, ivMercado, dias){
+  if(!closes || closes.length<40 || !isFinite(ivMercado) || ivMercado<=0) return null;
+  const rets=[];
+  for(let i=1;i<closes.length;i++){ const r=Math.log(closes[i]/closes[i-1]); if(isFinite(r)) rets.push(r); }
+  if(rets.length<30) return null;
+  const vent = (n) => {
+    const s=rets.slice(-n); if(s.length<10) return NaN;
+    const m=s.reduce((a,b)=>a+b,0)/s.length;
+    const v=s.reduce((a,b)=>a+(b-m)*(b-m),0)/Math.max(s.length-1,1);
+    return Math.sqrt(v*252);
+  };
+  const rv20=vent(20), rv60=vent(60), rv120=vent(120);
+  // Estimador de la realizada esperada: mezcla de ventanas (la vol es persistente
+  // pero revierte; ponderar varias ventanas es más robusto que una sola).
+  const rvEsp = [rv20,rv60,rv120].filter(isFinite).length
+    ? (0.5*(isFinite(rv20)?rv20:0) + 0.3*(isFinite(rv60)?rv60:0) + 0.2*(isFinite(rv120)?rv120:0)) /
+      (0.5*(isFinite(rv20)?1:0) + 0.3*(isFinite(rv60)?1:0) + 0.2*(isFinite(rv120)?1:0))
+    : NaN;
+  if(!isFinite(rvEsp)||rvEsp<=0) return null;
+  const vrpPts = (ivMercado - rvEsp)*100;        // en puntos de volatilidad
+  const vrpRatio = ivMercado/rvEsp;
+  return { iv:ivMercado*100, rv20:rv20*100, rv60:rv60*100, rv120:rv120*100,
+           rvEsp:rvEsp*100, vrpPts, vrpRatio, dias };
+}
+
+/* ── 2. SKEW: dónde está la zona rica de la curva ──
+   Para cada put, comparamos su IV con la IV ATM. La sobrevaloración
+   estructural se concentra en delta 0,15-0,30 según Sinclair. */
+function analizaSkew(rows, spot, ivATM){
+  if(!rows||!rows.length||!isFinite(spot)) return null;
+  const puts = rows.filter(r=>r.type==='P' && isFinite(r.delta) && isFinite(r.iv) && r.iv>0
+                              && Math.abs(r.delta)>0.02 && Math.abs(r.delta)<0.95);
+  if(puts.length<4) return null;
+  const atm = isFinite(ivATM)&&ivATM>0 ? ivATM
+            : (puts.reduce((best,r)=> !best||Math.abs(Math.abs(r.delta)-0.5)<Math.abs(Math.abs(best.delta)-0.5)?r:best, null)||{}).iv;
+  if(!isFinite(atm)||atm<=0) return null;
+  const conSkew = puts.map(r=>({
+    ...r, absDelta:Math.abs(r.delta),
+    skewPts:(r.iv-atm)*100,                      // cuántos puntos de IV por encima de la ATM
+    zonaSinclair: Math.abs(r.delta)>=0.15 && Math.abs(r.delta)<=0.30
+  })).sort((a,b)=>b.absDelta-a.absDelta);
+  const zona = conSkew.filter(r=>r.zonaSinclair);
+  const skewZona = zona.length ? zona.reduce((a,b)=>a+b.skewPts,0)/zona.length : NaN;
+  // pendiente: cuánto sube la IV por cada 0,10 de delta que bajamos
+  let pendiente=NaN;
+  const d25=conSkew.reduce((b,r)=>!b||Math.abs(r.absDelta-0.25)<Math.abs(b.absDelta-0.25)?r:b,null);
+  const d50=conSkew.reduce((b,r)=>!b||Math.abs(r.absDelta-0.50)<Math.abs(b.absDelta-0.50)?r:b,null);
+  if(d25&&d50&&Math.abs(d25.absDelta-d50.absDelta)>0.05)
+    pendiente=((d25.iv-d50.iv)*100)/((d50.absDelta-d25.absDelta)/0.10);
+  return { ivATM:atm*100, filas:conSkew, zona, skewZonaPts:skewZona, pendiente,
+           mejor: zona.length? zona.reduce((b,r)=>!b||r.skewPts>b.skewPts?r:b,null) : null };
+}
+
+/* ── 3. FILTRO DE EJECUCIÓN: ¿la ventaja supera la fricción? ──
+   Ventaja teórica = precio de mercado (a IV) − valor justo (a RV esperada).
+   Si vendes a IV y la realidad va a ser RV, esa diferencia es tu edge bruto.
+   Coste = media horquilla + comisión. Sinclair: rechazar si no lo supera
+   holgadamente (aquí, factor 2 por defecto). */
+function filtroEjecucion(op){
+  const { tipo, S, K, dte, ivMercado, rvEsperada, bid, ask, comision=0.65, factor=2 } = op;
+  if(![S,K,dte,ivMercado,rvEsperada].every(x=>isFinite(x)&&x>0)) return null;
+  const T=dte/365;
+  const pMercado = bsm(tipo, S, K, T, 0.045, 0, ivMercado);
+  const pJusto   = bsm(tipo, S, K, T, 0.045, 0, rvEsperada);
+  const edgeBruto = pMercado - pJusto;                 // por acción
+  const mid = (isFinite(bid)&&isFinite(ask)) ? (bid+ask)/2 : pMercado;
+  const mediaHorquilla = (isFinite(bid)&&isFinite(ask)) ? (ask-bid)/2 : pMercado*0.05;
+  const costeTotal = mediaHorquilla + comision/100;    // comisión por contrato → por acción
+  const edgeNeto = edgeBruto - costeTotal;
+  const ratio = costeTotal>0 ? edgeBruto/costeTotal : Infinity;
+  return {
+    pMercado, pJusto, edgeBruto, edgeBrutoUSD:edgeBruto*100,
+    mediaHorquilla, costeTotal, costeTotalUSD:costeTotal*100,
+    edgeNeto, edgeNetoUSD:edgeNeto*100, ratio,
+    acepta: edgeNeto>0 && ratio>=factor,
+    motivo: edgeNeto<=0 ? 'la ventaja teórica no cubre ni los costes'
+          : ratio<factor ? `la ventaja solo es ${ratio.toFixed(1)}× el coste (mínimo exigido: ${factor}×)`
+          : `ventaja de ${(edgeNeto*100).toFixed(2)} $ por contrato, ${ratio.toFixed(1)}× el coste`
+  };
+}
+
+/* ── 4. DIMENSIONAMIENTO: Kelly fraccionado con aviso de sesgo negativo ──
+   Vender opciones da muchas ganancias pequeñas y pocas pérdidas enormes.
+   Kelly completo sobre esa distribución lleva a la ruina porque subestima
+   la cola. Sinclair usa una fracción (1/4 o menos) y trunca el riesgo. */
+function dimensiona(op){
+  const { pGanar, ganancia, perdidaMax, capital, fraccion=0.25 } = op;
+  if(![pGanar,ganancia,perdidaMax,capital].every(x=>isFinite(x)&&x>0) || pGanar>=1) return null;
+  const b = ganancia/perdidaMax;                       // relación ganancia/pérdida
+  const q = 1-pGanar;
+  const kelly = (pGanar*b - q)/b;                      // fracción de Kelly completa
+  const kellyUsado = Math.max(0, kelly*fraccion);
+  const riesgoPorOp = capital*kellyUsado;
+  const contratos = perdidaMax>0 ? Math.floor(riesgoPorOp/(perdidaMax*100)) : 0;
+  const esperanza = pGanar*ganancia - q*perdidaMax;
+  // ¿cuántas operaciones ganadoras se lleva una perdedora?
+  const cuantas = ganancia>0 ? perdidaMax/ganancia : Infinity;
+  return {
+    b, kelly, kellyUsado, fraccion, riesgoPorOp, contratos,
+    esperanza, esperanzaUSD:esperanza*100, cuantas,
+    ruinaSiKellyPleno: kelly>0.25,
+    aviso: kelly<=0 ? 'Kelly negativo: esta operación NO tiene esperanza positiva. No hay tamaño correcto: el correcto es cero.'
+      : cuantas>20 ? `Perfil de sesgo negativo fuerte: una pérdida se lleva ${cuantas.toFixed(0)} operaciones ganadoras. Con Kelly pleno (${(kelly*100).toFixed(1)}%) un solo evento de cola te saca del juego; por eso se usa ${(fraccion*100).toFixed(0)}%.`
+      : `Una pérdida equivale a ${cuantas.toFixed(1)} ganancias. Kelly pleno sería ${(kelly*100).toFixed(1)}% del capital; se usa ${(kellyUsado*100).toFixed(2)}%.`
+  };
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CAPA DE INTERPRETACIÓN · convierte los números en un plan
+   Qué estructura, a qué strike, cuánto tiempo, cuándo cerrar y
+   qué puede salir mal. Sin esto los números no sirven de nada.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Reglas de gestión con base empírica: cerrar en el 50% del beneficio
+   máximo y no llevar posiciones cortas por debajo de ~21 días mejora
+   el retorno ajustado por riesgo, porque la gamma se dispara al final
+   y una posición que iba bien se estropea en horas. */
+function planGestion(dte, prima){
+  const objetivo = prima*0.5;
+  // El objetivo del 50% tiene sentido con plazo por delante. En vencimientos
+  // muy cortos el theta ya va a toda velocidad y esperar al 50% puede ser
+  // cuestión de horas: ahí la regla útil es otra (salir pronto o no entrar).
+  const texto = dte>=21
+    ? `<b>Cierra al 50% del beneficio</b> (recomprar a ≈$${(objetivo*100).toFixed(0)} por contrato). `+
+      `Aguantar hasta vencimiento por el último 50% multiplica el riesgo de gamma sin apenas mejorar el retorno esperado.`
+    : `<b>Objetivo de salida ≈$${(objetivo*100).toFixed(0)} por contrato (50%).</b> Con solo ${dte} días, `+
+      `ese nivel puede alcanzarse en horas: ten la orden de recompra puesta desde el principio, porque aquí no hay tiempo de reaccionar.`;
+  return {
+    cerrarEn: objetivo,
+    texto,
+    rodar: dte>21
+      ? `<b>Gestiona a 21 días</b>: por debajo de ese plazo la gamma se acelera y un movimiento normal te destroza una posición que iba ganando. Cierra o rueda.`
+      : dte>7
+        ? `<b>⚠️ Ya estás por debajo de 21 días.</b> Aquí la gamma manda: cualquier movimiento en contra se amplifica y el delta cambia deprisa. Es plazo para gestionar, no para abrir posiciones cortas nuevas.`
+        : `<b>⛔ Quedan ${dte} días.</b> Este es el terreno donde las posiciones cortas se estropean más rápido: la gamma es máxima y un movimiento normal produce pérdidas desproporcionadas. Si no tienes una razón muy concreta, este vencimiento no es el sitio.`
+  };
+}
+
+/* ① Qué hacer con un VRP concreto */
+function consejoVRP(f){
+  const c=[];
+  const rank = isFinite(f.rank)? f.rank : NaN;
+  const volAlta = f.rvEsp>45;
+
+  /* AVISO PRIORITARIO: un ratio IV/RV desorbitado casi siempre significa
+     que hay un evento con fecha (resultados, dato macro, sentencia). La prima
+     parece regalada y no lo es: en cuanto pasa el evento la implícita se
+     desploma, pero si el movimiento es grande te lleva por delante igual.
+     Va PRIMERO y en tono de freno, no como nota al pie: si aparece después
+     de un "escenario favorable para vender", ya has leído lo que querías leer. */
+  if(f.vrpRatio>1.9 && f.vrpPts>0){
+    c.push({t:'no', txt:`<b>⛔ Freno antes de nada: ratio IV/RV de ${f.vrpRatio.toFixed(2)}×.</b> `+
+      `Una prima así de desproporcionada casi nunca es un regalo: lo normal es que haya un <b>evento con fecha</b> `+
+      `(resultados, un dato macro, una resolución pendiente). Vender esto sin saber qué es, es la forma más rápida `+
+      `de comerte un movimiento del 15% con la posición abierta. <b>Comprueba el calendario antes de tocar nada.</b>`});
+  }
+
+  if(f.vrpPts<=0){
+    c.push({t:'no', txt:`<b>No vendas aquí.</b> El mercado cobra ${Math.abs(f.vrpPts).toFixed(1)} puntos MENOS de lo que este valor se mueve. Estarías asumiendo riesgo de cola sin cobrar por él. Si acaso, es el caso raro donde COMPRAR volatilidad tiene sentido.`});
+    return c;
+  }
+  if(f.vrpPts<2){
+    c.push({t:'flojo', txt:`<b>Prima demasiado escasa.</b> ${f.vrpPts.toFixed(1)} puntos no compensan el riesgo de cola de vender opciones. Espera a que la implícita suba: la paciencia aquí es la mitad del trabajo.`});
+    return c;
+  }
+  // estructura recomendada según prima y volatilidad del subyacente
+  if(f.vrpPts>=8 && volAlta){
+    c.push({t:'si', txt:`<b>Prima muy generosa (${f.vrpPts.toFixed(1)} pts) pero volatilidad alta (${f.rvEsp.toFixed(0)}%).</b> Es tentador vender desnudo y es justo donde la gente se arruina. Usa <b>riesgo definido</b>: put spread o iron condor. Cobras menos, pero un hueco a la baja no te saca del juego.`});
+  } else if(f.vrpPts>=8){
+    c.push({t:'si', txt:`<b>Prima muy generosa (${f.vrpPts.toFixed(1)} pts) con volatilidad contenida (${f.rvEsp.toFixed(0)}%).</b> Es el escenario más favorable para vender. Put en delta 0,15-0,30, o put spread si prefieres dormir tranquilo.`});
+  } else if(f.vrpPts>=4){
+    c.push({t:'si', txt:`<b>Prima decente (${f.vrpPts.toFixed(1)} pts).</b> Terreno normal para vender puts en la zona de delta 0,15-0,30. Nada espectacular, pero el viento va a favor.`});
+  } else {
+    c.push({t:'quiza', txt:`<b>Prima justita (${f.vrpPts.toFixed(1)} pts).</b> Solo si la horquilla es estrecha; con un valor poco líquido la fricción se lo come entero. Pásalo por el filtro de ejecución antes de nada.`});
+  }
+  // IV rank: contexto histórico
+  if(isFinite(rank)){
+    if(rank<0.25) c.push({t:'aviso', txt:`<b>IV rank ${(rank*100).toFixed(0)}%:</b> la implícita está baja respecto a su propio año. Aunque el VRP sea positivo, estás cobrando poco en términos históricos — y si la volatilidad sube, la posición se pone en contra por vega antes incluso de que el precio se mueva.`});
+    else if(rank>0.70) c.push({t:'bueno', txt:`<b>IV rank ${(rank*100).toFixed(0)}%:</b> la implícita está alta para este valor. Buen momento para vender, pero pregúntate <b>por qué</b> está alta: si hay resultados o una noticia pendiente, la prima es alta por un motivo.`});
+  }
+  if(f.vrpRatio>1.6 && f.vrpRatio<=1.9) c.push({t:'aviso', txt:`<b>Ratio IV/RV de ${f.vrpRatio.toFixed(2)}×:</b> una diferencia grande. Comprueba si hay resultados próximos o alguna operación corporativa antes de vender.`});
+  if(volAlta) c.push({t:'aviso', txt:`Volatilidad realizada del ${f.rvEsp.toFixed(0)}%: este valor se mueve mucho de verdad. Reduce el tamaño respecto a lo que harías en un valor tranquilo, aunque la prima invite a lo contrario.`});
+  return c;
+}
+
+/* ② Qué hacer con la curva de skew */
+function consejoSkew(sk, spot, dte){
+  const c=[];
+  const s=sk.skewZonaPts, mj=sk.mejor;
+  if(!isFinite(s)){ c.push({t:'no',txt:'No se pudo medir el skew con los datos disponibles.'}); return c; }
+  if(s>5){
+    c.push({t:'si', txt:`<b>Skew pronunciado (+${s.toFixed(1)} pts).</b> El miedo está caro. Es el escenario ideal para un <b>put spread de crédito</b>: vendes la put cara de la zona 0,15-0,30 y compras una más abajo, que está relativamente menos inflada. Te quedas con el diferencial de skew y con el riesgo acotado.`});
+  } else if(s>2){
+    c.push({t:'si', txt:`<b>Skew normal (+${s.toFixed(1)} pts).</b> Hay algo que cobrar. Vender put en delta 0,20-0,25 es la jugada estándar; el spread reduce el cobro pero también el susto.`});
+  } else if(s>0){
+    c.push({t:'quiza', txt:`<b>Skew flojo (+${s.toFixed(1)} pts).</b> Las puts OTM apenas pagan más que las ATM. Si vas a asumir riesgo de cola igualmente, plantéate vender más cerca del dinero, donde al menos la prima es mayor — o no operar este valor.`});
+  } else {
+    c.push({t:'no', txt:`<b>Skew invertido o plano.</b> Las puts no están pagando la prima de miedo habitual. Vender puts OTM aquí es cobrar poco por el mismo riesgo. Es más raro de lo que parece: comprueba que los datos sean correctos.`});
+  }
+  if(isFinite(sk.pendiente)&&sk.pendiente>3)
+    c.push({t:'bueno', txt:`La curva sube ${sk.pendiente.toFixed(1)} puntos de IV por cada 0,10 de delta que bajas. Con una pendiente así, <b>el spread gana atractivo</b>: la pata que vendes está mucho más inflada que la que compras.`});
+  if(mj)
+    c.push({t:'plan', txt:`<b>Candidata concreta:</b> vender la put ${mj.K} (delta ${mj.absDelta.toFixed(2)}, IV ${(mj.iv*100).toFixed(1)}%). `+
+      `Está un ${((spot-mj.K)/spot*100).toFixed(1)}% por debajo del precio actual, a ${dte} días. `+
+      `Para hacerlo spread, compra la put unos ${(spot*0.05).toFixed(0)} puntos más abajo.`});
+  c.push({t:'aviso', txt:`El skew existe porque las caídas son reales y bruscas. Cobrarlo no es dinero gratis: es cobrar por un seguro que a veces hay que pagar.`});
+  return c;
+}
+
+/* ③ Qué hacer con el resultado del filtro de ejecución */
+function consejoEjecucion(fe, dim, ctx){
+  const c=[];
+  const {dteReal, iv, rvEsp, g, prima, spot, kReal}=ctx;
+  if(!fe.acepta){
+    if(fe.edgeNeto<=0){
+      c.push({t:'no', txt:`<b>No la hagas.</b> Vendiendo a ${(iv*100).toFixed(1)}% cuando la realidad apunta a ${isFinite(rvEsp)?(rvEsp*100).toFixed(1):'—'}%, lo que ganas de ventaja no cubre ni la horquilla. Es trabajar gratis asumiendo riesgo.`});
+    } else {
+      c.push({t:'no', txt:`<b>Ventaja insuficiente.</b> Solo ${fe.ratio.toFixed(1)}× el coste. Opciones: buscar un <b>vencimiento más líquido</b> (los mensuales suelen tener mejor horquilla que los semanales), un <b>strike más negociado</b> (los números redondos), o esperar a que la implícita suba.`});
+    }
+    c.push({t:'aviso', txt:`Rechazar operaciones es la parte del trabajo que más dinero ahorra. La mayoría de las que "casi" pasan el filtro acaban siendo pérdidas por fricción.`});
+    return c;
+  }
+  c.push({t:'si', txt:`<b>Ventaja neta de $${fe.edgeNetoUSD.toFixed(0)} por contrato</b>, ${fe.ratio.toFixed(1)}× el coste de fricción. La operación tiene sentido matemático.`});
+  const ad=Math.abs(g.delta);
+  if(ad>=0.15&&ad<=0.30) c.push({t:'bueno', txt:`Delta ${ad.toFixed(2)}: en la zona donde el skew compensa mejor la probabilidad real de asignación. Aproximadamente <b>${(ad*100).toFixed(0)}% de probabilidad</b> de acabar dentro del dinero.`});
+  else if(ad>0.30) c.push({t:'aviso', txt:`Delta ${ad.toFixed(2)}: más cerca del dinero de lo ideal. Cobras más pero te asignan más a menudo (${(ad*100).toFixed(0)}% de probabilidad). Considera bajar el strike.`});
+  else c.push({t:'aviso', txt:`Delta ${ad.toFixed(2)}: muy lejos del dinero. Acertarás casi siempre, pero cobras tan poco que un solo día malo borra muchas operaciones. Es el perfil que más engaña.`});
+  // gestión
+  const pg=planGestion(dteReal, prima);
+  c.push({t:'plan', txt:pg.texto});
+  c.push({t:'plan', txt:pg.rodar});
+  // escenario adverso concreto
+  const sigma = spot*iv*Math.sqrt(dteReal/365);
+  const s3 = spot - 3*sigma;
+  if(s3 < kReal){
+    const perdida3 = (kReal - s3 - prima)*100;
+    c.push({t:'aviso', txt:`<b>Escenario de 3σ:</b> si ${ctx.sym} cayera a ${s3.toFixed(2)} (un movimiento grande pero perfectamente posible), esta put perdería del orden de <b>$${perdida3.toFixed(0)} por contrato</b> — unas ${(perdida3/(prima*100)).toFixed(0)} veces la prima que cobras. Ese es el riesgo real, no el que sugiere el ${((1-ad)*100).toFixed(0)}% de acierto.`});
+  }
+  if(dim && dim.contratos===0)
+    c.push({t:'no', txt:`<b>El tamaño sale a cero contratos</b> con tu capital y esa fracción de Kelly. Traducción: la operación es demasiado grande para tu cuenta. O reduces el riesgo (spread en vez de desnuda), o no la haces.`});
+  else if(dim)
+    c.push({t:'plan', txt:`<b>Tamaño: ${dim.contratos} contrato(s).</b> Riesgo comprometido ${dim.riesgoPorOp.toFixed(0)}$ (${(dim.kellyUsado*100).toFixed(2)}% del capital). Si te apetece poner más, esa es exactamente la señal de que no deberías.`});
+  return c;
+}
+
+/* Pinta una lista de consejos */
+function pintaConsejos(lista){
+  if(!lista||!lista.length) return '';
+  const ico={si:'✅',no:'⛔',quiza:'🤔',aviso:'⚠️',bueno:'👍',flojo:'😐',plan:'📋'};
+  const cls={si:'up',no:'dn',quiza:'warn',aviso:'warn',bueno:'up',flojo:'mute',plan:''};
+  return '<div class="consejos">'+lista.map(c=>
+    `<div class="consejo ${cls[c.t]||''}"><span class="consejo-ico">${ico[c.t]||'·'}</span><span>${c.txt}</span></div>`
+  ).join('')+'</div>';
+}
+
 function calcularGEX(rows, spot, opts={}){
   if(!rows || !rows.length || !isFinite(spot) || spot<=0) return null;
   const mult = opts.mult ?? 100;
@@ -8085,6 +8247,279 @@ function lecturaEstrategia(e){
     partes.push(`Mejora filtrando por <b>${mejor.nombre}</b> (${pct(mejor.media)} vs ${pct(siempre.media)}), y fuera de muestra da ${isFinite(mejor.oosMedia)?pct(mejor.oosMedia):'—'}.`);
   }
   return partes.join(' ');
+}
+
+/* ═══ ① VRP sobre los favoritos ═══ */
+async function scanVRPSinclair(){
+  if(!CN.url||!CN.key){ const m=$('vrpsMsg'); m.style.display='block';
+    m.innerHTML='Necesito el acceso a datos configurado (Mi cuenta → Configurar acceso).'; return; }
+  const favs=getFavs();
+  if(!favs.length){ const m=$('vrpsMsg'); m.style.display='block';
+    m.innerHTML='Añade tickers a <b>Favoritos</b> arriba.'; return; }
+  $('vrpsBtn').disabled=true; $('vrpsBtn').textContent='Midiendo…';
+  $('vrpsEmpty').style.display='none';
+  const m=$('vrpsMsg'); m.style.display='block'; m.textContent='Pidiendo implícitas e histórico…';
+  try{
+    const mets={};
+    for(const s of favs){
+      try{ const r=await api('metrics',{symbol:s});
+        mets[s]=((r&&r.data&&r.data.items)?r.data.items:(r&&r.items?r.items:[]))[0]||null;
+      }catch(e){ mets[s]=null; }
+    }
+    const dx=new DXLink(); await dx.connect(CN.url,CN.key);
+    const vel={}; dx.onCandle=(s,c)=>{const b=s.split('{')[0];(vel[b]=vel[b]||[]).push(c);};
+    favs.forEach(s=>dx.subscribeCandles(s,400,'d'));
+    await new Promise(r=>setTimeout(r,5000)); dx.disconnect();
+
+    const filas=[];
+    for(const s of favs){
+      const closes=(vel[s]||[]).sort((a,b)=>a.time-b.time).map(c=>c.close).filter(x=>isFinite(x)&&x>0);
+      const mt=mets[s];
+      let iv=mt?parseFloat(mt['implied-volatility-index']):NaN;
+      if(isFinite(iv)&&iv>3) iv/=100;
+      let rank=mt?parseFloat(mt['implied-volatility-index-rank']):NaN;
+      if(isFinite(rank)&&rank>1.5) rank/=100;
+      if(!isFinite(iv)||closes.length<40){ filas.push({sym:s, err: !isFinite(iv)?'sin IV del mercado':'pocas velas'}); continue; }
+      const v=calcVRP(closes, iv, 30);
+      if(!v){ filas.push({sym:s, err:'no se pudo calcular'}); continue; }
+      const meta=STOCK_META[s]||[s,'—'];
+      filas.push({sym:s, nombre:meta[0], rank, spot:closes[closes.length-1], ...v});
+    }
+    filas.sort((a,b)=>{ if(a.err&&b.err)return 0; if(a.err)return 1; if(b.err)return -1; return b.vrpPts-a.vrpPts; });
+    renderVRPSinclair(filas);
+    m.style.display='none';
+  }catch(e){ m.style.display='block'; m.innerHTML='Error: '+(e.message||e); }
+  $('vrpsBtn').disabled=false; $('vrpsBtn').textContent='Medir la prima';
+}
+
+function renderVRPSinclair(filas){
+  $('vrpsOut').style.display='block';
+  let html='<thead><tr><th>Valor</th><th>Implícita</th><th>Realizada<br>esperada</th><th>Prima<br>(IV−RV)</th><th>Ratio</th><th>IV rank</th><th>Lectura</th></tr></thead><tbody>';
+  for(const f of filas){
+    if(f.err){ html+=`<tr><td class="tk"><b>${f.sym}</b></td><td class="mute" colspan="6">${f.err}</td></tr>`; continue; }
+    const cls=f.vrpPts>3?'up':f.vrpPts<0?'dn':'mute';
+    const lectura = f.vrpPts>6 ? 'Prima muy generosa: el mercado paga bastante más de lo que este valor se mueve.'
+      : f.vrpPts>3 ? 'Prima decente. Es el terreno normal para vender.'
+      : f.vrpPts>0 ? 'Prima escasa: apenas compensa el riesgo de cola.'
+      : '<b>Prima negativa:</b> el mercado cobra MENOS de lo que se mueve. Vender aquí es regalar dinero.';
+    const rankTxt = isFinite(f.rank)? (f.rank*100).toFixed(0)+'%' : '—';
+    const rankAviso = isFinite(f.rank)&&f.rank<0.2 ? '<br><span class="mute" style="font-size:10px">IV rank bajo: la prima es pequeña en términos históricos</span>' : '';
+    html+=`<tr onclick="srGoChain('${f.sym}')" class="sec-main">
+      <td class="tk"><b>${f.sym}</b><br><span class="mute" style="font-size:10.5px">${f.nombre}</span></td>
+      <td class="num">${f.iv.toFixed(1)}%</td>
+      <td class="num mute">${f.rvEsp.toFixed(1)}%<br><span style="font-size:10px">20d ${f.rv20.toFixed(0)} · 60d ${f.rv60.toFixed(0)}</span></td>
+      <td class="num ${cls}"><b>${f.vrpPts>=0?'+':''}${f.vrpPts.toFixed(1)} pts</b></td>
+      <td class="num ${cls}">${f.vrpRatio.toFixed(2)}×</td>
+      <td class="num">${rankTxt}${rankAviso}</td>
+      <td style="font-size:11.5px" class="${cls}">${lectura}</td></tr>
+      <tr class="sec-trad"><td colspan="7">${pintaConsejos(consejoVRP(f))}</td></tr>`;
+  }
+  $('vrpsTable').innerHTML=html+'</tbody>';
+}
+
+/* ═══ ② SKEW de un ticker ═══ */
+async function scanSkewSinclair(){
+  const sym=(($('skSym')&&$('skSym').value)||'').trim().toUpperCase();
+  if(!sym){ const m=$('skMsg'); m.style.display='block'; m.innerHTML='Escribe un ticker.'; return; }
+  if(!CN.url||!CN.key){ const m=$('skMsg'); m.style.display='block';
+    m.innerHTML='Necesito el acceso a datos configurado.'; return; }
+  $('skBtn').disabled=true; $('skBtn').textContent='Analizando…';
+  $('skEmpty').style.display='none';
+  const m=$('skMsg'); m.style.display='block'; m.textContent='Cargando la cadena de '+sym+'…';
+  try{
+    const q=await api('quotes',{symbol:sym});
+    const qd=((q&&q.data&&q.data.items)?q.data.items:(q&&q.items?q.items:[]))[0];
+    let spot=NaN;
+    if(qd){ const b=parseFloat(qd.bid),a=parseFloat(qd.ask),l=parseFloat(qd.last);
+      spot=(isFinite(b)&&isFinite(a)&&a>0)?(b+a)/2:(isFinite(l)?l:NaN); }
+    if(!isFinite(spot)){ m.innerHTML='No llegó el precio de '+sym+'.'; $('skBtn').disabled=false; $('skBtn').textContent='Analizar el skew'; return; }
+
+    const ch=await api('chain',{symbol:sym});
+    const it=((ch&&ch.data&&ch.data.items)?ch.data.items:(ch&&ch.items?ch.items:[]));
+    const exps=(it[0]&&it[0].expirations)||[];
+    // vencimiento entre 21 y 60 días: donde Sinclair opera
+    const cand=exps.filter(e=>{const d=+e['days-to-expiration']; return isFinite(d)&&d>=21&&d<=60&&(e.strikes||[]).length;});
+    const exp=cand.length?cand[0]:exps.find(e=>(e.strikes||[]).length);
+    if(!exp){ m.innerHTML='No hay vencimientos con strikes entre 21 y 60 días.'; $('skBtn').disabled=false; $('skBtn').textContent='Analizar el skew'; return; }
+    const dte=+exp['days-to-expiration'];
+
+    const meta={}, syms=[];
+    for(const s of (exp.strikes||[])){
+      const K=+s['strike-price'];
+      if(!isFinite(K)||K>spot*1.05||K<spot*0.6) continue;   // puts: del dinero hacia abajo
+      if(s['put-streamer-symbol']){ meta[s['put-streamer-symbol']]={K}; syms.push(s['put-streamer-symbol']); }
+    }
+    if(!syms.length){ m.innerHTML='No hay puts en el rango.'; $('skBtn').disabled=false; $('skBtn').textContent='Analizar el skew'; return; }
+
+    const dx=new DXLink(); await dx.connect(CN.url,CN.key);
+    const gre={}, quo={};
+    dx.onGreeks=(s,g)=>{gre[s]=g;}; dx.onQuote=(s,q2)=>{quo[s]=q2;};
+    dx.subscribe(syms);
+    await new Promise(r=>setTimeout(r,6000)); dx.disconnect();
+
+    const rows=[];
+    for(const s of syms){
+      const g=gre[s], mm=meta[s], qq=quo[s];
+      if(!g||!isFinite(g.delta)||!isFinite(g.iv)||g.iv<=0) continue;
+      let iv=g.iv; if(iv>3) iv/=100;
+      rows.push({type:'P', K:mm.K, iv, delta:g.delta, gamma:g.gamma, theta:g.theta,
+                 bid:qq?qq.bid:NaN, ask:qq?qq.ask:NaN});
+    }
+    if(rows.length<4){ m.innerHTML='Solo llegaron '+rows.length+' puts con griegas. Con el mercado cerrado dxfeed no publica deltas ni IV.'; 
+      $('skBtn').disabled=false; $('skBtn').textContent='Analizar el skew'; return; }
+    const atmRow=rows.reduce((b,r)=>!b||Math.abs(Math.abs(r.delta)-0.5)<Math.abs(Math.abs(b.delta)-0.5)?r:b,null);
+    const sk=analizaSkew(rows, spot, atmRow?atmRow.iv:NaN);
+    if(!sk){ m.innerHTML='No se pudo calcular el skew.'; $('skBtn').disabled=false; $('skBtn').textContent='Analizar el skew'; return; }
+    renderSkewSinclair(sym, spot, dte, sk);
+    m.style.display='none';
+  }catch(e){ m.style.display='block'; m.innerHTML='Error: '+(e.message||e); }
+  $('skBtn').disabled=false; $('skBtn').textContent='Analizar el skew';
+}
+
+function renderSkewSinclair(sym, spot, dte, sk){
+  $('skOut').style.display='block';
+  const maxSkew=Math.max(...sk.filas.map(r=>Math.abs(r.skewPts)),1);
+  let html=`<div class="bt-grid" style="grid-template-columns:repeat(4,1fr)">
+    <div class="bt-cell"><div class="bt-num">${spot.toFixed(2)}</div><div class="bt-lbl">${sym}<br>precio</div></div>
+    <div class="bt-cell"><div class="bt-num">${sk.ivATM.toFixed(1)}%</div><div class="bt-lbl">IV del dinero</div></div>
+    <div class="bt-cell"><div class="bt-num ${sk.skewZonaPts>2?'up':'mute'}">${isFinite(sk.skewZonaPts)?'+'+sk.skewZonaPts.toFixed(1):'—'}</div><div class="bt-lbl">skew medio en<br>delta 0,15-0,30</div></div>
+    <div class="bt-cell"><div class="bt-num">${isFinite(sk.pendiente)?sk.pendiente.toFixed(1):'—'}</div><div class="bt-lbl">pts de IV por<br>cada 0,10 de delta</div></div>
+  </div>`;
+  html+='<div class="scrollx" style="margin-top:10px"><table class="quotes"><thead><tr><th>Strike</th><th>Delta</th><th>IV</th><th>Sobre la ATM</th><th></th><th>Prima</th></tr></thead><tbody>';
+  for(const r of sk.filas){
+    const w=Math.abs(r.skewPts)/maxSkew*100;
+    const esMejor = sk.mejor && r.K===sk.mejor.K;
+    const mid=(isFinite(r.bid)&&isFinite(r.ask))?((r.bid+r.ask)/2):NaN;
+    html+=`<tr class="${r.zonaSinclair?'gx-now':''}">
+      <td class="num">${r.K}${esMejor?' <span class="gx-tag up">mejor</span>':''}</td>
+      <td class="num">${r.absDelta.toFixed(2)}</td>
+      <td class="num">${(r.iv*100).toFixed(1)}%</td>
+      <td class="num ${r.skewPts>0?'up':'mute'}">${r.skewPts>=0?'+':''}${r.skewPts.toFixed(1)} pts</td>
+      <td><span class="gx-track" style="display:inline-block;width:90px"><span class="gx-fill up" style="width:${w.toFixed(0)}%"></span></span></td>
+      <td class="num">${isFinite(mid)?'$'+mid.toFixed(2):'—'}</td></tr>`;
+  }
+  html+='</tbody></table></div>';
+  html+=pintaConsejos(consejoSkew(sk, spot, dte));
+  const mj=sk.mejor;
+  html+=`<div class="gx-setup ${sk.skewZonaPts>2?'up':''}" style="margin-top:12px;display:none">
+    <div class="gx-setup-h">Lectura del skew · vencimiento a ${dte} días</div>
+    <div class="gx-setup-b">${
+      sk.skewZonaPts>4 ? `<b>Skew pronunciado.</b> Las puts de la zona 0,15-0,30 pagan ${sk.skewZonaPts.toFixed(1)} puntos de volatilidad por encima de la del dinero. Es el terreno donde la sobrevaloración estructural compensa bien la probabilidad real de asignación.`
+      : sk.skewZonaPts>1.5 ? `<b>Skew normal.</b> ${sk.skewZonaPts.toFixed(1)} puntos por encima de la ATM en la zona objetivo: hay algo que cobrar, sin ser excepcional.`
+      : `<b>Skew plano.</b> Solo ${isFinite(sk.skewZonaPts)?sk.skewZonaPts.toFixed(1):'—'} puntos sobre la ATM. Sin skew, vender puts OTM pierde su principal atractivo: estarías cobrando poco por asumir el mismo riesgo de cola.`
+    }</div>
+    ${mj?`<div class="gx-setup-b"><b>El contrato con mejor relación:</b> strike ${mj.K}, delta ${mj.absDelta.toFixed(2)},
+      IV ${(mj.iv*100).toFixed(1)}% (${mj.skewPts>=0?'+':''}${mj.skewPts.toFixed(1)} pts sobre la ATM).
+      Pásalo al filtro de ejecución de abajo para ver si la ventaja sobrevive a la horquilla.</div>`:''}
+    <div class="gx-setup-b mute" style="font-size:11.5px">Recuerda: un skew alto no es una invitación a vender más.
+      Es la compensación por un riesgo real de cola — el mercado paga eso porque a veces pasa.</div>
+  </div>`;
+  $('skOut').innerHTML=html;
+}
+
+/* ═══ ③ FILTRO DE EJECUCIÓN + TAMAÑO ═══ */
+async function evaluarOperacion(){
+  const sym=(($('exSym')&&$('exSym').value)||'').trim().toUpperCase();
+  const K=+($('exK')&&$('exK').value), dte=+($('exDte')&&$('exDte').value);
+  const cap=+($('exCap')&&$('exCap').value)||50000;
+  const frac=+(($('exFrac')&&$('exFrac').value)||0.25);
+  const com=+(($('exCom')&&$('exCom').value)||0.65);
+  const m=$('exMsg'); m.style.display='block';
+  if(!sym||!isFinite(K)||!isFinite(dte)||dte<=0){ m.innerHTML='Rellena ticker, strike y días a vencimiento.'; return; }
+  if(!CN.url||!CN.key){ m.innerHTML='Necesito el acceso a datos configurado.'; return; }
+  $('exBtn').disabled=true; $('exBtn').textContent='Evaluando…';
+  $('exEmpty').style.display='none';
+  m.textContent='Buscando el contrato…';
+  try{
+    // precio e histórico para la realizada esperada
+    const q=await api('quotes',{symbol:sym});
+    const qd=((q&&q.data&&q.data.items)?q.data.items:(q&&q.items?q.items:[]))[0];
+    let spot=NaN;
+    if(qd){ const b=parseFloat(qd.bid),a=parseFloat(qd.ask),l=parseFloat(qd.last);
+      spot=(isFinite(b)&&isFinite(a)&&a>0)?(b+a)/2:(isFinite(l)?l:NaN); }
+    const ch=await api('chain',{symbol:sym});
+    const it=((ch&&ch.data&&ch.data.items)?ch.data.items:(ch&&ch.items?ch.items:[]));
+    const exps=(it[0]&&it[0].expirations)||[];
+    let exp=null,dif=Infinity;
+    for(const e of exps){ const d=+e['days-to-expiration']; if(!isFinite(d)||!(e.strikes||[]).length) continue;
+      if(Math.abs(d-dte)<dif){dif=Math.abs(d-dte);exp=e;} }
+    if(!exp){ m.innerHTML='Sin vencimientos disponibles.'; $('exBtn').disabled=false; $('exBtn').textContent='Evaluar la operación'; return; }
+    const dteReal=+exp['days-to-expiration'];
+    const st=(exp.strikes||[]).reduce((b,s)=>{const k=+s['strike-price'];
+      return (!b||Math.abs(k-K)<Math.abs(+b['strike-price']-K))?s:b;},null);
+    if(!st||!st['put-streamer-symbol']){ m.innerHTML='No encontré ese strike.'; $('exBtn').disabled=false; $('exBtn').textContent='Evaluar la operación'; return; }
+    const kReal=+st['strike-price'];
+
+    const dx=new DXLink(); await dx.connect(CN.url,CN.key);
+    const vel=[]; let g=null,qq=null;
+    dx.onCandle=(s,c)=>{ if(s.split('{')[0]===sym) vel.push(c); };
+    dx.onGreeks=(s,x)=>{ if(s===st['put-streamer-symbol']) g=x; };
+    dx.onQuote=(s,x)=>{ if(s===st['put-streamer-symbol']) qq=x; };
+    dx.subscribeCandles(sym,400,'d');
+    dx.subscribe([st['put-streamer-symbol']]);
+    await new Promise(r=>setTimeout(r,6000)); dx.disconnect();
+
+    const closes=vel.sort((a,b)=>a.time-b.time).map(c=>c.close).filter(x=>isFinite(x)&&x>0);
+    if(!isFinite(spot)&&closes.length) spot=closes[closes.length-1];
+    if(!g||!isFinite(g.iv)||closes.length<40){
+      m.innerHTML='<b>Faltan datos.</b> '+(!g?'No llegaron las griegas del contrato (con el mercado cerrado dxfeed no las publica).':'Pocas velas del subyacente.');
+      $('exBtn').disabled=false; $('exBtn').textContent='Evaluar la operación'; return; }
+    let iv=g.iv; if(iv>3) iv/=100;
+    const v=calcVRP(closes, iv, dteReal);
+    const rvEsp=v?v.rvEsp/100:NaN;
+    const fe=filtroEjecucion({tipo:'P', S:spot, K:kReal, dte:dteReal, ivMercado:iv,
+      rvEsperada:rvEsp, bid:qq?qq.bid:NaN, ask:qq?qq.ask:NaN, comision:com, factor:2});
+    if(!fe){ m.innerHTML='No se pudo evaluar.'; $('exBtn').disabled=false; $('exBtn').textContent='Evaluar la operación'; return; }
+    // dimensionamiento: prob. de acabar dentro ≈ |delta|; pérdida máxima razonable = strike (put desnuda) o el ancho si es spread
+    const pAsignacion=Math.min(Math.abs(g.delta),0.95);
+    const prima=(isFinite(qq&&qq.bid)?qq.bid:fe.pMercado);
+    // pérdida "de trabajo": movimiento de 2 sigma en contra, no la ruina teórica
+    const sigmaPer = spot*iv*Math.sqrt(dteReal/365);
+    const perdidaTrabajo = Math.max(sigmaPer*2 - (spot-kReal), prima*3)/1;   // por acción
+    const dim=dimensiona({pGanar:1-pAsignacion, ganancia:prima, perdidaMax:perdidaTrabajo, capital:cap, fraccion:frac});
+    renderEvaluacion({sym, spot, kReal, dteReal, iv, rvEsp, v, g, qq, fe, dim, prima, perdidaTrabajo, cap, frac});
+    m.style.display='none';
+  }catch(e){ m.style.display='block'; m.innerHTML='Error: '+(e.message||e); }
+  $('exBtn').disabled=false; $('exBtn').textContent='Evaluar la operación';
+}
+
+function renderEvaluacion(R){
+  $('exOut').style.display='block';
+  const {sym,spot,kReal,dteReal,iv,rvEsp,v,g,qq,fe,dim,prima,perdidaTrabajo,cap}=R;
+  const ok=fe.acepta;
+  let html=`<div class="gx-setup ${ok?'up':'dn'}">
+    <div class="gx-setup-h">${ok?'✅ La operación pasa el filtro':'❌ La operación NO pasa el filtro'} ·
+      vender put ${sym} ${kReal} a ${dteReal} días</div>
+    <div class="gx-setup-b"><b>Motivo:</b> ${fe.motivo}</div>
+  </div>`;
+  html+=`<div class="bt-grid" style="grid-template-columns:repeat(4,1fr);margin-top:10px">
+    <div class="bt-cell"><div class="bt-num">${(iv*100).toFixed(1)}%</div><div class="bt-lbl">implícita<br>(lo que cobras)</div></div>
+    <div class="bt-cell"><div class="bt-num">${isFinite(rvEsp)?(rvEsp*100).toFixed(1)+'%':'—'}</div><div class="bt-lbl">realizada esperada<br>(lo que se mueve)</div></div>
+    <div class="bt-cell"><div class="bt-num ${fe.edgeBruto>0?'up':'dn'}">$${fe.edgeBrutoUSD.toFixed(0)}</div><div class="bt-lbl">ventaja bruta<br>por contrato</div></div>
+    <div class="bt-cell"><div class="bt-num ${fe.edgeNeto>0?'up':'dn'}">$${fe.edgeNetoUSD.toFixed(0)}</div><div class="bt-lbl">ventaja NETA<br>tras fricción</div></div>
+  </div>`;
+  html+=`<div class="scrollx" style="margin-top:10px"><table class="quotes"><tbody>
+    <tr><td class="tk">Precio de mercado (a IV ${(iv*100).toFixed(1)}%)</td><td class="num">$${(fe.pMercado*100).toFixed(2)}</td></tr>
+    <tr><td class="tk">Valor justo (a realizada ${isFinite(rvEsp)?(rvEsp*100).toFixed(1):'—'}%)</td><td class="num">$${(fe.pJusto*100).toFixed(2)}</td></tr>
+    <tr><td class="tk">Media horquilla</td><td class="num dn">−$${(fe.mediaHorquilla*100).toFixed(2)}</td></tr>
+    <tr><td class="tk">Coste total de fricción</td><td class="num dn">−$${fe.costeTotalUSD.toFixed(2)}</td></tr>
+    <tr><td class="tk"><b>Ventaja / coste</b></td><td class="num ${fe.ratio>=2?'up':'dn'}"><b>${isFinite(fe.ratio)?fe.ratio.toFixed(1):'∞'}×</b> <span class="mute">(mínimo 2×)</span></td></tr>
+    <tr><td class="tk">Delta del contrato</td><td class="num">${isFinite(g.delta)?g.delta.toFixed(3):'—'} <span class="mute">${Math.abs(g.delta)>=0.15&&Math.abs(g.delta)<=0.30?'· en la zona de Sinclair':''}</span></td></tr>
+  </tbody></table></div>`;
+  html+=pintaConsejos(consejoEjecucion(fe, dim, {sym,spot,kReal,dteReal,iv,rvEsp,g,prima}));
+  if(dim){
+    html+=`<div class="gx-setup" style="margin-top:12px">
+      <div class="gx-setup-h">Tamaño de la posición</div>
+      <div class="gx-setup-b"><b>${dim.contratos} contrato(s)</b> con ${cap.toLocaleString()} $ de capital,
+        arriesgando ${dim.riesgoPorOp.toFixed(0)} $ (${(dim.kellyUsado*100).toFixed(2)}% del capital).</div>
+      <div class="gx-setup-b">${dim.aviso}</div>
+      <div class="gx-setup-b mute" style="font-size:11.5px">Prima cobrada ≈ $${(prima*100).toFixed(0)} por contrato ·
+        pérdida de trabajo estimada (movimiento de 2σ en contra) ≈ $${(perdidaTrabajo*100).toFixed(0)}.
+        No es la pérdida máxima teórica de una put desnuda, que es mucho mayor: si vendes sin cobertura,
+        el riesgo real es el strike entero menos la prima.</div>
+    </div>`;
+  }
+  $('exOut').innerHTML=html;
 }
 
 async function scanStochRSI(){
