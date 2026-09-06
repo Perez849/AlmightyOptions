@@ -2390,17 +2390,43 @@ function stats(){
   const pnlAbajo = pnl(0.01, 1e-6, VV());             // el precio se va casi a cero
   const pnlArriba = pnl(st.S * 10, 1e-6, VV());       // el precio se multiplica por 10
 
-  // PÉRDIDA ilimitada: la curva sigue CAYENDO más allá del gráfico
-  const ilimitadoAbajo = pnlAbajo < mn - 1;
-  const ilimitadoArriba = pnlArriba < mn - 1;
-  const ilimitado = ilimitadoAbajo || ilimitadoArriba;
+  /* ─────────────────────────────────────────────────────────────────
+     LO ILIMITADO SE DEDUCE DE LAS PATAS, NO SE SONDEA.
+     Antes se comparaba el P&L "muy lejos" contra el máximo del rango
+     del gráfico. Eso fallaba de forma escandalosa cuando los strikes
+     quedaban lejos del spot cargado: en un put spread 900/890 con un
+     spot muy distinto, todo el rango visible es plano y el sondeo a
+     S×10 salía por encima → lo declaraba "GANANCIA SIN LÍMITE" cuando
+     un spread tiene el beneficio topado por definición.
 
-  // GANANCIA ilimitada: la curva sigue SUBIENDO más allá del gráfico.
-  // Mismo bug en espejo: una call comprada gana sin tope al alza, pero el
-  // bucle solo mira ±3.2σ y reporta el borde como si fuera el máximo.
-  const ganaArriba = pnlArriba > mx + 1;              // sigue ganando si se dispara
-  const ganaAbajo = pnlAbajo > mx + 1;                // sigue ganando si se desploma (put comprada)
-  const gananciaIlimitada = ganaArriba || ganaAbajo;
+     El comportamiento en los extremos es determinista:
+       · S → ∞  : solo cuentan las CALLS. Ganas sin tope si tienes
+                  calls compradas netas; pierdes sin tope si vendidas.
+       · S → 0  : solo cuentan las PUTS. El recorrido está acotado por
+                  los strikes (una put no vale más que su strike), así
+                  que ahí NUNCA es literalmente ilimitado, solo grande.
+     ───────────────────────────────────────────────────────────────── */
+  let netCalls=0, netPuts=0;
+  st.legs.forEach(l=>{
+    const q=(l.side==='B'?1:-1)*(+l.qty||1);
+    if(l.type==='C') netCalls+=q; else netPuts+=q;
+  });
+
+  // Al alza solo hay riesgo/ganancia sin tope si quedan calls netas
+  const ganaArriba   = netCalls > 0;    // calls compradas netas → gana sin límite
+  const ilimitadoArriba = netCalls < 0; // calls vendidas netas → pierde sin límite
+  // A la baja el recorrido está acotado por los strikes: grande, pero finito
+  const ilimitadoAbajo = false;
+  const ganaAbajo = false;
+
+  const ilimitado = ilimitadoArriba;
+  const gananciaIlimitada = ganaArriba;
+
+  /* Aviso aparte: riesgo GRANDE pero acotado a la baja (puts vendidas netas).
+     No es infinito, pero puede ser casi todo el capital, así que merece
+     decirse en vez de mostrar un número tranquilizador sin contexto. */
+  const riesgoGrandeAbajo = netPuts < 0;
+  const perdidaMaxAbajo = riesgoGrandeAbajo ? Math.abs(pnlAbajo) : NaN;
 
   // Escenarios REALISTAS (no el infinito teórico), para pérdidas Y ganancias
   const crash = pnl(st.S * 0.7, 1e-6, VV());          // -30%: un crash serio
@@ -2419,12 +2445,22 @@ function stats(){
     if(isFinite(px)) netAbrir = (l.side==='B'?1:-1)*l.qty*px*100;
   }
   return{
-    max:mx, min:mn, be, net:netAbrir, cap:Math.abs(mn),
+    max:mx, min:mn, be, net:netAbrir,
+    // CAPITAL EN RIESGO: antes era |mn|, el peor punto del GRÁFICO. Si el peor
+    // caso caía fuera del rango, el capital salía pequeño y el retorno sobre
+    // capital (ROC) quedaba inflado — justo la métrica que invita a operar.
+    cap: ilimitado ? Infinity : Math.max(Math.abs(mn), isFinite(pnlAbajo)&&pnlAbajo<0?Math.abs(pnlAbajo):0),
     ilimitado, ilimitadoAbajo, ilimitadoArriba,
     gananciaIlimitada, ganaArriba, ganaAbajo,
+    netCalls, netPuts, riesgoGrandeAbajo, perdidaMaxAbajo,
     crash, crashFuerte, rally, rallyFuerte,
-    perdidaMax: ilimitado ? Infinity : Math.abs(mn),
-    gananciaMax: gananciaIlimitada ? Infinity : mx,
+    // La pérdida máxima real puede estar FUERA del rango del gráfico (p.ej. un
+    // put spread cuyo peor caso es con el subyacente muy por debajo). Tomamos
+    // el peor entre lo visible y el extremo inferior evaluado.
+    perdidaMax: ilimitado ? Infinity : Math.max(Math.abs(mn), isFinite(pnlAbajo)&&pnlAbajo<0?Math.abs(pnlAbajo):0),
+    // Simétrico a perdidaMax: el mejor caso también puede quedar FUERA del
+    // rango del gráfico (p.ej. un spread cuyos strikes están lejos del spot).
+    gananciaMax: gananciaIlimitada ? Infinity : Math.max(mx, isFinite(pnlArriba)?pnlArriba:-Infinity, isFinite(pnlAbajo)?pnlAbajo:-Infinity),
   };
 }
 let lid=0;
@@ -2481,17 +2517,29 @@ function ribbon(){
 }
 function payFigs(){
   if(!st.legs.length){$('payFigs').innerHTML='';$('payNote').innerHTML='';return;}
-  const s=stats();const roc=s.gananciaIlimitada?Infinity:s.max/Math.max(s.cap,1)*100;
+  const s=stats();
+  // ROC: con riesgo ilimitado el capital comprometido no está definido, así que
+  // el porcentaje no significa nada. Antes salía 0 (dividir por Infinity), que
+  // engaña al revés: parecería una operación sin retorno en vez de sin límite.
+  const roc = s.gananciaIlimitada ? Infinity
+            : (!isFinite(s.cap) ? NaN : s.gananciaMax/Math.max(s.cap,1)*100);
   $('payFigs').innerHTML=
     fig2(s.net<0?'Te pagan hoy':'Pagas hoy', money(Math.abs(s.net)), s.net<0?'up':'dn', s.net<0?'Crédito':'Débito')+
     fig2('Lo máximo que ganas',
-         s.gananciaIlimitada ? 'SIN LÍMITE' : money(s.max),
+         // usamos gananciaMax (contempla los extremos), no el máximo del gráfico
+         s.gananciaIlimitada ? 'SIN LÍMITE' : money(s.gananciaMax),
          'up',
          s.gananciaIlimitada ? '△ ganancia ilimitada' : 'Beneficio máximo')+
     fig2('Lo máximo que pierdes',
-         s.ilimitado ? 'SIN LÍMITE' : money(Math.abs(s.min)),
+         // money() antepone '+' a cualquier positivo. Pasar Math.abs() hacía que
+         // una PÉRDIDA se mostrara como '+$1.23', lo contrario de lo que significa.
+         // Además, el peor caso puede caer FUERA del rango del gráfico: usamos
+         // perdidaMax, que ya contempla el extremo inferior.
+         s.ilimitado ? 'SIN LÍMITE' : money(-Math.abs(s.perdidaMax)),
          'dn',
-         s.ilimitado ? '⚠ riesgo ilimitado' : 'Pérdida máxima')+
+         s.ilimitado ? '⚠ riesgo ilimitado'
+           : s.riesgoGrandeAbajo ? '⚠ acotado, pero grande si se desploma'
+           : 'Pérdida máxima')+
     fig2('Si cae un 30%', money(s.crash), s.crash>=0?'up':'dn', 'Escenario de crash')+
     fig2('La frontera está en', s.be.map(b=>b.toFixed(1)).join('  y  ')||'—', '', 'Puntos de equilibrio');
   payNote(s);
@@ -2588,7 +2636,7 @@ function payNote(s){
 
   // Lo máximo y lo mínimo — SIN MENTIR sobre el riesgo ilimitado
   if(s.ilimitado){
-    t+=`<p><b>El mejor caso:</b> ganas <b class="num">${money(s.max)}</b>.</p>`;
+    t+=`<p><b>El mejor caso:</b> ganas <b class="num">${money(s.gananciaMax)}</b>.</p>`;
     t+=`<p class="clave dn"><b>⚠ El peor caso NO TIENE LÍMITE.</b>
       Esta estructura pierde ${s.ilimitadoAbajo?'sin tope si el precio se desploma':'sin tope si el precio se dispara'}.
       No hay un "máximo que puedes perder": cuanto más se mueva en tu contra, más pierdes.</p>`;
@@ -2615,13 +2663,15 @@ function payNote(s){
       sin límite. ${s.ganaArriba
         ? `Si sube un 50%, ganas <b class="num">${money(s.rallyFuerte)}</b>, y de ahí para arriba.`
         : `Si cae un 50%, ganas <b class="num">${money(s.crashFuerte)}</b>, y de ahí para abajo.`}</p>
-      <p><b>El peor caso:</b> pierdes <b class="num">${money(Math.abs(s.min))}</b>, y esa pérdida
+      <p><b>El peor caso:</b> pierdes <b class="num">${money(-Math.abs(s.perdidaMax))}</b>, y esa pérdida
       <b>sí tiene tope</b> — es lo que pagaste. Ni un céntimo más.
       Es la asimetría de comprar opciones: pérdida limitada, ganancia abierta.</p>`;
   } else {
-    t+=`<p><b>El mejor caso:</b> ganas <b class="num">${money(s.max)}</b>.
-      <b>El peor:</b> pierdes <b class="num">${money(Math.abs(s.min))}</b>.
-      Ambos <b>tienen tope</b>: pase lo que pase, te mueves dentro de esos límites.</p>`;
+    t+=`<p><b>El mejor caso:</b> ganas <b class="num">${money(s.gananciaMax)}</b>.
+      <b>El peor:</b> pierdes <b class="num">${money(-Math.abs(s.perdidaMax))}</b>.
+      ${s.riesgoGrandeAbajo
+        ? 'La pérdida está acotada, pero <b>solo por el strike</b>: si el subyacente se desploma, esa cifra es casi todo el riesgo del contrato.'
+        : 'Ambos <b>tienen tope</b>: pase lo que pase, te mueves dentro de esos límites.'}</p>`;
   }
 
   // Los breakevens: la frontera
@@ -2948,7 +2998,7 @@ function showMC(){
   const {rn,real,hayReal}=mcR;
   const R=hayReal?real:rn;
   const s=stats();
-  const perdMax=Math.abs(s.min);
+  const perdMax=Math.abs(s.perdidaMax);   // el peor caso REAL, no el borde del gráfico
 
   $('mcFigs').innerHTML=
     fig2('Ganas en', (R.pop*100).toFixed(0)+' de cada 100', R.pop>.5?'up':'mk', 'Probabilidad de beneficio')+
