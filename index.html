@@ -335,6 +335,9 @@ details[open]>.adv-summary::before{content:"▾ "}
 .sec-main td{border-bottom:none}
 .sec-cross{margin-left:3px;font-size:11px}
 .sec-cross.up{color:var(--bull,#3fb950)}.sec-cross.dn{color:var(--bear,#f85149)}
+.incoherente{padding:16px;border-radius:10px;border:2px solid var(--bear,#f85149);background:rgba(248,81,73,.10)}
+.incoherente-t{font-family:var(--body);font-size:15px;font-weight:700;color:var(--bear,#f85149);margin-bottom:8px}
+.incoherente-b{font-family:var(--body);font-size:13px;line-height:1.55;color:var(--ink2)}
 .consejos{margin-top:10px;display:flex;flex-direction:column;gap:7px}
 .consejo{display:flex;gap:8px;align-items:flex-start;font-family:var(--body);font-size:12.5px;line-height:1.5;padding:8px 10px;border-radius:6px;background:rgba(255,255,255,.03);border:1px solid var(--rule2)}
 .consejo.up{border-color:var(--bull,#3fb950)}.consejo.dn{border-color:var(--bear,#f85149)}.consejo.warn{border-color:var(--warn,#d29922)}
@@ -2282,6 +2285,9 @@ const CN={get url(){return localStorage.getItem('tt_url')||''},get key(){return 
 
 const $=i=>document.getElementById(i);
 const money=x=>(x>=0?'+':'−')+'$'+Math.abs(x).toFixed(Math.abs(x)<10?2:0);
+// Cuando el texto ya dice "ganas"/"pierdes", el signo sobra y además confunde:
+// "pierdes +$500" es contradictorio. Este formatea la cifra sin signo.
+const cantidad=x=>'$'+Math.abs(x).toFixed(Math.abs(x)<10?2:0);
 const pc=x=>(x*100).toFixed(1)+'%';
 const HELP={
  delta:'Cuánto gana o pierde tu posición por cada dólar que se mueva el subyacente. Un delta neto de 50 se comporta como tener 50 acciones.',
@@ -2412,6 +2418,21 @@ function stats(){
     if(l.type==='C') netCalls+=q; else netPuts+=q;
   });
 
+  /* ¿LOS STRIKES CUADRAN CON EL PRECIO?
+     Si el subyacente de la pestaña no se ha actualizado (p.ej. sigue en 100
+     mientras los strikes son 900/890), TODO el análisis sale sin sentido:
+     las opciones quedan tan dentro o fuera del dinero que las griegas valen
+     cero, no hay punto de equilibrio y las cifras no significan nada.
+     Antes eso se mostraba igualmente, con números que parecían válidos. */
+  const strikes = st.legs.map(l=>+l.K).filter(isFinite);
+  let strikesIncoherentes=false, strikeLejano=null;
+  if(strikes.length && isFinite(st.S) && st.S>0){
+    for(const K of strikes){
+      const dist = Math.abs(K/st.S - 1);
+      if(dist > 0.6){ strikesIncoherentes=true; if(!strikeLejano||Math.abs(K/st.S-1)>Math.abs(strikeLejano/st.S-1)) strikeLejano=K; }
+    }
+  }
+
   // Al alza solo hay riesgo/ganancia sin tope si quedan calls netas
   const ganaArriba   = netCalls > 0;    // calls compradas netas → gana sin límite
   const ilimitadoArriba = netCalls < 0; // calls vendidas netas → pierde sin límite
@@ -2453,6 +2474,7 @@ function stats(){
     ilimitado, ilimitadoAbajo, ilimitadoArriba,
     gananciaIlimitada, ganaArriba, ganaAbajo,
     netCalls, netPuts, riesgoGrandeAbajo, perdidaMaxAbajo,
+    strikesIncoherentes, strikeLejano,
     crash, crashFuerte, rally, rallyFuerte,
     // La pérdida máxima real puede estar FUERA del rango del gráfico (p.ej. un
     // put spread cuyo peor caso es con el subyacente muy por debajo). Tomamos
@@ -2523,6 +2545,25 @@ function payFigs(){
   // engaña al revés: parecería una operación sin retorno en vez de sin límite.
   const roc = s.gananciaIlimitada ? Infinity
             : (!isFinite(s.cap) ? NaN : s.gananciaMax/Math.max(s.cap,1)*100);
+  /* Si los strikes no cuadran con el precio, el resto de cifras no significan
+     nada. Se avisa ARRIBA y en rojo, no como nota al pie: mostrar números
+     tranquilizadores sobre datos incoherentes es peor que no mostrar nada. */
+  if(s.strikesIncoherentes){
+    $('payFigs').innerHTML=`<div class="incoherente">
+      <div class="incoherente-t">⛔ Los strikes no cuadran con el precio del subyacente</div>
+      <div class="incoherente-b">
+        Tienes un strike de <b>${s.strikeLejano}</b> con ${st.sym||'el subyacente'} a <b>${st.S}</b>.
+        Con esa diferencia, las opciones quedan tan dentro (o fuera) del dinero que las griegas valen
+        cero, no hay punto de equilibrio y <b>las cifras de abajo no significan nada</b>.
+        <br><br><b>Qué hacer:</b> actualiza el precio del subyacente en el campo de arriba al valor real
+        de ${st.sym||'este valor'}, o carga la posición desde la <b>Cadena</b> (así el precio y los strikes
+        entran juntos y coherentes).
+      </div>
+    </div>`;
+    $('payNote').innerHTML='';
+    return;
+  }
+
   $('payFigs').innerHTML=
     fig2(s.net<0?'Te pagan hoy':'Pagas hoy', money(Math.abs(s.net)), s.net<0?'up':'dn', s.net<0?'Crédito':'Débito')+
     fig2('Lo máximo que ganas',
@@ -2645,13 +2686,13 @@ function payNote(s){
         <thead><tr><th>Si ${st.sym}…</th><th>El precio queda en</th><th>Tú…</th></tr></thead>
         <tbody>
           <tr><td class="tk">cae un 30%</td><td>${(st.S*0.7).toFixed(2)}</td>
-              <td class="${s.crash>=0?'up':'dn'}">${s.crash>=0?'ganas ':'pierdes '}${money(Math.abs(s.crash))}</td></tr>
+              <td class="${s.crash>=0?'up':'dn'}">${s.crash>=0?'ganas ':'pierdes '}${cantidad(s.crash)}</td></tr>
           <tr><td class="tk">cae un 50% <small class="mute">(como en 2008)</small></td><td>${(st.S*0.5).toFixed(2)}</td>
-              <td class="${s.crashFuerte>=0?'up':'dn'}">${s.crashFuerte>=0?'ganas ':'pierdes '}${money(Math.abs(s.crashFuerte))}</td></tr>
+              <td class="${s.crashFuerte>=0?'up':'dn'}">${s.crashFuerte>=0?'ganas ':'pierdes '}${cantidad(s.crashFuerte)}</td></tr>
           <tr><td class="tk">sube un 30%</td><td>${(st.S*1.3).toFixed(2)}</td>
-              <td class="${s.rally>=0?'up':'dn'}">${s.rally>=0?'ganas ':'pierdes '}${money(Math.abs(s.rally))}</td></tr>
+              <td class="${s.rally>=0?'up':'dn'}">${s.rally>=0?'ganas ':'pierdes '}${cantidad(s.rally)}</td></tr>
           <tr><td class="tk">sube un 50%</td><td>${(st.S*1.5).toFixed(2)}</td>
-              <td class="${s.rallyFuerte>=0?'up':'dn'}">${s.rallyFuerte>=0?'ganas ':'pierdes '}${money(Math.abs(s.rallyFuerte))}</td></tr>
+              <td class="${s.rallyFuerte>=0?'up':'dn'}">${s.rallyFuerte>=0?'ganas ':'pierdes '}${cantidad(s.rallyFuerte)}</td></tr>
         </tbody>
       </table>`;
     t+=`<p class="tip"><b>Cómo se arregla:</b> compra una opción más lejana del mismo tipo para
@@ -2908,7 +2949,7 @@ function volScen(){
     ${grid.map(r=>`<tr${r.d===0?' class="atm"':''}>
       <td class="tk">${r.d===0?'no cambia (hoy)':r.d>0?`sube ${r.d} puntos`:`baja ${-r.d} puntos`}</td>
       <td>${(st.IV+r.d).toFixed(1)}%</td>
-      <td class="${r.pnl>=0?'up':'dn'}">${r.d===0?'—':(r.pnl>=0?'ganas ':'pierdes ')+money(Math.abs(r.pnl))}</td>
+      <td class="${r.pnl>=0?'up':'dn'}">${r.d===0?'—':(r.pnl>=0?'ganas ':'pierdes ')+cantidad(r.pnl)}</td>
       </tr>`).join('')}
     </tbody></table>`;
 
@@ -6323,6 +6364,24 @@ function medirEstrategias0DTE(filas, opts={}){
    ═══════════════════════════════════════════════════════════════ */
 
 /* ── 1. VRP: cuánto cobra el mercado por encima de lo que se mueve ── */
+/* Precio del subyacente de forma robusta. Con el mercado cerrado la API puede
+   devolver bid/ask a cero o ausentes; probamos varias fuentes por orden de
+   fiabilidad en vez de quedarnos en NaN y abortar el análisis. */
+async function spotDe(sym){
+  try{
+    const q=await api('quotes',{symbol:sym});
+    const d=((q&&q.data&&q.data.items)?q.data.items:(q&&q.items?q.items:[]))[0];
+    if(d){
+      const b=parseFloat(d.bid), a=parseFloat(d.ask);
+      if(isFinite(b)&&isFinite(a)&&b>0&&a>0) return (b+a)/2;      // mid, lo mejor
+      const mk=parseFloat(d.mark); if(isFinite(mk)&&mk>0) return mk;
+      const l=parseFloat(d.last); if(isFinite(l)&&l>0) return l;
+      const pc=parseFloat(d['prev-close']); if(isFinite(pc)&&pc>0) return pc;
+    }
+  }catch(e){}
+  return NaN;   // quien llama decide: puede tirar de velas como último recurso
+}
+
 function calcVRP(closes, ivMercado, dias){
   if(!closes || closes.length<40 || !isFinite(ivMercado) || ivMercado<=0) return null;
   const rets=[];
@@ -7524,14 +7583,8 @@ async function gexDeTicker(sym){
   if(!usar.length) return {sym, err:'sin vencimientos a menos de 45 días'};
 
   // precio de referencia
-  let spot=NaN;
-  try{
-    const q=await api('quotes',{symbol:sym});
-    const d=(q&&q.data&&q.data.items?q.data.items:(q&&q.items?q.items:[]))[0];
-    if(d){ const b=parseFloat(d.bid), a=parseFloat(d.ask), l=parseFloat(d.last);
-      spot = (isFinite(b)&&isFinite(a)&&a>0)?(b+a)/2:(isFinite(l)?l:NaN); }
-  }catch(e){}
-  if(!isFinite(spot)||spot<=0) return {sym, err:'sin precio del subyacente'};
+  const spot=await spotDe(sym);
+  if(!isFinite(spot)||spot<=0) return {sym, err:'sin precio del subyacente por ninguna vía'};
 
   // strikes cercanos (±15%) de esos vencimientos
   const meta={}; const syms=[];
@@ -8377,12 +8430,8 @@ async function scanSkewSinclair(){
   $('skEmpty').style.display='none';
   const m=$('skMsg'); m.style.display='block'; m.textContent='Cargando la cadena de '+sym+'…';
   try{
-    const q=await api('quotes',{symbol:sym});
-    const qd=((q&&q.data&&q.data.items)?q.data.items:(q&&q.items?q.items:[]))[0];
-    let spot=NaN;
-    if(qd){ const b=parseFloat(qd.bid),a=parseFloat(qd.ask),l=parseFloat(qd.last);
-      spot=(isFinite(b)&&isFinite(a)&&a>0)?(b+a)/2:(isFinite(l)?l:NaN); }
-    if(!isFinite(spot)){ m.innerHTML='No llegó el precio de '+sym+'.'; $('skBtn').disabled=false; $('skBtn').textContent='Analizar el skew'; return; }
+    let spot=await spotDe(sym);
+    if(!isFinite(spot)){ m.innerHTML='No llegó el precio de '+sym+' por ninguna vía (bid/ask, mark, último, cierre anterior).'; $('skBtn').disabled=false; $('skBtn').textContent='Analizar el skew'; return; }
 
     const ch=await api('chain',{symbol:sym});
     const it=((ch&&ch.data&&ch.data.items)?ch.data.items:(ch&&ch.items?ch.items:[]));
@@ -8482,11 +8531,7 @@ async function evaluarOperacion(){
   m.textContent='Buscando el contrato…';
   try{
     // precio e histórico para la realizada esperada
-    const q=await api('quotes',{symbol:sym});
-    const qd=((q&&q.data&&q.data.items)?q.data.items:(q&&q.items?q.items:[]))[0];
-    let spot=NaN;
-    if(qd){ const b=parseFloat(qd.bid),a=parseFloat(qd.ask),l=parseFloat(qd.last);
-      spot=(isFinite(b)&&isFinite(a)&&a>0)?(b+a)/2:(isFinite(l)?l:NaN); }
+    let spot=await spotDe(sym);
     const ch=await api('chain',{symbol:sym});
     const it=((ch&&ch.data&&ch.data.items)?ch.data.items:(ch&&ch.items?ch.items:[]));
     const exps=(it[0]&&it[0].expirations)||[];
