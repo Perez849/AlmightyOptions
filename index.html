@@ -680,6 +680,63 @@ summary:hover{color:var(--ink)}
         a la horquilla, y cuántos contratos tocan según tu capital.
       </div>
     </section>
+    <section class="blk">
+      <h2>📐 Análisis de persistencia<span class="sub">qué valores aguantan la dirección y cuáles se giran</span></h2>
+      <div class="historia" style="font-size:13.5px;margin-bottom:12px">
+        <p>El problema que resuelve: una señal puede <b>acertar la dirección y perder igual</b>, porque
+        el valor rompe y se gira a las dos velas. Esto mide, ticker a ticker, <b>cuánto aguanta</b>
+        el movimiento una vez arrancado.</p>
+        <p style="margin-top:6px"><b>El canal EMA34</b> (banda alta = EMA de máximos, banda baja = EMA de
+        mínimos, línea media = EMA de cierres) marca el rango normal del precio. Su función es hacer
+        <b>binario</b> el retroceso: la vela cerró dentro del canal o no cerró. Sin él habría que decidir
+        a ojo si una corrección cuenta.</p>
+        <p style="margin-top:6px"><b>Dos relojes distintos:</b> <b>velas fuera</b> del canal es impulso puro;
+        <b>velas vivo</b> cuenta hasta que el cierre pierde la línea media, permitiendo que el precio vuelva
+        dentro y salga otra vez — que es como se comporta una tendencia sana. El segundo es el que importa.</p>
+        <p class="caveat" style="margin-top:8px"><b>Control cruzado:</b> el <b>Variance Ratio</b> de Lo-MacKinlay
+        y la autocorrelación se calculan al margen de la señal. Si un valor sale bien en persistencia y
+        además tiene VR&gt;1, dos métodos independientes dicen lo mismo. Si se contradicen, desconfía.</p>
+      </div>
+      <div class="btns" style="margin-bottom:6px">
+        <button class="btn solid" id="perBtn" onclick="scanPersistencia()">Analizar persistencia</button>
+        <button class="btn quiet sm" onclick="pararPersistencia()">Detener</button>
+        <select id="perUni" class="btn quiet" style="padding:8px">
+          <option value="favs">Mis favoritos</option>
+          <option value="liquidos" selected>30 más líquidos</option>
+          <option value="amplio">120 del universo</option>
+        </select>
+        <select id="perLado" class="btn quiet" style="padding:8px">
+          <option value="both" selected>Largos y cortos</option>
+          <option value="long">Solo largos</option>
+          <option value="short">Solo cortos</option>
+        </select>
+      </div>
+      <div class="sr-progress" id="perProg" style="display:none">
+        <div class="sr-bar"><div class="sr-fill" id="perFill"></div></div>
+        <div class="sr-ptxt" id="perPtxt"></div>
+      </div>
+      <div class="caveat" id="perMsg" style="display:none"></div>
+      <div id="perOut" style="display:none"><div id="perTable"></div>
+        <div class="historia" style="font-size:12px;margin-top:10px">
+          <b>Velas vivo</b> = mediana y percentil 75 de lo que dura el ciclo hasta perder la línea media.
+          <b>Recorrido a favor</b> = cuánto llega a moverse el precio a tu favor tras salir del canal, en %
+          (mediana y p75; debajo, desglosado en largos y cortos, que no son simétricos).
+          <b>Máximo alcanzado</b> = el mejor evento del histórico y el percentil 90, para saber hasta dónde
+          puede estirarse. <b>En contra</b> = cuánto se mueve en tu contra antes de resolverse: si esa cifra
+          se parece al recorrido a favor, la entrada tiene que ser muy fina. <b>Se gira rápido</b> = % de eventos muertos en ≤2 velas
+          (penaliza en el score). <b>Llega lejos</b> = % que recorre al menos un ancho de canal.
+          <b>MFE/MAE</b> = recorrido a favor entre recorrido en contra. <b>VR(4)</b> por encima de 1 =
+          estructuralmente tendencial. Filtros aplicados: mínimo 12 eventos, precio &gt;5 $, volumen &gt;20M $/día.
+        </div>
+      </div>
+      <div class="empty" id="perEmpty">
+        <strong>Ranking de persistencia</strong>
+        Sobre ~60 sesiones de velas de 15 minutos, detecta cada ruptura del canal EMA34 y mide cuántas velas
+        sobrevive el movimiento. Te ordena los valores de más a menos persistente, para que operes los de
+        arriba y descartes los que se giran a las dos velas.
+      </div>
+    </section>
+
   </div>
 
   <!-- ═══════════ MI CUENTA ═══════════ -->
@@ -6637,6 +6694,249 @@ function pintaConsejos(lista){
   ).join('')+'</div>';
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   ANÁLISIS DE PERSISTENCIA DIRECCIONAL · canal EMA34 en 15m
+   ───────────────────────────────────────────────────────────────
+   El problema que resuelve: una señal puede acertar la dirección y
+   aun así perder, porque el valor rompe y se gira a las dos velas.
+   Esto mide, ticker a ticker, CUÁNTO AGUANTA el movimiento una vez
+   arrancado, para operar solo los persistentes.
+
+   CANAL (sobre 34 velas de 15m, EMA con adjust=false):
+     banda alta  = EMA(High,34) · banda baja = EMA(Low,34)
+     línea media = EMA(Close,34)
+   Su función es hacer BINARIO el retroceso: la vela cerró dentro
+   del canal o no. Sin él habría que decidir a ojo si una corrección
+   "cuenta".
+
+   EVENTOS:
+     LARGO  → el cierre cruza de dentro/abajo a POR ENCIMA de la banda alta
+     CORTO  → el cierre cruza de dentro/arriba a POR DEBAJO de la banda baja
+
+   DOS RELOJES, que miden cosas distintas:
+     bars_out   = velas consecutivas cerrando FUERA del canal (impulso puro)
+     bars_alive = velas hasta que el cierre pierde la LÍNEA MEDIA. Este es el
+                  importante: permite que el precio vuelva dentro y salga otra
+                  vez, que es como se comporta una tendencia sana. El ciclo
+                  solo muere cuando se pierde la media central.
+   ═══════════════════════════════════════════════════════════════ */
+const PERS_CFG = {
+  emaLen: 34, maxBars: 26, reversalBars: 2, ftMult: 1.0,
+  minEventos: 12, minPrecio: 5, minADV: 20,   // ADV en millones de USD
+  pesos: { medAlive:0.25, p75Alive:0.10, medOut:0.15, followThru:0.20,
+           edgeRatio:0.15, vr4:0.10, reversalPct:-0.20 }
+};
+
+/* Fecha de sesión en hora de Nueva York (para no cruzar de día) */
+function sesionNY(ms){
+  return new Date(ms).toLocaleDateString('en-CA',{timeZone:'America/New_York'});
+}
+/* Minutos desde medianoche en NY, para filtrar 09:30-16:00 */
+function minutosNY(ms){
+  const s=new Date(ms).toLocaleTimeString('en-GB',{timeZone:'America/New_York',hour12:false,hour:'2-digit',minute:'2-digit'});
+  const [h,m]=s.split(':').map(Number);
+  return h*60+m;
+}
+
+function emaSerieAdj(vals, span){
+  const k=2/(span+1), out=new Array(vals.length).fill(NaN);
+  let prev=NaN;
+  for(let i=0;i<vals.length;i++){
+    const v=vals[i];
+    if(!isFinite(v)) { out[i]=prev; continue; }
+    prev = isFinite(prev) ? v*k+prev*(1-k) : v;   // adjust=false: arranca en el primer valor
+    out[i]=prev;
+  }
+  return out;
+}
+
+/* Construye canal, ATR y sesiones sobre las velas de 15m */
+function canalEMA34(velas, cfg=PERS_CFG){
+  const v=velas.filter(c=>isFinite(c.close)&&isFinite(c.high)&&isFinite(c.low)&&c.close>0)
+               .filter(c=>{ const m=minutosNY(c.time); return m>=570 && m<960; })   // 09:30–16:00
+               .sort((a,b)=>a.time-b.time);
+  if(v.length<cfg.emaLen*5) return null;
+  const ses=v.map(c=>sesionNY(c.time));
+  const emaH=emaSerieAdj(v.map(c=>c.high), cfg.emaLen);
+  const emaL=emaSerieAdj(v.map(c=>c.low),  cfg.emaLen);
+  const emaC=emaSerieAdj(v.map(c=>c.close),cfg.emaLen);
+  // True Range: la primera vela de cada sesión usa High−Low (sin gap overnight)
+  const tr=new Array(v.length).fill(NaN);
+  for(let i=0;i<v.length;i++){
+    const primeraDelDia = i===0 || ses[i]!==ses[i-1];
+    tr[i] = primeraDelDia ? (v[i].high-v[i].low)
+          : Math.max(v[i].high-v[i].low, Math.abs(v[i].high-v[i-1].close), Math.abs(v[i].low-v[i-1].close));
+  }
+  const atr=emaSerieAdj(tr, cfg.emaLen);
+  return { v, ses, emaH, emaL, emaC, atr, ancho: emaH.map((h,i)=>h-emaL[i]) };
+}
+
+/* Detecta y mide los eventos */
+function eventosPersistencia(C, cfg=PERS_CFG, lado='both'){
+  const {v,ses,emaH,emaL,emaC,atr,ancho}=C;
+  const n=v.length, warm=cfg.emaLen*3;
+  const ev=[];
+  for(let t=warm;t<n-1;t++){
+    if(ses[t]!==ses[t-1]) continue;                 // sin señal en la 1ª vela del día
+    if(!isFinite(atr[t])||atr[t]<=0) continue;
+    for(const dir of [1,-1]){
+      if(lado==='long'&&dir===-1) continue;
+      if(lado==='short'&&dir===1) continue;
+      const cruza = dir===1
+        ? (v[t].close>emaH[t] && v[t-1].close<=emaH[t-1])
+        : (v[t].close<emaL[t] && v[t-1].close>=emaL[t-1]);
+      if(!cruza) continue;
+
+      const entrada=v[t].close;
+      let barsOut=0, barsAlive=0, mfe=0, mae=0, siguemidiendoOut=true, k=t;
+      while(k+1<n && ses[k+1]===ses[t] && barsAlive<cfg.maxBars){
+        k++; barsAlive++;
+        let fuera, vivo;
+        if(dir===1){
+          mfe=Math.max(mfe, v[k].high-entrada);
+          mae=Math.max(mae, entrada-v[k].low);
+          fuera = v[k].close>emaH[k];
+          vivo  = v[k].close>emaC[k];          // el ciclo vive mientras no pierda la media
+        }else{
+          mfe=Math.max(mfe, entrada-v[k].low);
+          mae=Math.max(mae, v[k].high-entrada);
+          fuera = v[k].close<emaL[k];
+          vivo  = v[k].close<emaC[k];
+        }
+        if(siguemidiendoOut && fuera) barsOut++; else siguemidiendoOut=false;
+        if(!vivo) break;
+      }
+      const a=atr[t];
+      const w=(isFinite(ancho[t])&&ancho[t]>0)?ancho[t]:a;
+      ev.push({
+        dir: dir===1?'long':'short', time:v[t].time, entrada,
+        barsOut, barsAlive,
+        // Recorrido en % del precio: el ATR sirve para comparar entre valores,
+        // pero para saber si el movimiento da para algo hace falta el %.
+        mfePct: (mfe/entrada)*100,
+        maePct: (mae/entrada)*100,
+        mfeATR: mfe/a, maeATR: mae/a,
+        retATR: ((v[k].close-entrada)/a)*dir,
+        followThru: mfe >= cfg.ftMult*w ? 1 : 0,
+        reversal: barsAlive<=cfg.reversalBars ? 1 : 0,
+      });
+    }
+  }
+  return ev;
+}
+
+/* Variance Ratio de Lo-MacKinlay intradía, sin cruzar sesión.
+   >1 estructuralmente tendencial · <1 reversivo. Es independiente de la
+   señal, así que sirve de control cruzado. */
+function varianceRatio(C, q){
+  const {v,ses}=C;
+  const r=[], rq=[];
+  let ini=0;
+  for(let i=1;i<=v.length;i++){
+    if(i===v.length || ses[i]!==ses[ini]){
+      const seg=v.slice(ini,i);
+      if(seg.length>=q+4){
+        const rr=[];
+        for(let j=1;j<seg.length;j++) rr.push(Math.log(seg[j].close/seg[j-1].close));
+        r.push(...rr);
+        for(let j=q-1;j<rr.length;j++){ let s=0; for(let m=j-q+1;m<=j;m++) s+=rr[m]; rq.push(s); }
+      }
+      ini=i;
+    }
+  }
+  if(r.length<20||rq.length<10) return NaN;
+  const va=(x)=>{const m=x.reduce((a,b)=>a+b,0)/x.length;
+    return x.reduce((a,b)=>a+(b-m)*(b-m),0)/Math.max(x.length-1,1);};
+  const v1=va(r), vq=va(rq);
+  return v1>0 ? vq/(q*v1) : NaN;
+}
+
+function autocorr1(C){
+  const {v,ses}=C; const vals=[];
+  let ini=0;
+  for(let i=1;i<=v.length;i++){
+    if(i===v.length || ses[i]!==ses[ini]){
+      const seg=v.slice(ini,i);
+      if(seg.length>6){
+        const rr=[];
+        for(let j=1;j<seg.length;j++) rr.push(Math.log(seg[j].close/seg[j-1].close));
+        const m=rr.reduce((a,b)=>a+b,0)/rr.length;
+        let num=0, den=0;
+        for(let j=1;j<rr.length;j++) num+=(rr[j]-m)*(rr[j-1]-m);
+        for(let j=0;j<rr.length;j++) den+=(rr[j]-m)*(rr[j]-m);
+        if(den>0) vals.push(num/den);
+      }
+      ini=i;
+    }
+  }
+  return vals.length? vals.reduce((a,b)=>a+b,0)/vals.length : NaN;
+}
+
+const mediana=a=>{if(!a.length)return NaN;const s=[...a].sort((x,y)=>x-y);const m=Math.floor(s.length/2);
+  return s.length%2?s[m]:(s[m-1]+s[m])/2;};
+const percentil=(a,p)=>{if(!a.length)return NaN;const s=[...a].sort((x,y)=>x-y);
+  const i=(s.length-1)*p, lo=Math.floor(i), hi=Math.ceil(i);
+  return lo===hi?s[lo]:s[lo]+(s[hi]-s[lo])*(i-lo);};
+
+/* Resumen por ticker */
+function resumenPersistencia(C, ev, sym, cfg=PERS_CFG){
+  if(ev.length<cfg.minEventos) return {sym, err:`solo ${ev.length} eventos (mínimo ${cfg.minEventos})`};
+  const {v,ses}=C;
+  const alive=ev.map(e=>e.barsAlive), out=ev.map(e=>e.barsOut);
+  const mfe=mediana(ev.map(e=>e.mfeATR)), mae=mediana(ev.map(e=>e.maeATR));
+  // Recorrido en %: cuánto llega a subir (o bajar, en cortos) tras salir del canal
+  const mfeP=ev.map(e=>e.mfePct), maeP=ev.map(e=>e.maePct);
+  const mfePctMed=mediana(mfeP), mfePctP75=percentil(mfeP,0.75), mfePctP90=percentil(mfeP,0.90),
+        mfePctMax=Math.max(...mfeP), maePctMed=mediana(maeP), maePctP75=percentil(maeP,0.75);
+  // separado por lado, porque subir y bajar no son simétricos
+  const largos=ev.filter(e=>e.dir==='long'), cortos=ev.filter(e=>e.dir==='short');
+  const mfeLargoMed = largos.length? mediana(largos.map(e=>e.mfePct)) : NaN;
+  const mfeCortoMed = cortos.length? mediana(cortos.map(e=>e.mfePct)) : NaN;
+  // volumen medio diario en millones de USD
+  const porDia={};
+  for(let i=0;i<v.length;i++){
+    const vol=isFinite(v[i].volume)?v[i].volume:0;
+    porDia[ses[i]]=(porDia[ses[i]]||0)+vol*v[i].close;
+  }
+  const dias=Object.values(porDia);
+  const adv = dias.length? dias.reduce((a,b)=>a+b,0)/dias.length/1e6 : NaN;
+  return {
+    sym, nEv:ev.length,
+    nLong:ev.filter(e=>e.dir==='long').length,
+    nShort:ev.filter(e=>e.dir==='short').length,
+    medAlive:mediana(alive), avgAlive:alive.reduce((a,b)=>a+b,0)/alive.length,
+    p75Alive:percentil(alive,0.75),
+    medOut:mediana(out), maxOut:Math.max(...out),
+    followThru:ev.reduce((a,b)=>a+b.followThru,0)/ev.length*100,
+    reversalPct:ev.reduce((a,b)=>a+b.reversal,0)/ev.length*100,
+    mfeATR:mfe, maeATR:mae, edgeRatio: mae>0? mfe/mae : NaN,
+    mfePctMed, mfePctP75, mfePctP90, mfePctMax, maePctMed, maePctP75,
+    mfeLargoMed, mfeCortoMed,
+    retATRmed:mediana(ev.map(e=>e.retATR)),
+    winPct:ev.filter(e=>e.retATR>0).length/ev.length*100,
+    vr4:varianceRatio(C,4), vr8:varianceRatio(C,8), ac1:autocorr1(C),
+    precio:v[v.length-1].close, adv, velas:v.length,
+  };
+}
+
+/* Score compuesto: z-score de cada métrica, ponderado. reversalPct resta. */
+function rankingPersistencia(filas, cfg=PERS_CFG){
+  const ok=filas.filter(f=>!f.err);
+  if(!ok.length) return filas;
+  const z=(campo)=>{
+    const xs=ok.map(f=>f[campo]).filter(isFinite);
+    if(xs.length<2) return ()=>0;
+    const m=xs.reduce((a,b)=>a+b,0)/xs.length;
+    const sd=Math.sqrt(xs.reduce((a,b)=>a+(b-m)*(b-m),0)/xs.length);
+    return (x)=> (!isFinite(x)||sd===0) ? 0 : Math.max(-3,Math.min(3,(x-m)/sd));
+  };
+  const fz={}; for(const c in cfg.pesos) fz[c]=z(c);
+  ok.forEach(f=>{ let s=0; for(const c in cfg.pesos) s+=cfg.pesos[c]*fz[c](f[c]); f.score=s; });
+  ok.sort((a,b)=>b.score-a.score);
+  ok.forEach((f,i)=>f.rank=i+1);
+  return ok.concat(filas.filter(f=>f.err));
+}
+
 function calcularGEX(rows, spot, opts={}){
   if(!rows || !rows.length || !isFinite(spot) || spot<=0) return null;
   const mult = opts.mult ?? 100;
@@ -8615,6 +8915,134 @@ function renderEvaluacion(R){
     </div>`;
   }
   $('exOut').innerHTML=html;
+}
+
+/* Escáner de persistencia sobre un universo elegido */
+let PERS={running:false, filas:[], done:0, total:0};
+
+function universoPersistencia(){
+  const modo=($('perUni')&&$('perUni').value)||'favs';
+  if(modo==='favs') return getFavs();
+  if(modo==='liquidos') return ['SPY','QQQ','IWM','NVDA','TSLA','AAPL','MSFT','AMD','META','AMZN','GOOGL','NFLX',
+    'AVGO','MU','SMCI','COIN','PLTR','MARA','SOFI','INTC','BAC','XOM','JPM','UBER','SNOW','CRWD','DIS','BA','GS','CAT'];
+  return STOCH_UNIVERSE.slice(0,120);
+}
+
+async function scanPersistencia(){
+  if(PERS.running) return;
+  if(!CN.url||!CN.key){ const m=$('perMsg'); m.style.display='block';
+    m.innerHTML='Necesito el acceso a datos configurado (Mi cuenta → Configurar acceso).'; return; }
+  const uni=universoPersistencia();
+  if(!uni.length){ const m=$('perMsg'); m.style.display='block';
+    m.innerHTML='No hay tickers. Añade favoritos o elige otro universo.'; return; }
+  PERS={running:true, filas:[], done:0, total:uni.length};
+  $('perEmpty').style.display='none'; $('perOut').style.display='none';
+  $('perProg').style.display='block'; $('perBtn').disabled=true; $('perBtn').textContent='Analizando…';
+  const lado=($('perLado')&&$('perLado').value)||'both';
+
+  try{
+    const dx=new DXLink(); PERS.dx=dx;
+    await dx.connect(CN.url, CN.key);
+    const LOTE=6;
+    for(let i=0;i<uni.length && PERS.running;i+=LOTE){
+      const lote=uni.slice(i,i+LOTE);
+      const buck={};
+      dx.onCandle=(s,c)=>{ const b=s.split('{')[0]; (buck[b]=buck[b]||[]).push(c); };
+      // 90 días naturales ≈ 60 sesiones ≈ 1.560 velas de 15m por ticker
+      lote.forEach(s=>dx.subscribeCandles(s, 90, '15m'));
+      await new Promise(r=>setTimeout(r, 7000));
+      for(const sym of lote){
+        const velas=(buck[sym]||[]);
+        if(velas.length<200){ PERS.filas.push({sym, err:`pocas velas (${velas.length})`}); PERS.done++; continue; }
+        const C=canalEMA34(velas);
+        if(!C){ PERS.filas.push({sym, err:'no se pudo construir el canal'}); PERS.done++; continue; }
+        const ev=eventosPersistencia(C, PERS_CFG, lado);
+        const r=resumenPersistencia(C, ev, sym);
+        // filtros de liquidez y precio
+        if(!r.err){
+          if(r.precio<PERS_CFG.minPrecio) r.err=`precio ${r.precio.toFixed(2)} < ${PERS_CFG.minPrecio}`;
+          else if(isFinite(r.adv)&&r.adv<PERS_CFG.minADV) r.err=`volumen ${r.adv.toFixed(0)}M < ${PERS_CFG.minADV}M`;
+        }
+        const meta=STOCK_META[sym]||[sym,'—'];
+        PERS.filas.push({...r, nombre:meta[0], sector:meta[1]});
+        PERS.done++;
+      }
+      lote.forEach(s=>{ try{ dx.unsubscribeCandles(s,'15m'); }catch(e){} });
+      const pct=Math.round(PERS.done/PERS.total*100);
+      $('perFill').style.width=pct+'%';
+      $('perPtxt').textContent=`${PERS.done} / ${PERS.total} · ${PERS.filas.filter(f=>!f.err).length} con datos suficientes`;
+      renderPersistencia();
+    }
+    try{ dx.disconnect(); }catch(e){}
+  }catch(e){ $('perMsg').style.display='block'; $('perMsg').innerHTML='Error: '+(e.message||e); }
+  PERS.running=false;
+  $('perProg').style.display='none';
+  $('perBtn').disabled=false; $('perBtn').textContent='Analizar persistencia';
+  renderPersistencia(true);
+}
+function pararPersistencia(){ PERS.running=false; try{PERS.dx&&PERS.dx.disconnect();}catch(e){} }
+
+function renderPersistencia(final){
+  if(!PERS.filas.length) return;
+  $('perOut').style.display='block';
+  const R=rankingPersistencia(PERS.filas);
+  const ok=R.filter(f=>!f.err);
+  const num=(x,d=1)=>isFinite(x)?x.toFixed(d):'—';
+  let html='<div class="scrollx"><table class="quotes"><thead><tr>'+
+    '<th>#</th><th>Ticker</th><th>Eventos</th><th>Velas vivo<br>(mediana / p75)</th>'+
+    '<th>Recorrido a favor<br>(mediana / p75)</th><th>Máximo<br>alcanzado</th><th>En contra<br>(mediana)</th>'+
+    '<th>Se gira<br>rápido</th><th>Llega<br>lejos</th><th>MFE/MAE</th><th>VR(4)</th><th>Score</th></tr></thead><tbody>';
+  for(const f of ok){
+    const revCls = f.reversalPct>40?'dn':f.reversalPct<25?'up':'mute';
+    const ftCls = f.followThru>50?'up':f.followThru<30?'dn':'mute';
+    const vrCls = f.vr4>1.05?'up':f.vr4<0.95?'dn':'mute';
+    const scCls = f.score>0.4?'up':f.score<-0.4?'dn':'mute';
+    html+=`<tr onclick="srGoChain('${f.sym}')">
+      <td class="num mute">${f.rank}</td>
+      <td class="tk"><b>${f.sym}</b><br><span class="mute" style="font-size:10.5px">${f.nombre||''}</span></td>
+      <td class="num">${f.nEv}<br><span class="mute" style="font-size:10px">${f.nLong}L/${f.nShort}C</span></td>
+      <td class="num"><b>${num(f.medAlive,0)}</b><span class="mute"> / ${num(f.p75Alive,0)}</span></td>
+      <td class="num up"><b>${num(f.mfePctMed,2)}%</b><span class="mute"> / ${num(f.mfePctP75,2)}%</span>
+        ${isFinite(f.mfeLargoMed)&&isFinite(f.mfeCortoMed)?`<br><span class="mute" style="font-size:10px">L ${num(f.mfeLargoMed,2)}% · C ${num(f.mfeCortoMed,2)}%</span>`:''}</td>
+      <td class="num up">${num(f.mfePctMax,2)}%<br><span class="mute" style="font-size:10px">p90 ${num(f.mfePctP90,2)}%</span></td>
+      <td class="num dn">${num(f.maePctMed,2)}%</td>
+      <td class="num ${revCls}">${num(f.reversalPct,0)}%</td>
+      <td class="num ${ftCls}">${num(f.followThru,0)}%</td>
+      <td class="num">${num(f.edgeRatio,2)}</td>
+      <td class="num ${vrCls}">${num(f.vr4,2)}</td>
+      <td class="num ${scCls}"><b>${num(f.score,2)}</b></td></tr>`;
+  }
+  html+='</tbody></table></div>';
+  const err=R.filter(f=>f.err);
+  if(err.length) html+=`<div class="historia mute" style="font-size:11.5px;margin-top:8px">Descartados (${err.length}): `+
+    err.slice(0,12).map(f=>f.sym+' — '+f.err).join(' · ')+(err.length>12?' …':'')+'</div>';
+
+  if(final && ok.length){
+    const mejor=ok[0], peor=ok[ok.length-1];
+    html+=`<div class="gx-setup up" style="margin-top:14px">
+      <div class="gx-setup-h">Lectura del ranking</div>
+      <div class="gx-setup-b"><b>Los de arriba aguantan la dirección.</b> ${mejor.sym} encabeza:
+        sus movimientos viven una mediana de <b>${num(mejor.medAlive,0)} velas</b> (p75 ${num(mejor.p75Alive,0)}),
+        solo el <b>${num(mejor.reversalPct,0)}%</b> se gira en dos velas o menos y el
+        <b>${num(mejor.followThru,0)}%</b> recorre al menos un ancho de canal.
+        ${isFinite(mejor.vr4)&&mejor.vr4>1.05?`Su VR(4) de ${num(mejor.vr4,2)} lo confirma por una vía independiente de la señal: es estructuralmente tendencial.`:''}</div>
+      <div class="gx-setup-b"><b>Cuánto se mueve:</b> tras salir del canal, ${mejor.sym} recorre a favor una
+        mediana del <b>${num(mejor.mfePctMed,2)}%</b> (uno de cada cuatro llega al ${num(mejor.mfePctP75,2)}%,
+        y el mejor del histórico alcanzó el ${num(mejor.mfePctMax,2)}%). En contra se mueve
+        ${num(mejor.maePctMed,2)}% de mediana antes de resolverse.
+        ${isFinite(mejor.mfePctMed)&&isFinite(mejor.maePctMed)&&mejor.mfePctMed>mejor.maePctMed*1.5
+          ? 'El recorrido a favor supera claramente al adverso: hay margen para colocar el stop sin que te barran.'
+          : 'Ojo: el recorrido en contra se parece al favorable, así que el stop tiene que ser muy ajustado o te sacarán antes de tiempo.'}</div>
+      <div class="gx-setup-b"><b>Los de abajo son la trampa.</b> ${peor.sym} cierra la lista con
+        <b>${num(peor.reversalPct,0)}%</b> de giros rápidos${isFinite(peor.vr4)&&peor.vr4<0.95?` y VR(4) de ${num(peor.vr4,2)} (mean-reverting)`:''}.
+        Ahí la señal puede acertar la dirección y perder igual, porque el movimiento no dura.</div>
+      <div class="gx-setup-b mute" style="font-size:11.5px">Esto mide <b>persistencia</b>, no rentabilidad:
+        dice cuánto dura un movimiento una vez arrancado, no si tu entrada acierta. Combínalo con tu señal —
+        opera los de arriba, descarta los de abajo. Y ojo con el histórico: son ~60 sesiones, suficiente para
+        el ranking pero no para dar por eterna la clasificación.</div>
+    </div>`;
+  }
+  $('perTable').innerHTML=html;
 }
 
 async function scanStochRSI(){
