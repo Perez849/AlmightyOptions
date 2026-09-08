@@ -338,6 +338,12 @@ details[open]>.adv-summary::before{content:"▾ "}
 .incoherente{padding:16px;border-radius:10px;border:2px solid var(--bear,#f85149);background:rgba(248,81,73,.10)}
 .incoherente-t{font-family:var(--body);font-size:15px;font-weight:700;color:var(--bear,#f85149);margin-bottom:8px}
 .incoherente-b{font-family:var(--body);font-size:13px;line-height:1.55;color:var(--ink2)}
+.expl{margin:12px 0;border:1px solid var(--rule2);border-radius:8px;background:rgba(255,255,255,.02)}
+.expl summary{cursor:pointer;padding:11px 13px;font-family:var(--body);font-size:13px;font-weight:600;color:var(--ink2)}
+.expl summary:hover{color:var(--ink)}
+.expl-b{padding:0 13px 13px;font-family:var(--body);font-size:12.5px;line-height:1.6;color:var(--ink2)}
+.expl-b p{margin:7px 0}
+.formula{font-family:var(--num);font-size:12.5px;padding:9px 11px;background:rgba(255,255,255,.04);border-radius:6px;text-align:center}
 .consejos{margin-top:10px;display:flex;flex-direction:column;gap:7px}
 .consejo{display:flex;gap:8px;align-items:flex-start;font-family:var(--body);font-size:12.5px;line-height:1.5;padding:8px 10px;border-radius:6px;background:rgba(255,255,255,.03);border:1px solid var(--rule2)}
 .consejo.up{border-color:var(--bull,#3fb950)}.consejo.dn{border-color:var(--bear,#f85149)}.consejo.warn{border-color:var(--warn,#d29922)}
@@ -710,6 +716,14 @@ summary:hover{color:var(--ink)}
           <option value="long">Solo largos</option>
           <option value="short">Solo cortos</option>
         </select>
+        <select id="perOrden" class="btn quiet" style="padding:8px" onchange="renderPersistencia(true)">
+          <option value="retorno" selected>Ordenar: retorno por evento</option>
+          <option value="edge">Ordenar: MFE/MAE (a favor vs en contra)</option>
+          <option value="recorrido">Ordenar: recorrido a favor (%)</option>
+          <option value="duracion">Ordenar: velas que aguanta</option>
+          <option value="nogira">Ordenar: menos giros rápidos</option>
+          <option value="score">Ordenar: score compuesto</option>
+        </select>
       </div>
       <div class="sr-progress" id="perProg" style="display:none">
         <div class="sr-bar"><div class="sr-fill" id="perFill"></div></div>
@@ -729,6 +743,61 @@ summary:hover{color:var(--ink)}
           estructuralmente tendencial. Filtros aplicados: mínimo 12 eventos, precio &gt;5 $, volumen &gt;20M $/día.
         </div>
       </div>
+      <details class="expl">
+        <summary>¿Cómo se calcula el score y qué significa el VR?</summary>
+        <div class="expl-b">
+          <p><b>El score</b> es una suma ponderada de <b>z-scores</b>: para cada métrica miro la media y la
+          desviación típica <b>entre los tickers que has analizado</b>, convierto el valor de cada uno en
+          «cuántas desviaciones está por encima o por debajo del grupo» (recortado a ±3 para que un extremo
+          no lo domine todo), lo multiplico por su peso y sumo.</p>
+          <table class="quotes" style="margin:8px 0"><tbody>
+            <tr><td>Mediana de velas vivo</td><td class="num up"><b>+0,25</b></td></tr>
+            <tr><td>Llega lejos (follow-through)</td><td class="num up">+0,20</td></tr>
+            <tr><td>Velas fuera del canal</td><td class="num up">+0,15</td></tr>
+            <tr><td>Edge ratio (a favor / en contra)</td><td class="num up">+0,15</td></tr>
+            <tr><td>Percentil 75 de velas vivo</td><td class="num up">+0,10</td></tr>
+            <tr><td>VR(4)</td><td class="num up">+0,10</td></tr>
+            <tr><td><b>Se gira rápido</b></td><td class="num dn"><b>−0,20</b></td></tr>
+          </tbody></table>
+          <p>Lo que más pesa es <b>cuánto dura</b> el movimiento, y lo único que resta es girarse rápido.</p>
+          <p class="caveat"><b>Ojo con esto:</b> al ser relativo al grupo, un score de +1,5 significa «de los
+          mejores <b>de esta lista</b>», no «bueno en absoluto». Si analizas 30 valores malos, el mejor de
+          ellos sacará score alto igualmente. Mira siempre también las cifras crudas: si el primero se gira
+          en 3 velas, el ranking no lo arregla.</p>
+
+          <p style="margin-top:10px"><b>El Variance Ratio (VR)</b> de Lo-MacKinlay compara la varianza de los
+          retornos de 4 velas con 4 veces la de 1 vela:</p>
+          <p class="formula">VR(4) = Var(retorno de 4 velas) ÷ [ 4 × Var(retorno de 1 vela) ]</p>
+          <p>Si el precio fuera un paseo aleatorio puro saldría <b>VR = 1</b>: por encima, los movimientos
+          se encadenan; por debajo, se cancelan.</p>
+          <p class="caveat"><b>Pero cuidado con el 1 como listón.</b> En velas de 15 minutos <b>casi ningún
+          valor supera 1</b>, y no es un fallo del cálculo: los retornos intradía arrastran ruido de
+          microestructura (el rebote entre bid y ask hace que un tick arriba tienda a seguirse de uno abajo),
+          y eso mete autocorrelación negativa artificial. Es un hecho conocido del intradía.
+          <b>Lo que importa aquí es el VR relativo</b>: cuál de tus tickers lo tiene más alto que los demás.
+          Por eso el color de esa columna compara contra la <b>mediana del grupo</b>, no contra 1.</p>
+          <p><b>Por qué se incluye igualmente:</b> el VR se calcula <b>sin usar la señal del canal para
+          nada</b> — solo mira los retornos. Sirve de control cruzado: si un valor sale bien en persistencia
+          y además tiene el VR más alto del grupo, dos métodos independientes coinciden.</p>
+
+          <p style="margin-top:10px"><b>MFE y MAE</b> son <i>Maximum Favorable Excursion</i> y <i>Maximum
+          Adverse Excursion</i>: cuánto llegó a moverse el precio <b>a tu favor</b> y <b>en tu contra</b>
+          durante el evento, antes de que se resolviera. El <b>ratio MFE/MAE</b> dice cuánto recorrido bueno
+          hay por cada unidad de recorrido malo: un 1,8 significa que se mueve casi el doble a favor.
+          Es la métrica que decide si puedes poner un stop sin que te barran.</p>
+
+          <p style="margin-top:10px"><b>El retorno medio por evento</b> (en múltiplos de ATR) es
+          <b>la cifra más directa de todas</b>: lo que se llevó de media cada señal al cerrar el ciclo.
+          Positivo = la ruptura del canal, por sí sola, dejó dinero sobre la mesa. No depende de ningún peso
+          ni ponderación mía.</p>
+
+          <p class="caveat"><b>Sobre el score:</b> los pesos de la tabla de arriba son <b>un criterio, no una
+          verdad</b>. Si no te convencen, usa el selector de ordenación para clasificar por una sola métrica
+          medida — <b>retorno por evento</b> o <b>MFE/MAE</b> son las más honestas, porque no llevan
+          ponderaciones inventadas.</p>
+        </div>
+      </details>
+
       <div class="empty" id="perEmpty">
         <strong>Ranking de persistencia</strong>
         Sobre ~60 sesiones de velas de 15 minutos, detecta cada ruptura del canal EMA34 y mide cuántas velas
@@ -8987,15 +9056,36 @@ function renderPersistencia(final){
   $('perOut').style.display='block';
   const R=rankingPersistencia(PERS.filas);
   const ok=R.filter(f=>!f.err);
+  const vrs=ok.map(f=>f.vr4).filter(isFinite).sort((a,b)=>a-b);
+  const vrMed = vrs.length? vrs[Math.floor(vrs.length/2)] : NaN;
+  /* ORDENACIONES DIRECTAS. El score compuesto lleva pesos que son un criterio
+     mío, no una verdad: aquí puedes ordenar por una sola métrica medida, sin
+     ponderaciones inventadas. La de "retorno por evento" es la más honesta
+     para decidir: es lo que se llevó de media cada señal, en múltiplos de ATR. */
+  const orden=($('perOrden')&&$('perOrden').value)||'retorno';
+  const criterio={
+    retorno:  f=>f.retATRmed,
+    edge:     f=>f.edgeRatio,
+    recorrido:f=>f.mfePctMed,
+    duracion: f=>f.medAlive,
+    nogira:   f=>-f.reversalPct,
+    score:    f=>f.score,
+  }[orden];
+  ok.sort((a,b)=>{const x=criterio(b),y=criterio(a);
+    return (isFinite(x)?x:-9e9)-(isFinite(y)?y:-9e9);});
+  ok.forEach((f,i)=>f.rank=i+1);
   const num=(x,d=1)=>isFinite(x)?x.toFixed(d):'—';
   let html='<div class="scrollx"><table class="quotes"><thead><tr>'+
     '<th>#</th><th>Ticker</th><th>Eventos</th><th>Velas vivo<br>(mediana / p75)</th>'+
     '<th>Recorrido a favor<br>(mediana / p75)</th><th>Máximo<br>alcanzado</th><th>En contra<br>(mediana)</th>'+
+    '<th>Retorno medio<br>por evento</th><th>Acierto</th>'+
     '<th>Se gira<br>rápido</th><th>Llega<br>lejos</th><th>MFE/MAE</th><th>VR(4)</th><th>Score</th></tr></thead><tbody>';
   for(const f of ok){
     const revCls = f.reversalPct>40?'dn':f.reversalPct<25?'up':'mute';
     const ftCls = f.followThru>50?'up':f.followThru<30?'dn':'mute';
-    const vrCls = f.vr4>1.05?'up':f.vr4<0.95?'dn':'mute';
+    // El VR intradía casi siempre sale <1 por el ruido de microestructura
+    // (rebote bid-ask). Comparamos contra la MEDIANA del grupo, no contra 1.
+    const vrCls = (isFinite(f.vr4)&&isFinite(vrMed)) ? (f.vr4>vrMed*1.05?'up':f.vr4<vrMed*0.95?'dn':'mute') : 'mute';
     const scCls = f.score>0.4?'up':f.score<-0.4?'dn':'mute';
     html+=`<tr onclick="srGoChain('${f.sym}')">
       <td class="num mute">${f.rank}</td>
@@ -9006,6 +9096,8 @@ function renderPersistencia(final){
         ${isFinite(f.mfeLargoMed)&&isFinite(f.mfeCortoMed)?`<br><span class="mute" style="font-size:10px">L ${num(f.mfeLargoMed,2)}% · C ${num(f.mfeCortoMed,2)}%</span>`:''}</td>
       <td class="num up">${num(f.mfePctMax,2)}%<br><span class="mute" style="font-size:10px">p90 ${num(f.mfePctP90,2)}%</span></td>
       <td class="num dn">${num(f.maePctMed,2)}%</td>
+      <td class="num ${f.retATRmed>0.05?'up':f.retATRmed<-0.05?'dn':'mute'}"><b>${f.retATRmed>=0?'+':''}${num(f.retATRmed,2)}</b><br><span class="mute" style="font-size:10px">× ATR</span></td>
+      <td class="num ${f.winPct>52?'up':f.winPct<45?'dn':'mute'}">${num(f.winPct,0)}%</td>
       <td class="num ${revCls}">${num(f.reversalPct,0)}%</td>
       <td class="num ${ftCls}">${num(f.followThru,0)}%</td>
       <td class="num">${num(f.edgeRatio,2)}</td>
@@ -9036,6 +9128,32 @@ function renderPersistencia(final){
       <div class="gx-setup-b"><b>Los de abajo son la trampa.</b> ${peor.sym} cierra la lista con
         <b>${num(peor.reversalPct,0)}%</b> de giros rápidos${isFinite(peor.vr4)&&peor.vr4<0.95?` y VR(4) de ${num(peor.vr4,2)} (mean-reverting)`:''}.
         Ahí la señal puede acertar la dirección y perder igual, porque el movimiento no dura.</div>
+      ${mejor.medAlive<=3 || mejor.reversalPct>40 ? `<div class="gx-setup-b" style="color:var(--warn,#d29922)">
+        <b>⚠️ Aviso sobre el ranking:</b> el score es <b>relativo a esta lista</b>. ${mejor.sym} es el primero,
+        pero sus cifras crudas no son buenas (mediana de ${num(mejor.medAlive,0)} velas,
+        ${num(mejor.reversalPct,0)}% de giros rápidos). Que encabece significa «el menos malo de los
+        analizados», no que sea persistente. Prueba con otro universo antes de operar nada de aquí.</div>` : ''}
+      ${ok.filter(f=>isFinite(f.vr4)&&f.vr4<1&&f.score>0.4).length ? `<div class="gx-setup-b" style="color:var(--warn,#d29922)">
+        <b>⚠️ Contradicción:</b> ${ok.filter(f=>isFinite(f.vr4)&&f.vr4<1&&f.score>0.4).map(f=>f.sym).join(', ')}
+        ${ok.filter(f=>isFinite(f.vr4)&&f.vr4<1&&f.score>0.4).length===1?'sale':'salen'} bien en persistencia pero con
+        VR(4) por debajo de 1, que indica lo contrario (mean-reverting). Dos métodos independientes discrepan:
+        puede ser que los eventos del canal capten algo que el VR global no ve, o que el ranking esté midiendo ruido.
+        Trátalo con pinzas.</div>` : ''}
+      ${(()=>{
+        // LOS QUE DE VERDAD SIRVEN: retorno por evento positivo + más recorrido a
+        // favor que en contra + no se giran a las dos velas. Sin ponderaciones.
+        const buenos=ok.filter(f=>f.retATRmed>0.05 && f.edgeRatio>1.2 && f.reversalPct<35 && f.nEv>=20);
+        if(buenos.length) return `<div class="gx-setup-b" style="border-left:3px solid var(--bull,#3fb950);padding-left:9px">
+          <b>✅ Los que encajan con tu estrategia (${buenos.length}):</b>
+          ${buenos.slice(0,8).map(f=>`<b>${f.sym}</b> (${f.retATRmed>=0?'+':''}${num(f.retATRmed,2)}×ATR por evento, MFE/MAE ${num(f.edgeRatio,2)}, ${num(f.reversalPct,0)}% de giros)`).join(' · ')}.
+          Cumplen las tres condiciones a la vez: <b>dejaron dinero de media</b> por evento, se mueven más a
+          favor que en contra, y no se giran a las dos velas. Sin pesos ni scores: son los tres números crudos.</div>`;
+        return `<div class="gx-setup-b" style="border-left:3px solid var(--warn,#d29922);padding-left:9px">
+          <b>⚠️ Ninguno cumple las tres condiciones a la vez</b> (retorno por evento positivo, MFE/MAE &gt; 1,2
+          y menos del 35% de giros rápidos, con 20+ eventos). En este universo, la ruptura del canal por sí
+          sola no dejó dinero. Opciones: prueba otro universo, cambia el lado (solo largos o solo cortos), o
+          asume que a esta señal le falta un filtro adicional.</div>`;
+      })()}
       <div class="gx-setup-b mute" style="font-size:11.5px">Esto mide <b>persistencia</b>, no rentabilidad:
         dice cuánto dura un movimiento una vez arrancado, no si tu entrada acierta. Combínalo con tu señal —
         opera los de arriba, descarta los de abajo. Y ojo con el histórico: son ~60 sesiones, suficiente para
