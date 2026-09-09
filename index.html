@@ -344,6 +344,7 @@ details[open]>.adv-summary::before{content:"▾ "}
 .expl-b{padding:0 13px 13px;font-family:var(--body);font-size:12.5px;line-height:1.6;color:var(--ink2)}
 .expl-b p{margin:7px 0}
 .formula{font-family:var(--num);font-size:12.5px;padding:9px 11px;background:rgba(255,255,255,.04);border-radius:6px;text-align:center}
+.leyenda-t{font-family:var(--body);font-size:12px;line-height:1.6;padding:10px 12px;border-radius:8px;background:rgba(255,255,255,.03);border:1px solid var(--rule2);margin-bottom:10px}
 .consejos{margin-top:10px;display:flex;flex-direction:column;gap:7px}
 .consejo{display:flex;gap:8px;align-items:flex-start;font-family:var(--body);font-size:12.5px;line-height:1.5;padding:8px 10px;border-radius:6px;background:rgba(255,255,255,.03);border:1px solid var(--rule2)}
 .consejo.up{border-color:var(--bull,#3fb950)}.consejo.dn{border-color:var(--bear,#f85149)}.consejo.warn{border-color:var(--warn,#d29922)}
@@ -717,7 +718,7 @@ summary:hover{color:var(--ink)}
           <option value="short">Solo cortos</option>
         </select>
         <select id="perOrden" class="btn quiet" style="padding:8px" onchange="renderPersistencia(true)">
-          <option value="retorno" selected>Ordenar: retorno por evento</option>
+          <option value="retorno" selected>Ordenar: esperanza por operación</option>
           <option value="edge">Ordenar: MFE/MAE (a favor vs en contra)</option>
           <option value="recorrido">Ordenar: recorrido a favor (%)</option>
           <option value="duracion">Ordenar: velas que aguanta</option>
@@ -9280,6 +9281,14 @@ function renderPersistencia(final){
   const ok=R.filter(f=>!f.err);
   const vrs=ok.map(f=>f.vr4).filter(isFinite).sort((a,b)=>a-b);
   const vrMed = vrs.length? vrs[Math.floor(vrs.length/2)] : NaN;
+  /* CORRECCIÓN POR MIRAR VARIOS TICKERS A LA VEZ.
+     Si analizas 30 tickers, haces 30 contrastes: al 5%, uno o dos saldrán
+     "significativos" por azar aunque ninguno tenga ventaja. El umbral sube.
+     Misma notación que en estacionalidad, para no liarse:
+       ✓  = supera 1,96 (el listón de siempre, insuficiente si miras muchos)
+       ✓✓ = supera el umbral corregido → este sí es de fiar */
+  const nTickers=ok.length;
+  const umbralCorr = nTickers>1 ? Math.sqrt(2*Math.log(nTickers))+1.0 : 1.96;
   /* ORDENACIONES DIRECTAS. El score compuesto lleva pesos que son un criterio
      mío, no una verdad: aquí puedes ordenar por una sola métrica medida, sin
      ponderaciones inventadas. La de "retorno por evento" es la más honesta
@@ -9297,7 +9306,16 @@ function renderPersistencia(final){
     return (isFinite(x)?x:-9e9)-(isFinite(y)?y:-9e9);});
   ok.forEach((f,i)=>f.rank=i+1);
   const num=(x,d=1)=>isFinite(x)?x.toFixed(d):'—';
-  let html='<div class="scrollx"><table class="quotes"><thead><tr>'+
+  let html=`<div class="leyenda-t">
+    <b>Qué significan los ticks de la columna «Esperanza»:</b><br>
+    <span class="mute">t=1,2 (azar)</span> → la esperanza no se distingue de cero. <b>Ignóralo.</b><br>
+    <span class="warn">t=2,3 ✓</span> → supera el listón normal (1,96), <b>pero</b> estás mirando ${ok.length}
+    tickers a la vez: al 5%, uno o dos salen así por pura casualidad. <b>Insuficiente.</b><br>
+    <b class="up">t=3,8 ✓✓</b> → supera el umbral corregido (t&gt;${umbralCorr.toFixed(1)}) por estar comparando
+    ${ok.length} tickers. <b>Este sí.</b><br>
+    <span class="mute" style="font-size:11px">Cuantos más tickers analizas, más alto tiene que ser el t para
+    creérselo. Es la misma lógica que si tiras 30 monedas: que una saque 8 caras seguidas no es un milagro.</span>
+  </div>` + '<div class="scrollx"><table class="quotes"><thead><tr>'+
     '<th>#</th><th>Ticker</th><th>Eventos</th><th>Velas vivo<br>(mediana / p75)</th>'+
     '<th>Recorrido a favor<br>(mediana / p75)</th><th>Máximo<br>alcanzado</th><th>En contra<br>(mediana)</th>'+
     '<th>Esperanza<br>por operación</th><th>Objetivo<br>vs stop</th>'+
@@ -9321,7 +9339,9 @@ function renderPersistencia(final){
       <td class="num ${f.espSig&&f.espSig.sig?(f.espSig.media>0?'up':'dn'):'mute'}">
         <b>${f.espATR>=0?'+':''}${num(f.espATR,3)}</b>
         <br><span class="mute" style="font-size:10px">${f.espSig&&isFinite(f.espSig.t)
-          ? (f.espSig.sig ? 't='+num(f.espSig.t,1)+' ✓✓' : 't='+num(f.espSig.t,1)+' (azar)')
+          ? (Math.abs(f.espSig.t)>umbralCorr ? 't='+num(f.espSig.t,1)+' ✓✓'
+             : f.espSig.sig ? 't='+num(f.espSig.t,1)+' ✓'
+             : 't='+num(f.espSig.t,1)+' (azar)')
           : '× ATR'}</span></td>
       <td class="num"><span class="up">${num(f.pctObjetivo,0)}%</span><span class="mute"> / </span><span class="dn">${num(f.pctStop,0)}%</span>
         <br><span class="mute" style="font-size:10px">llega / salta</span></td>
@@ -9375,8 +9395,8 @@ function renderPersistencia(final){
         /* EXIGENCIA REAL: que el retorno por evento sea estadísticamente
            distinto de cero (t>1,96), no solo positivo. Con 40 eventos y mucha
            dispersión, un +0,15 de media puede ser casualidad pura. */
-        const solidos=ok.filter(f=>f.espSig&&f.espSig.sig&&f.espSig.media>0&&f.edgeRatio>1.2&&f.reversalPct<35);
-        const flojos=ok.filter(f=>f.espATR>0.02&&f.edgeRatio>1.2&&f.reversalPct<35&&!(f.espSig&&f.espSig.sig));
+        const solidos=ok.filter(f=>f.espSig&&Math.abs(f.espSig.t)>umbralCorr&&f.espSig.media>0&&f.edgeRatio>1.2&&f.reversalPct<35);
+        const flojos=ok.filter(f=>f.espATR>0.02&&f.edgeRatio>1.2&&f.reversalPct<35&&!(f.espSig&&Math.abs(f.espSig.t)>umbralCorr));
         if(solidos.length) return `<div class="gx-setup-b" style="border-left:3px solid var(--bull,#3fb950);padding-left:9px">
           <b>✅ Los que encajan de verdad (${solidos.length}):</b>
           ${solidos.slice(0,8).map(f=>`<b>${f.sym}</b> (esperanza ${f.espSig.media>=0?'+':''}${num(f.espSig.media,3)}×ATR, <b>t=${num(f.espSig.t,1)}</b>, llega al objetivo ${num(f.pctObjetivo,0)}% de las veces frente a ${num(f.pctStop,0)}% de stops)`).join(' · ')}.
@@ -9479,8 +9499,14 @@ function renderEstacionalidad(){
   }
 
   /* EL AVISO QUE EVITA QUE TE CREAS UN ESPEJISMO */
-  html+=`<div class="gx-warn" style="border-color:var(--rule2);margin-top:12px">
-    <b>Cómo leer esto sin engañarse.</b> Se han hecho <b>${R.nTests} contrastes a la vez</b> (uno por franja).
+  html+=`<div class="leyenda-t" style="margin-top:12px">
+    <b>Los ticks, igual que en persistencia:</b>
+    <span class="mute">sin tick</span> = no se distingue del azar ·
+    <span class="warn">✓</span> = supera 1,96 pero insuficiente aquí ·
+    <b class="up">✓✓</b> = supera el umbral corregido (t&gt;${R.umbralBonf.toFixed(1)}). <b>Solo estas valen.</b>
+  </div>
+  <div class="gx-warn" style="border-color:var(--rule2);margin-top:10px">
+    <b>Por qué hace falta corregir.</b> Se han hecho <b>${R.nTests} contrastes a la vez</b> (uno por franja).
     Al 5%, unas <b>${R.esperadosPorAzar.toFixed(1)}</b> saldrían "significativas" por puro azar aunque el valor
     no tuviera ningún patrón. Aquí salieron <b>${R.nSig}</b> con t&gt;1,96 (marcadas ✓) y solo
     <b>${R.nSigCorregida}</b> superan el umbral corregido de t&gt;${R.umbralBonf.toFixed(1)} (marcadas ✓✓ y resaltadas).
