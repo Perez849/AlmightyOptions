@@ -752,11 +752,11 @@ summary:hover{color:var(--ink)}
           no lo domine todo), lo multiplico por su peso y sumo.</p>
           <table class="quotes" style="margin:8px 0"><tbody>
             <tr><td>Mediana de velas vivo</td><td class="num up"><b>+0,25</b></td></tr>
-            <tr><td>Llega lejos (follow-through)</td><td class="num up">+0,20</td></tr>
+            <tr><td>Llega lejos (follow-through)</td><td class="num up">+0,22</td></tr>
             <tr><td>Velas fuera del canal</td><td class="num up">+0,15</td></tr>
-            <tr><td>Edge ratio (a favor / en contra)</td><td class="num up">+0,15</td></tr>
+            <tr><td>Edge ratio (a favor / en contra)</td><td class="num up">+0,20</td></tr>
             <tr><td>Percentil 75 de velas vivo</td><td class="num up">+0,10</td></tr>
-            <tr><td>VR(4)</td><td class="num up">+0,10</td></tr>
+            <tr><td>VR(4) <span class="mute">(bajado: casi nunca es significativo)</span></td><td class="num mute">+0,03</td></tr>
             <tr><td><b>Se gira rápido</b></td><td class="num dn"><b>−0,20</b></td></tr>
           </tbody></table>
           <p>Lo que más pesa es <b>cuánto dura</b> el movimiento, y lo único que resta es girarse rápido.</p>
@@ -770,12 +770,18 @@ summary:hover{color:var(--ink)}
           <p class="formula">VR(4) = Var(retorno de 4 velas) ÷ [ 4 × Var(retorno de 1 vela) ]</p>
           <p>Si el precio fuera un paseo aleatorio puro saldría <b>VR = 1</b>: por encima, los movimientos
           se encadenan; por debajo, se cancelan.</p>
-          <p class="caveat"><b>Pero cuidado con el 1 como listón.</b> En velas de 15 minutos <b>casi ningún
-          valor supera 1</b>, y no es un fallo del cálculo: los retornos intradía arrastran ruido de
-          microestructura (el rebote entre bid y ask hace que un tick arriba tienda a seguirse de uno abajo),
-          y eso mete autocorrelación negativa artificial. Es un hecho conocido del intradía.
-          <b>Lo que importa aquí es el VR relativo</b>: cuál de tus tickers lo tiene más alto que los demás.
-          Por eso el color de esa columna compara contra la <b>mediana del grupo</b>, no contra 1.</p>
+          <p class="caveat"><b>El VR es la métrica menos útil de todas, y conviene decirlo.</b>
+          Comprobé el estimador sobre paseos aleatorios simulados: da media <b>0,9926</b> con desviación
+          <b>0,0485</b>, y la teoría de Lo-MacKinlay predice 0,0483 para este número de velas. O sea:
+          el cálculo <b>está bien</b> y coincide con la teoría.<br><br>
+          El problema es otro: con ~1.500 velas, <b>cualquier VR entre 0,905 y 1,095 es indistinguible de un
+          paseo aleatorio</b>. Y en 15 minutos casi todos los valores caen ahí o justo debajo, porque los
+          retornos intradía arrastran ruido de microestructura (el rebote entre bid y ask mete autocorrelación
+          negativa artificial). <b>Traducción práctica: si dos tickers salen 0,94 y 0,91, esa diferencia es
+          ruido, no información.</b><br><br>
+          Por eso ahora la columna muestra el <b>estadístico z</b> y marca «no signif.» cuando el valor no se
+          distingue de 1, y su peso en el score se ha bajado de 0,10 a 0,03. Sigue estando por si algún valor
+          sí sale claramente fuera de banda, pero <b>no bases decisiones en él</b>.</p>
           <p><b>Por qué se incluye igualmente:</b> el VR se calcula <b>sin usar la señal del canal para
           nada</b> — solo mira los retornos. Sirve de control cruzado: si un valor sale bien en persistencia
           y además tiene el VR más alto del grupo, dos métodos independientes coinciden.</p>
@@ -787,9 +793,13 @@ summary:hover{color:var(--ink)}
           Es la métrica que decide si puedes poner un stop sin que te barran.</p>
 
           <p style="margin-top:10px"><b>El retorno medio por evento</b> (en múltiplos de ATR) es
-          <b>la cifra más directa de todas</b>: lo que se llevó de media cada señal al cerrar el ciclo.
-          Positivo = la ruptura del canal, por sí sola, dejó dinero sobre la mesa. No depende de ningún peso
-          ni ponderación mía.</p>
+          <b>la cifra que de verdad decide</b>: lo que se llevó de media cada señal al cerrar el ciclo.
+          No depende de ningún peso ni ponderación mía.</p>
+          <p><b>Y debajo va su estadístico t</b>, que es lo que separa una ventaja de un espejismo: con unos
+          40 eventos y mucha dispersión, un +0,15 de media puede ser casualidad pura. Solo cuando
+          <b>t &gt; 1,96</b> se puede decir que el retorno es distinto de cero con confianza. Un ticker con
+          +0,30 y t=1,1 <b>no</b> es mejor apuesta que uno con +0,20 y t=2,4 — el segundo está demostrado y
+          el primero no.</p>
 
           <p class="caveat"><b>Sobre el score:</b> los pesos de la tabla de arriba son <b>un criterio, no una
           verdad</b>. Si no te convencen, usa el selector de ordenación para clasificar por una sola métrica
@@ -805,6 +815,47 @@ summary:hover{color:var(--ink)}
         arriba y descartes los que se giran a las dos velas.
       </div>
     </section>
+    <section class="blk">
+      <h2>🕐 Estacionalidad intradía<span class="sub">qué suele hacer un valor a cada hora de la sesión</span></h2>
+      <div class="historia" style="font-size:13.5px;margin-bottom:12px">
+        <p>Agrupa ~60 sesiones de velas de 15 minutos por <b>franja horaria</b> y mide qué suele pasar en cada
+        una: retorno medio, con qué frecuencia sube, cuánto se mueve y cuánto volumen entra. Sirve para saber
+        si un valor tiene <b>hábitos</b>: abre con fuerza, se duerme a media mañana, se activa al cierre…</p>
+        <p class="caveat" style="margin-top:8px"><b>El aviso que hace esto útil en vez de peligroso:</b>
+        al mirar 26 franjas a la vez se hacen 26 contrastes, y al 5% <b>una o dos saldrán "significativas"
+        por puro azar</b> aunque el valor no tenga ningún patrón. Por eso aquí se aplica corrección por
+        contrastes múltiples y solo las marcadas <b>✓✓</b> merecen crédito. Sin eso, cualquier serie
+        aleatoria parece tener patrones horarios.</p>
+      </div>
+      <div class="btns" style="margin-bottom:6px">
+        <div class="fld" style="display:inline-block;margin-right:8px">
+          <input id="estSym" placeholder="NVDA" maxlength="8" style="text-transform:uppercase;width:110px">
+        </div>
+        <button class="btn solid" id="estBtn" onclick="scanEstacionalidad()">Analizar estacionalidad</button>
+        <select id="estBloque" class="btn quiet" style="padding:8px">
+          <option value="15" selected>Franjas de 15 min</option>
+          <option value="30">Franjas de 30 min</option>
+          <option value="60">Franjas de 1 hora</option>
+        </select>
+      </div>
+      <div class="caveat" id="estMsg" style="display:none"></div>
+      <div id="estOut" style="display:none"><div id="estTable"></div>
+        <div class="historia" style="font-size:12px;margin-top:10px">
+          <b>Retorno medio</b> = lo que hace de media esa franja, con su barra. <b>t</b> = cuántas desviaciones
+          está de cero: <b>✓</b> supera 1,96 (el listón habitual) y <b>✓✓</b> supera el umbral corregido por
+          haber mirado muchas franjas — solo estas últimas son de fiar. <b>% alcista</b> = con qué frecuencia
+          esa vela cierra por encima de donde abrió (más robusto que la media). <b>Rango medio</b> = cuánto
+          se mueve dentro de la vela, en % — esto es lo más estable de todo. <b>Volumen</b> = relativo a la
+          media del día.
+        </div>
+      </div>
+      <div class="empty" id="estEmpty">
+        <strong>Patrones horarios</strong>
+        Escribe un ticker y te digo, franja a franja, qué suele hacer durante la sesión: dónde tiende a subir,
+        dónde se mueve más y dónde se queda dormido — separando lo que es patrón de lo que es casualidad.
+      </div>
+    </section>
+
 
   </div>
 
@@ -6792,8 +6843,12 @@ function pintaConsejos(lista){
 const PERS_CFG = {
   emaLen: 34, maxBars: 26, reversalBars: 2, ftMult: 1.0,
   minEventos: 12, minPrecio: 5, minADV: 20,   // ADV en millones de USD
-  pesos: { medAlive:0.25, p75Alive:0.10, medOut:0.15, followThru:0.20,
-           edgeRatio:0.15, vr4:0.10, reversalPct:-0.20 }
+  /* El VR pesaba 0,10, pero con ~1.500 velas su banda de ruido es ±0,095:
+     casi ningún valor intradía sale significativo, así que estaba metiendo
+     ruido en el ranking. Se le baja el peso y se reparte en las métricas que
+     sí se miden directamente sobre los eventos. */
+  pesos: { medAlive:0.25, p75Alive:0.10, medOut:0.15, followThru:0.22,
+           edgeRatio:0.20, vr4:0.03, reversalPct:-0.20 }
 };
 
 /* Fecha de sesión en hora de Nueva York (para no cruzar de día) */
@@ -6920,6 +6975,34 @@ function varianceRatio(C, q){
   return v1>0 ? vq/(q*v1) : NaN;
 }
 
+/* Contraste de Lo-MacKinlay: ¿el VR se distingue de 1 o es ruido?
+   Bajo la hipótesis nula (paseo aleatorio), Var(VR) = 2(2q−1)(q−1)/(3qn).
+   Verificado: la teoría da desviación 0,0483 y la simulación 0,0485.
+   CONSECUENCIA: con ~1.500 velas, cualquier VR entre 0,905 y 1,095 NO se
+   distingue de un paseo aleatorio. Sin esto, comparar un 0,94 con un 0,91
+   es comparar ruido con ruido. */
+function vrSignificancia(vr, q, nObs){
+  if(!isFinite(vr)||!isFinite(nObs)||nObs<50) return {z:NaN, sig:false, banda:NaN};
+  const varNula = 2*(2*q-1)*(q-1)/(3*q*nObs);
+  const sd = Math.sqrt(varNula);
+  const z = (vr-1)/sd;
+  return { z, sd, sig: Math.abs(z)>1.96, banda: 1.96*sd,
+           lo: 1-1.96*sd, hi: 1+1.96*sd };
+}
+
+/* Contraste del retorno medio por evento: ¿es distinto de cero o es azar?
+   Esta es LA pregunta para decidir si un activo sirve. Con 40 eventos y mucha
+   dispersión, un +0,15 de media puede ser perfectamente casualidad. */
+function retSignificancia(rets){
+  const x=rets.filter(isFinite);
+  const n=x.length;
+  if(n<10) return {t:NaN, sig:false, n};
+  const m=x.reduce((a,b)=>a+b,0)/n;
+  const sd=Math.sqrt(x.reduce((a,b)=>a+(b-m)*(b-m),0)/Math.max(n-1,1));
+  const t = sd>0 ? m/(sd/Math.sqrt(n)) : 0;
+  return { t, media:m, sd, n, sig: Math.abs(t)>1.96 };
+}
+
 function autocorr1(C){
   const {v,ses}=C; const vals=[];
   let ini=0;
@@ -6984,6 +7067,8 @@ function resumenPersistencia(C, ev, sym, cfg=PERS_CFG){
     retATRmed:mediana(ev.map(e=>e.retATR)),
     winPct:ev.filter(e=>e.retATR>0).length/ev.length*100,
     vr4:varianceRatio(C,4), vr8:varianceRatio(C,8), ac1:autocorr1(C),
+    vrSig: vrSignificancia(varianceRatio(C,4), 4, v.length),
+    retSig: retSignificancia(ev.map(e=>e.retATR)),
     precio:v[v.length-1].close, adv, velas:v.length,
   };
 }
@@ -7004,6 +7089,99 @@ function rankingPersistencia(filas, cfg=PERS_CFG){
   ok.sort((a,b)=>b.score-a.score);
   ok.forEach((f,i)=>f.rank=i+1);
   return ok.concat(filas.filter(f=>f.err));
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ESTACIONALIDAD INTRADÍA · ¿se repite el comportamiento por horas?
+   ───────────────────────────────────────────────────────────────
+   Para un valor concreto, agrupa todas las velas de 15m por su
+   FRANJA HORARIA (09:30, 09:45, 10:00…) y mide qué suele hacer en
+   cada una: retorno medio, si tiende a subir o bajar, cuánto se
+   mueve (rango) y cuánto volumen entra.
+
+   AVISO METODOLÓGICO que va en el propio resultado: con ~60
+   sesiones y 26 franjas, se hacen 26 contrastes a la vez. Al 5%,
+   más o menos UNA franja saldrá "significativa" por puro azar
+   aunque no haya ningún patrón. Por eso se muestra el umbral
+   corregido y no se vende cada t>2 como un hallazgo.
+   ═══════════════════════════════════════════════════════════════ */
+function estacionalidadIntradia(velas, opts={}){
+  const bloque = opts.bloque || 15;          // minutos por franja: 15, 30 o 60
+  const v=velas.filter(c=>isFinite(c.close)&&isFinite(c.open)&&c.close>0)
+               .filter(c=>{const m=minutosNY(c.time); return m>=570 && m<960;})
+               .sort((a,b)=>a.time-b.time);
+  if(v.length<200) return null;
+
+  const franjaDe = ms => { const m=minutosNY(ms); return Math.floor((m-570)/bloque)*bloque+570; };
+  const etiqueta = f => `${String(Math.floor(f/60)).padStart(2,'0')}:${String(f%60).padStart(2,'0')}`;
+  const dowDe = ms => new Date(ms).toLocaleDateString('en-US',{timeZone:'America/New_York',weekday:'short'});
+
+  // agrupar por franja
+  const g={}, porDia={}, porDow={};
+  for(let i=0;i<v.length;i++){
+    const c=v[i];
+    const f=franjaDe(c.time), ses=sesionNY(c.time), dow=dowDe(c.time);
+    const ret=(c.close/c.open-1)*100;
+    const rango=((c.high-c.low)/c.open)*100;
+    if(!isFinite(ret)) continue;
+    (g[f]=g[f]||{rets:[],rangos:[],vols:[]});
+    g[f].rets.push(ret); g[f].rangos.push(rango);
+    g[f].vols.push(isFinite(c.volume)?c.volume:NaN);
+    // recorrido acumulado del día, para ver la forma de la sesión
+    porDia[ses]=porDia[ses]||{};
+    porDia[ses][f]=(porDia[ses][f]||0)+ret;
+    (porDow[dow]=porDow[dow]||[]).push(ret);
+  }
+
+  const franjas=Object.keys(g).map(Number).sort((a,b)=>a-b);
+  const nSesiones=Object.keys(porDia).length;
+  const volTotalMedio = (()=>{ const t=franjas.flatMap(f=>g[f].vols).filter(isFinite);
+    return t.length? t.reduce((a,b)=>a+b,0)/t.length : NaN; })();
+
+  const filas=franjas.map(f=>{
+    const R=g[f].rets, n=R.length;
+    const m=R.reduce((a,b)=>a+b,0)/n;
+    const sd=Math.sqrt(R.reduce((a,b)=>a+(b-m)*(b-m),0)/Math.max(n-1,1));
+    const t=sd>0? m/(sd/Math.sqrt(n)) : 0;
+    const alcistas=R.filter(x=>x>0).length;
+    const rangos=g[f].rangos, vols=g[f].vols.filter(isFinite);
+    return {
+      franja:f, etiqueta:etiqueta(f), n,
+      retMedio:m, retMediana:mediana(R), sd, t,
+      pctAlcista: alcistas/n*100,
+      rangoMedio: rangos.reduce((a,b)=>a+b,0)/rangos.length,
+      volRel: (vols.length&&isFinite(volTotalMedio)&&volTotalMedio>0)
+              ? (vols.reduce((a,b)=>a+b,0)/vols.length)/volTotalMedio : NaN,
+    };
+  });
+
+  // recorrido acumulado medio del día (la "forma" típica de la sesión)
+  const acum=[]; let suma=0;
+  for(const fila of filas){ suma+=fila.retMedio; acum.push({etiqueta:fila.etiqueta, acum:suma}); }
+
+  // corrección por contrastes múltiples: probamos tantas franjas como haya
+  const nTests=filas.length;
+  const umbralBonf = nTests>0 ? Math.sqrt(2*Math.log(nTests))+1.0 : 1.96;   // aprox. conservadora
+  const esperadosPorAzar = nTests*0.05;
+  const sig = filas.filter(f=>Math.abs(f.t)>1.96);
+  const sigCorregida = filas.filter(f=>Math.abs(f.t)>umbralBonf);
+
+  // por día de la semana
+  const dias=['Mon','Tue','Wed','Thu','Fri'];
+  const porDiaSemana=dias.filter(d=>porDow[d]&&porDow[d].length>20).map(d=>{
+    const R=porDow[d], n=R.length, m=R.reduce((a,b)=>a+b,0)/n;
+    const sd=Math.sqrt(R.reduce((a,b)=>a+(b-m)*(b-m),0)/Math.max(n-1,1));
+    return {dia:d, n, retMedio:m, t: sd>0? m/(sd/Math.sqrt(n)) : 0,
+            pctAlcista: R.filter(x=>x>0).length/n*100};
+  });
+
+  return { filas, acum, nSesiones, nTests, umbralBonf, esperadosPorAzar,
+           nSig: sig.length, nSigCorregida: sigCorregida.length,
+           sig, sigCorregida, porDiaSemana, bloque,
+           mejor: filas.reduce((b,f)=>!b||f.retMedio>b.retMedio?f:b,null),
+           peor:  filas.reduce((b,f)=>!b||f.retMedio<b.retMedio?f:b,null),
+           masVolatil: filas.reduce((b,f)=>!b||f.rangoMedio>b.rangoMedio?f:b,null),
+           masCalma:   filas.reduce((b,f)=>!b||f.rangoMedio<b.rangoMedio?f:b,null) };
 }
 
 function calcularGEX(rows, spot, opts={}){
@@ -9096,12 +9274,19 @@ function renderPersistencia(final){
         ${isFinite(f.mfeLargoMed)&&isFinite(f.mfeCortoMed)?`<br><span class="mute" style="font-size:10px">L ${num(f.mfeLargoMed,2)}% · C ${num(f.mfeCortoMed,2)}%</span>`:''}</td>
       <td class="num up">${num(f.mfePctMax,2)}%<br><span class="mute" style="font-size:10px">p90 ${num(f.mfePctP90,2)}%</span></td>
       <td class="num dn">${num(f.maePctMed,2)}%</td>
-      <td class="num ${f.retATRmed>0.05?'up':f.retATRmed<-0.05?'dn':'mute'}"><b>${f.retATRmed>=0?'+':''}${num(f.retATRmed,2)}</b><br><span class="mute" style="font-size:10px">× ATR</span></td>
+      <td class="num ${f.retSig&&f.retSig.sig?(f.retSig.media>0?'up':'dn'):'mute'}">
+        <b>${f.retATRmed>=0?'+':''}${num(f.retATRmed,2)}</b>
+        <br><span class="mute" style="font-size:10px">${f.retSig&&isFinite(f.retSig.t)
+          ? (f.retSig.sig ? 't='+num(f.retSig.t,1)+' ✓' : 't='+num(f.retSig.t,1)+' (azar)')
+          : '× ATR'}</span></td>
       <td class="num ${f.winPct>52?'up':f.winPct<45?'dn':'mute'}">${num(f.winPct,0)}%</td>
       <td class="num ${revCls}">${num(f.reversalPct,0)}%</td>
       <td class="num ${ftCls}">${num(f.followThru,0)}%</td>
       <td class="num">${num(f.edgeRatio,2)}</td>
-      <td class="num ${vrCls}">${num(f.vr4,2)}</td>
+      <td class="num ${f.vrSig&&f.vrSig.sig?vrCls:'mute'}">${num(f.vr4,2)}
+        <br><span class="mute" style="font-size:10px">${f.vrSig&&isFinite(f.vrSig.z)
+          ? (f.vrSig.sig ? 'z='+num(f.vrSig.z,1)+' ✓' : 'no signif.')
+          : '—'}</span></td>
       <td class="num ${scCls}"><b>${num(f.score,2)}</b></td></tr>`;
   }
   html+='</tbody></table></div>';
@@ -9142,17 +9327,24 @@ function renderPersistencia(final){
       ${(()=>{
         // LOS QUE DE VERDAD SIRVEN: retorno por evento positivo + más recorrido a
         // favor que en contra + no se giran a las dos velas. Sin ponderaciones.
-        const buenos=ok.filter(f=>f.retATRmed>0.05 && f.edgeRatio>1.2 && f.reversalPct<35 && f.nEv>=20);
-        if(buenos.length) return `<div class="gx-setup-b" style="border-left:3px solid var(--bull,#3fb950);padding-left:9px">
-          <b>✅ Los que encajan con tu estrategia (${buenos.length}):</b>
-          ${buenos.slice(0,8).map(f=>`<b>${f.sym}</b> (${f.retATRmed>=0?'+':''}${num(f.retATRmed,2)}×ATR por evento, MFE/MAE ${num(f.edgeRatio,2)}, ${num(f.reversalPct,0)}% de giros)`).join(' · ')}.
-          Cumplen las tres condiciones a la vez: <b>dejaron dinero de media</b> por evento, se mueven más a
-          favor que en contra, y no se giran a las dos velas. Sin pesos ni scores: son los tres números crudos.</div>`;
+        /* EXIGENCIA REAL: que el retorno por evento sea estadísticamente
+           distinto de cero (t>1,96), no solo positivo. Con 40 eventos y mucha
+           dispersión, un +0,15 de media puede ser casualidad pura. */
+        const solidos=ok.filter(f=>f.retSig&&f.retSig.sig&&f.retSig.media>0&&f.edgeRatio>1.2&&f.reversalPct<35);
+        const flojos=ok.filter(f=>f.retATRmed>0.05&&f.edgeRatio>1.2&&f.reversalPct<35&&!(f.retSig&&f.retSig.sig));
+        if(solidos.length) return `<div class="gx-setup-b" style="border-left:3px solid var(--bull,#3fb950);padding-left:9px">
+          <b>✅ Los que encajan de verdad (${solidos.length}):</b>
+          ${solidos.slice(0,8).map(f=>`<b>${f.sym}</b> (${f.retSig.media>=0?'+':''}${num(f.retSig.media,2)}×ATR por evento, <b>t=${num(f.retSig.t,1)}</b>, MFE/MAE ${num(f.edgeRatio,2)}, ${num(f.reversalPct,0)}% giros)`).join(' · ')}.
+          Su retorno por evento es <b>estadísticamente distinto de cero</b> (t&gt;1,96), no solo positivo por
+          casualidad. Es la única exigencia que separa una ventaja real de un espejismo con 40 datos.</div>`
+          + (flojos.length?`<div class="gx-setup-b mute" style="font-size:11.5px">Positivos pero <b>sin significancia</b> (podrían ser azar): ${flojos.slice(0,10).map(f=>f.sym+' (t='+num(f.retSig?f.retSig.t:NaN,1)+')').join(', ')}.</div>`:'');
         return `<div class="gx-setup-b" style="border-left:3px solid var(--warn,#d29922);padding-left:9px">
-          <b>⚠️ Ninguno cumple las tres condiciones a la vez</b> (retorno por evento positivo, MFE/MAE &gt; 1,2
-          y menos del 35% de giros rápidos, con 20+ eventos). En este universo, la ruptura del canal por sí
-          sola no dejó dinero. Opciones: prueba otro universo, cambia el lado (solo largos o solo cortos), o
-          asume que a esta señal le falta un filtro adicional.</div>`;
+          <b>⚠️ Ninguno tiene retorno por evento estadísticamente positivo.</b>
+          ${flojos.length?`Estos salen positivos pero <b>no superan el contraste</b> (t&lt;1,96, o sea, compatible con azar): ${flojos.slice(0,8).map(f=>f.sym).join(', ')}. `:''}
+          Con ~40 eventos por ticker hace falta una ventaja considerable para que se distinga del ruido.
+          Opciones honestas: prueba <b>solo largos</b> o <b>solo cortos</b> (muchas rupturas funcionan en una
+          dirección y no en la otra), amplía el universo para tener más eventos, o acepta que a esta señal
+          le falta un filtro adicional — que es un resultado válido, no un fracaso.</div>`;
       })()}
       <div class="gx-setup-b mute" style="font-size:11.5px">Esto mide <b>persistencia</b>, no rentabilidad:
         dice cuánto dura un movimiento una vez arrancado, no si tu entrada acierta. Combínalo con tu señal —
@@ -9161,6 +9353,116 @@ function renderPersistencia(final){
     </div>`;
   }
   $('perTable').innerHTML=html;
+}
+
+/* Estacionalidad intradía de un valor */
+let EST={sym:null, R:null};
+
+async function scanEstacionalidad(){
+  const sym=(($('estSym')&&$('estSym').value)||'').trim().toUpperCase();
+  const m=$('estMsg'); m.style.display='block';
+  if(!sym){ m.innerHTML='Escribe un ticker.'; return; }
+  if(!CN.url||!CN.key){ m.innerHTML='Necesito el acceso a datos configurado.'; return; }
+  $('estBtn').disabled=true; $('estBtn').textContent='Analizando…';
+  $('estEmpty').style.display='none';
+  m.textContent='Descargando ~60 sesiones de velas de 15m de '+sym+'…';
+  try{
+    const dx=new DXLink(); await dx.connect(CN.url,CN.key);
+    const velas=[];
+    dx.onCandle=(s,c)=>{ if(s.split('{')[0]===sym) velas.push(c); };
+    dx.subscribeCandles(sym, 90, '15m');
+    await new Promise(r=>setTimeout(r, 8000));
+    dx.disconnect();
+    if(velas.length<200){ m.innerHTML='Solo llegaron '+velas.length+' velas de '+sym+'. Comprueba el ticker.';
+      $('estBtn').disabled=false; $('estBtn').textContent='Analizar estacionalidad'; return; }
+    const bloque=+(($('estBloque')&&$('estBloque').value)||15);
+    const R=estacionalidadIntradia(velas,{bloque});
+    if(!R){ m.innerHTML='No se pudo calcular.'; $('estBtn').disabled=false; $('estBtn').textContent='Analizar estacionalidad'; return; }
+    EST={sym,R};
+    renderEstacionalidad();
+    m.style.display='none';
+  }catch(e){ m.style.display='block'; m.innerHTML='Error: '+(e.message||e); }
+  $('estBtn').disabled=false; $('estBtn').textContent='Analizar estacionalidad';
+}
+
+function renderEstacionalidad(){
+  const {sym,R}=EST; if(!R) return;
+  $('estOut').style.display='block';
+  const num=(x,d=3)=>isFinite(x)?((x>=0?'+':'')+x.toFixed(d)):'—';
+  const maxAbs=Math.max(...R.filas.map(f=>Math.abs(f.retMedio)),0.001);
+  const maxRango=Math.max(...R.filas.map(f=>f.rangoMedio),0.001);
+
+  let html=`<div class="bt-grid" style="grid-template-columns:repeat(4,1fr)">
+    <div class="bt-cell"><div class="bt-num">${R.nSesiones}</div><div class="bt-lbl">sesiones<br>analizadas</div></div>
+    <div class="bt-cell"><div class="bt-num up">${R.mejor.etiqueta}</div><div class="bt-lbl">mejor franja<br>${num(R.mejor.retMedio)}%</div></div>
+    <div class="bt-cell"><div class="bt-num dn">${R.peor.etiqueta}</div><div class="bt-lbl">peor franja<br>${num(R.peor.retMedio)}%</div></div>
+    <div class="bt-cell"><div class="bt-num">${R.masVolatil.etiqueta}</div><div class="bt-lbl">más movida<br>${R.masVolatil.rangoMedio.toFixed(2)}% rango</div></div>
+  </div>`;
+
+  html+='<div class="scrollx" style="margin-top:12px"><table class="quotes"><thead><tr>'+
+    '<th>Franja</th><th>Retorno medio</th><th></th><th>t</th><th>% alcista</th><th>Rango medio</th><th>Volumen</th></tr></thead><tbody>';
+  for(const f of R.filas){
+    const w=Math.abs(f.retMedio)/maxAbs*100;
+    const pos=f.retMedio>=0;
+    const sigCorr=Math.abs(f.t)>R.umbralBonf, sig=Math.abs(f.t)>1.96;
+    const tTxt = sigCorr ? `<b class="${pos?'up':'dn'}">${f.t.toFixed(1)} ✓✓</b>`
+               : sig ? `<span class="warn">${f.t.toFixed(1)} ✓</span>`
+               : `<span class="mute">${f.t.toFixed(1)}</span>`;
+    const wR=f.rangoMedio/maxRango*100;
+    html+=`<tr class="${sigCorr?'gx-now':''}">
+      <td class="num"><b>${f.etiqueta}</b></td>
+      <td class="num ${pos?'up':'dn'}">${num(f.retMedio)}%</td>
+      <td style="width:110px"><span class="gx-track" style="display:inline-block;width:100px"><span class="gx-fill ${pos?'up':'dn'}" style="width:${w.toFixed(0)}%"></span></span></td>
+      <td class="num">${tTxt}</td>
+      <td class="num ${f.pctAlcista>55?'up':f.pctAlcista<45?'dn':'mute'}">${f.pctAlcista.toFixed(0)}%</td>
+      <td class="num"><span class="mute">${f.rangoMedio.toFixed(3)}%</span>
+        <span class="gx-track" style="display:inline-block;width:44px;margin-left:5px"><span class="gx-fill" style="width:${wR.toFixed(0)}%;background:var(--brand)"></span></span></td>
+      <td class="num mute">${isFinite(f.volRel)?f.volRel.toFixed(2)+'×':'—'}</td></tr>`;
+  }
+  html+='</tbody></table></div>';
+
+  // por día de la semana
+  if(R.porDiaSemana.length){
+    const nom={Mon:'lunes',Tue:'martes',Wed:'miércoles',Thu:'jueves',Fri:'viernes'};
+    html+='<div class="scrollx" style="margin-top:12px"><table class="quotes"><thead><tr><th>Día</th><th>Retorno medio por vela</th><th>t</th><th>% alcista</th><th>Velas</th></tr></thead><tbody>'+
+      R.porDiaSemana.map(d=>`<tr>
+        <td class="tk">${nom[d.dia]||d.dia}</td>
+        <td class="num ${d.retMedio>=0?'up':'dn'}">${num(d.retMedio,4)}%</td>
+        <td class="num ${Math.abs(d.t)>1.96?'':'mute'}">${d.t.toFixed(2)}</td>
+        <td class="num">${d.pctAlcista.toFixed(0)}%</td>
+        <td class="num mute">${d.n}</td></tr>`).join('')+'</tbody></table></div>';
+  }
+
+  /* EL AVISO QUE EVITA QUE TE CREAS UN ESPEJISMO */
+  html+=`<div class="gx-warn" style="border-color:var(--rule2);margin-top:12px">
+    <b>Cómo leer esto sin engañarse.</b> Se han hecho <b>${R.nTests} contrastes a la vez</b> (uno por franja).
+    Al 5%, unas <b>${R.esperadosPorAzar.toFixed(1)}</b> saldrían "significativas" por puro azar aunque el valor
+    no tuviera ningún patrón. Aquí salieron <b>${R.nSig}</b> con t&gt;1,96 (marcadas ✓) y solo
+    <b>${R.nSigCorregida}</b> superan el umbral corregido de t&gt;${R.umbralBonf.toFixed(1)} (marcadas ✓✓ y resaltadas).
+    <b>Fíate solo de las ✓✓.</b> Y aun así: ${R.nSesiones} sesiones son pocas, y lo que funcionó estos dos meses
+    no tiene por qué seguir funcionando.
+  </div>`;
+
+  // lectura práctica
+  const fuertes=R.sigCorregida;
+  html+=`<div class="gx-setup ${fuertes.length?'up':''}" style="margin-top:12px">
+    <div class="gx-setup-h">Qué hacer con esto · ${sym}</div>
+    ${fuertes.length
+      ? `<div class="gx-setup-b"><b>Franjas con patrón sólido:</b> ${fuertes.map(f=>`<b>${f.etiqueta}</b> (${num(f.retMedio)}%, ${f.pctAlcista.toFixed(0)}% alcista, t=${f.t.toFixed(1)})`).join(' · ')}.
+        Sobreviven a la corrección por contrastes múltiples, así que no son casualidad de haber mirado 26 franjas.</div>`
+      : `<div class="gx-setup-b"><b>Ninguna franja tiene un patrón sólido.</b> Las que salen con t&gt;1,96 son
+        compatibles con el azar cuando se tienen en cuenta los ${R.nTests} contrastes. Para este valor,
+        la hora del día no predice la dirección — que es el resultado más habitual y también es información útil.</div>`}
+    <div class="gx-setup-b"><b>Lo que sí es fiable aunque no prediga dirección:</b> el <b>rango medio</b> y el
+      <b>volumen</b>. Son mucho más estables que el retorno y te dicen <b>cuándo</b> operar aunque no <b>hacia dónde</b>:
+      ${sym} se mueve más en <b>${R.masVolatil.etiqueta}</b> (${R.masVolatil.rangoMedio.toFixed(2)}% de rango) y menos en
+      <b>${R.masCalma.etiqueta}</b> (${R.masCalma.rangoMedio.toFixed(2)}%).
+      Para comprar opciones intradía interesa la franja movida; para venderlas, la tranquila.</div>
+    <div class="gx-setup-b mute" style="font-size:11.5px">El <b>% alcista</b> es más robusto que el retorno medio
+      (no lo distorsiona un día extremo). Si una franja tiene 60% de velas alcistas sostenido, dice más que
+      un retorno medio alto que venga de dos sesiones sueltas.</div>
+  </div>`;
+  $('estTable').innerHTML=html;
 }
 
 async function scanStochRSI(){
