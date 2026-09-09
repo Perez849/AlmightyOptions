@@ -841,6 +841,9 @@ summary:hover{color:var(--ink)}
       <div class="caveat" id="estMsg" style="display:none"></div>
       <div id="estOut" style="display:none"><div id="estTable"></div>
         <div class="historia" style="font-size:12px;margin-top:10px">
+          <b>Todas las horas están en hora española</b> (con la hora de Nueva York debajo en gris).
+          El desfase se calcula con las zonas horarias reales, así que es correcto tanto en horario de
+          verano como de invierno.<br>
           <b>Retorno medio</b> = lo que hace de media esa franja, con su barra. <b>t</b> = cuántas desviaciones
           está de cero: <b>✓</b> supera 1,96 (el listón habitual) y <b>✓✓</b> supera el umbral corregido por
           haber mirado muchas franjas — solo estas últimas son de fiar. <b>% alcista</b> = con qué frecuencia
@@ -6842,6 +6845,7 @@ function pintaConsejos(lista){
    ═══════════════════════════════════════════════════════════════ */
 const PERS_CFG = {
   emaLen: 34, maxBars: 26, reversalBars: 2, ftMult: 1.0,
+  objetivoATR: 1.0, stopATR: 0.7,     // objetivo y stop en múltiplos de ATR
   minEventos: 12, minPrecio: 5, minADV: 20,   // ADV en millones de USD
   /* El VR pesaba 0,10, pero con ~1.500 velas su banda de ruido es ±0,095:
      casi ningún valor intradía sale significativo, así que estaba metiendo
@@ -6912,24 +6916,42 @@ function eventosPersistencia(C, cfg=PERS_CFG, lado='both'){
       if(!cruza) continue;
 
       const entrada=v[t].close;
+      const aTramo=atr[t];
+      /* OBJETIVO Y STOP: hay que saber cuál se toca ANTES, porque el retorno al
+         cierre del ciclo es ≈0 por construcción (sales en la línea media).
+         Lo que decide si una señal gana dinero es si el objetivo llega antes
+         que el stop, no dónde acaba el ciclo. */
+      const objATR=cfg.objetivoATR, stopATR=cfg.stopATR;
+      let tocaObjetivo=false, tocaStop=false, barsAObjetivo=NaN;
       let barsOut=0, barsAlive=0, mfe=0, mae=0, siguemidiendoOut=true, k=t;
       while(k+1<n && ses[k+1]===ses[t] && barsAlive<cfg.maxBars){
         k++; barsAlive++;
-        let fuera, vivo;
+        let fuera, vivo, favor, contra;
         if(dir===1){
-          mfe=Math.max(mfe, v[k].high-entrada);
-          mae=Math.max(mae, entrada-v[k].low);
+          favor = v[k].high-entrada; contra = entrada-v[k].low;
           fuera = v[k].close>emaH[k];
           vivo  = v[k].close>emaC[k];          // el ciclo vive mientras no pierda la media
         }else{
-          mfe=Math.max(mfe, entrada-v[k].low);
-          mae=Math.max(mae, v[k].high-entrada);
+          favor = entrada-v[k].low; contra = v[k].high-entrada;
           fuera = v[k].close<emaL[k];
           vivo  = v[k].close<emaC[k];
+        }
+        mfe=Math.max(mfe,favor); mae=Math.max(mae,contra);
+        // primer toque: si en la misma vela se tocan los dos, asumimos el STOP
+        // (es lo conservador: no se sabe el orden dentro de la vela)
+        if(!tocaObjetivo && !tocaStop){
+          const llegaStop = contra >= stopATR*aTramo;
+          const llegaObj  = favor  >= objATR*aTramo;
+          if(llegaStop){ tocaStop=true; }
+          else if(llegaObj){ tocaObjetivo=true; barsAObjetivo=barsAlive; }
         }
         if(siguemidiendoOut && fuera) barsOut++; else siguemidiendoOut=false;
         if(!vivo) break;
       }
+      /* Resultado de operar la señal con ese objetivo y stop */
+      const resultadoATR = tocaObjetivo ? objATR
+                        : tocaStop ? -stopATR
+                        : ((v[k].close-entrada)/aTramo)*dir;   // cierre del ciclo
       const a=atr[t];
       const w=(isFinite(ancho[t])&&ancho[t]>0)?ancho[t]:a;
       ev.push({
@@ -6941,6 +6963,7 @@ function eventosPersistencia(C, cfg=PERS_CFG, lado='both'){
         maePct: (mae/entrada)*100,
         mfeATR: mfe/a, maeATR: mae/a,
         retATR: ((v[k].close-entrada)/a)*dir,
+        resultadoATR, tocaObjetivo:tocaObjetivo?1:0, tocaStop:tocaStop?1:0, barsAObjetivo,
         followThru: mfe >= cfg.ftMult*w ? 1 : 0,
         reversal: barsAlive<=cfg.reversalBars ? 1 : 0,
       });
@@ -7066,6 +7089,14 @@ function resumenPersistencia(C, ev, sym, cfg=PERS_CFG){
     mfeLargoMed, mfeCortoMed,
     retATRmed:mediana(ev.map(e=>e.retATR)),
     winPct:ev.filter(e=>e.retATR>0).length/ev.length*100,
+    /* LO QUE DE VERDAD DECIDE: resultado de operar con objetivo y stop.
+       El retorno al cierre del ciclo es ≈0 por construcción (el ciclo termina
+       cuando el precio vuelve a la línea media, así que sales justo ahí).
+       Esto sí sirve: cuántas veces llega el objetivo antes que el stop. */
+    espATR: ev.reduce((a,b)=>a+b.resultadoATR,0)/ev.length,
+    pctObjetivo: ev.filter(e=>e.tocaObjetivo).length/ev.length*100,
+    pctStop: ev.filter(e=>e.tocaStop).length/ev.length*100,
+    espSig: retSignificancia(ev.map(e=>e.resultadoATR)),
     vr4:varianceRatio(C,4), vr8:varianceRatio(C,8), ac1:autocorr1(C),
     vrSig: vrSignificancia(varianceRatio(C,4), 4, v.length),
     retSig: retSignificancia(ev.map(e=>e.retATR)),
@@ -7113,7 +7144,20 @@ function estacionalidadIntradia(velas, opts={}){
   if(v.length<200) return null;
 
   const franjaDe = ms => { const m=minutosNY(ms); return Math.floor((m-570)/bloque)*bloque+570; };
-  const etiqueta = f => `${String(Math.floor(f/60)).padStart(2,'0')}:${String(f%60).padStart(2,'0')}`;
+  // Etiqueta en hora de NUEVA YORK (que es donde ocurre) y en hora ESPAÑOLA,
+  // que es la que tú miras. El desfase se calcula de verdad con las zonas
+  // horarias, así que sale bien tanto en horario de verano como de invierno.
+  const ejemplo = v.length? v[0].time : Date.now();
+  const desfase = (()=>{
+    const ny=new Date(ejemplo).toLocaleString('en-GB',{timeZone:'America/New_York',hour12:false,hour:'2-digit',minute:'2-digit'});
+    const es=new Date(ejemplo).toLocaleString('en-GB',{timeZone:'Europe/Madrid',hour12:false,hour:'2-digit',minute:'2-digit'});
+    const [nh,nm]=ny.split(':').map(Number), [eh,em]=es.split(':').map(Number);
+    let d=(eh*60+em)-(nh*60+nm); if(d<-720) d+=1440; if(d>720) d-=1440;
+    return d;   // minutos que va España por delante (normalmente +360)
+  })();
+  const hhmm = m => `${String(Math.floor(((m%1440)+1440)%1440/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
+  const etiqueta = f => hhmm(f);
+  const etiquetaES = f => hhmm(f+desfase);
   const dowDe = ms => new Date(ms).toLocaleDateString('en-US',{timeZone:'America/New_York',weekday:'short'});
 
   // agrupar por franja
@@ -7146,7 +7190,7 @@ function estacionalidadIntradia(velas, opts={}){
     const alcistas=R.filter(x=>x>0).length;
     const rangos=g[f].rangos, vols=g[f].vols.filter(isFinite);
     return {
-      franja:f, etiqueta:etiqueta(f), n,
+      franja:f, etiqueta:etiqueta(f), etiquetaES:etiquetaES(f), n,
       retMedio:m, retMediana:mediana(R), sd, t,
       pctAlcista: alcistas/n*100,
       rangoMedio: rangos.reduce((a,b)=>a+b,0)/rangos.length,
@@ -7157,7 +7201,7 @@ function estacionalidadIntradia(velas, opts={}){
 
   // recorrido acumulado medio del día (la "forma" típica de la sesión)
   const acum=[]; let suma=0;
-  for(const fila of filas){ suma+=fila.retMedio; acum.push({etiqueta:fila.etiqueta, acum:suma}); }
+  for(const fila of filas){ suma+=fila.retMedio; acum.push({etiqueta:fila.etiqueta, etiquetaES:fila.etiquetaES, acum:suma}); }
 
   // corrección por contrastes múltiples: probamos tantas franjas como haya
   const nTests=filas.length;
@@ -7175,7 +7219,7 @@ function estacionalidadIntradia(velas, opts={}){
             pctAlcista: R.filter(x=>x>0).length/n*100};
   });
 
-  return { filas, acum, nSesiones, nTests, umbralBonf, esperadosPorAzar,
+  return { filas, acum, nSesiones, nTests, umbralBonf, esperadosPorAzar, desfase,
            nSig: sig.length, nSigCorregida: sigCorregida.length,
            sig, sigCorregida, porDiaSemana, bloque,
            mejor: filas.reduce((b,f)=>!b||f.retMedio>b.retMedio?f:b,null),
@@ -9242,7 +9286,7 @@ function renderPersistencia(final){
      para decidir: es lo que se llevó de media cada señal, en múltiplos de ATR. */
   const orden=($('perOrden')&&$('perOrden').value)||'retorno';
   const criterio={
-    retorno:  f=>f.retATRmed,
+    retorno:  f=>f.espATR,   // esperanza real con objetivo/stop
     edge:     f=>f.edgeRatio,
     recorrido:f=>f.mfePctMed,
     duracion: f=>f.medAlive,
@@ -9256,7 +9300,7 @@ function renderPersistencia(final){
   let html='<div class="scrollx"><table class="quotes"><thead><tr>'+
     '<th>#</th><th>Ticker</th><th>Eventos</th><th>Velas vivo<br>(mediana / p75)</th>'+
     '<th>Recorrido a favor<br>(mediana / p75)</th><th>Máximo<br>alcanzado</th><th>En contra<br>(mediana)</th>'+
-    '<th>Retorno medio<br>por evento</th><th>Acierto</th>'+
+    '<th>Esperanza<br>por operación</th><th>Objetivo<br>vs stop</th>'+
     '<th>Se gira<br>rápido</th><th>Llega<br>lejos</th><th>MFE/MAE</th><th>VR(4)</th><th>Score</th></tr></thead><tbody>';
   for(const f of ok){
     const revCls = f.reversalPct>40?'dn':f.reversalPct<25?'up':'mute';
@@ -9274,12 +9318,13 @@ function renderPersistencia(final){
         ${isFinite(f.mfeLargoMed)&&isFinite(f.mfeCortoMed)?`<br><span class="mute" style="font-size:10px">L ${num(f.mfeLargoMed,2)}% · C ${num(f.mfeCortoMed,2)}%</span>`:''}</td>
       <td class="num up">${num(f.mfePctMax,2)}%<br><span class="mute" style="font-size:10px">p90 ${num(f.mfePctP90,2)}%</span></td>
       <td class="num dn">${num(f.maePctMed,2)}%</td>
-      <td class="num ${f.retSig&&f.retSig.sig?(f.retSig.media>0?'up':'dn'):'mute'}">
-        <b>${f.retATRmed>=0?'+':''}${num(f.retATRmed,2)}</b>
-        <br><span class="mute" style="font-size:10px">${f.retSig&&isFinite(f.retSig.t)
-          ? (f.retSig.sig ? 't='+num(f.retSig.t,1)+' ✓' : 't='+num(f.retSig.t,1)+' (azar)')
+      <td class="num ${f.espSig&&f.espSig.sig?(f.espSig.media>0?'up':'dn'):'mute'}">
+        <b>${f.espATR>=0?'+':''}${num(f.espATR,3)}</b>
+        <br><span class="mute" style="font-size:10px">${f.espSig&&isFinite(f.espSig.t)
+          ? (f.espSig.sig ? 't='+num(f.espSig.t,1)+' ✓✓' : 't='+num(f.espSig.t,1)+' (azar)')
           : '× ATR'}</span></td>
-      <td class="num ${f.winPct>52?'up':f.winPct<45?'dn':'mute'}">${num(f.winPct,0)}%</td>
+      <td class="num"><span class="up">${num(f.pctObjetivo,0)}%</span><span class="mute"> / </span><span class="dn">${num(f.pctStop,0)}%</span>
+        <br><span class="mute" style="font-size:10px">llega / salta</span></td>
       <td class="num ${revCls}">${num(f.reversalPct,0)}%</td>
       <td class="num ${ftCls}">${num(f.followThru,0)}%</td>
       <td class="num">${num(f.edgeRatio,2)}</td>
@@ -9330,14 +9375,14 @@ function renderPersistencia(final){
         /* EXIGENCIA REAL: que el retorno por evento sea estadísticamente
            distinto de cero (t>1,96), no solo positivo. Con 40 eventos y mucha
            dispersión, un +0,15 de media puede ser casualidad pura. */
-        const solidos=ok.filter(f=>f.retSig&&f.retSig.sig&&f.retSig.media>0&&f.edgeRatio>1.2&&f.reversalPct<35);
-        const flojos=ok.filter(f=>f.retATRmed>0.05&&f.edgeRatio>1.2&&f.reversalPct<35&&!(f.retSig&&f.retSig.sig));
+        const solidos=ok.filter(f=>f.espSig&&f.espSig.sig&&f.espSig.media>0&&f.edgeRatio>1.2&&f.reversalPct<35);
+        const flojos=ok.filter(f=>f.espATR>0.02&&f.edgeRatio>1.2&&f.reversalPct<35&&!(f.espSig&&f.espSig.sig));
         if(solidos.length) return `<div class="gx-setup-b" style="border-left:3px solid var(--bull,#3fb950);padding-left:9px">
           <b>✅ Los que encajan de verdad (${solidos.length}):</b>
-          ${solidos.slice(0,8).map(f=>`<b>${f.sym}</b> (${f.retSig.media>=0?'+':''}${num(f.retSig.media,2)}×ATR por evento, <b>t=${num(f.retSig.t,1)}</b>, MFE/MAE ${num(f.edgeRatio,2)}, ${num(f.reversalPct,0)}% giros)`).join(' · ')}.
+          ${solidos.slice(0,8).map(f=>`<b>${f.sym}</b> (esperanza ${f.espSig.media>=0?'+':''}${num(f.espSig.media,3)}×ATR, <b>t=${num(f.espSig.t,1)}</b>, llega al objetivo ${num(f.pctObjetivo,0)}% de las veces frente a ${num(f.pctStop,0)}% de stops)`).join(' · ')}.
           Su retorno por evento es <b>estadísticamente distinto de cero</b> (t&gt;1,96), no solo positivo por
           casualidad. Es la única exigencia que separa una ventaja real de un espejismo con 40 datos.</div>`
-          + (flojos.length?`<div class="gx-setup-b mute" style="font-size:11.5px">Positivos pero <b>sin significancia</b> (podrían ser azar): ${flojos.slice(0,10).map(f=>f.sym+' (t='+num(f.retSig?f.retSig.t:NaN,1)+')').join(', ')}.</div>`:'');
+          + (flojos.length?`<div class="gx-setup-b mute" style="font-size:11.5px">Positivos pero <b>sin significancia</b> (podrían ser azar): ${flojos.slice(0,10).map(f=>f.sym+' (t='+num(f.espSig?f.espSig.t:NaN,1)+')').join(', ')}.</div>`:'');
         return `<div class="gx-setup-b" style="border-left:3px solid var(--warn,#d29922);padding-left:9px">
           <b>⚠️ Ninguno tiene retorno por evento estadísticamente positivo.</b>
           ${flojos.length?`Estos salen positivos pero <b>no superan el contraste</b> (t&lt;1,96, o sea, compatible con azar): ${flojos.slice(0,8).map(f=>f.sym).join(', ')}. `:''}
@@ -9394,13 +9439,13 @@ function renderEstacionalidad(){
 
   let html=`<div class="bt-grid" style="grid-template-columns:repeat(4,1fr)">
     <div class="bt-cell"><div class="bt-num">${R.nSesiones}</div><div class="bt-lbl">sesiones<br>analizadas</div></div>
-    <div class="bt-cell"><div class="bt-num up">${R.mejor.etiqueta}</div><div class="bt-lbl">mejor franja<br>${num(R.mejor.retMedio)}%</div></div>
-    <div class="bt-cell"><div class="bt-num dn">${R.peor.etiqueta}</div><div class="bt-lbl">peor franja<br>${num(R.peor.retMedio)}%</div></div>
-    <div class="bt-cell"><div class="bt-num">${R.masVolatil.etiqueta}</div><div class="bt-lbl">más movida<br>${R.masVolatil.rangoMedio.toFixed(2)}% rango</div></div>
+    <div class="bt-cell"><div class="bt-num up">${R.mejor.etiquetaES}</div><div class="bt-lbl">mejor franja<br>${num(R.mejor.retMedio)}%</div></div>
+    <div class="bt-cell"><div class="bt-num dn">${R.peor.etiquetaES}</div><div class="bt-lbl">peor franja<br>${num(R.peor.retMedio)}%</div></div>
+    <div class="bt-cell"><div class="bt-num">${R.masVolatil.etiquetaES}</div><div class="bt-lbl">más movida<br>${R.masVolatil.rangoMedio.toFixed(2)}% rango</div></div>
   </div>`;
 
   html+='<div class="scrollx" style="margin-top:12px"><table class="quotes"><thead><tr>'+
-    '<th>Franja</th><th>Retorno medio</th><th></th><th>t</th><th>% alcista</th><th>Rango medio</th><th>Volumen</th></tr></thead><tbody>';
+    '<th>Hora<br>española</th><th>Retorno medio</th><th></th><th>t</th><th>% alcista</th><th>Rango medio</th><th>Volumen</th></tr></thead><tbody>';
   for(const f of R.filas){
     const w=Math.abs(f.retMedio)/maxAbs*100;
     const pos=f.retMedio>=0;
@@ -9410,7 +9455,7 @@ function renderEstacionalidad(){
                : `<span class="mute">${f.t.toFixed(1)}</span>`;
     const wR=f.rangoMedio/maxRango*100;
     html+=`<tr class="${sigCorr?'gx-now':''}">
-      <td class="num"><b>${f.etiqueta}</b></td>
+      <td class="num"><b>${f.etiquetaES}</b><br><span class="mute" style="font-size:10px">${f.etiqueta} NY</span></td>
       <td class="num ${pos?'up':'dn'}">${num(f.retMedio)}%</td>
       <td style="width:110px"><span class="gx-track" style="display:inline-block;width:100px"><span class="gx-fill ${pos?'up':'dn'}" style="width:${w.toFixed(0)}%"></span></span></td>
       <td class="num">${tTxt}</td>
@@ -9448,15 +9493,15 @@ function renderEstacionalidad(){
   html+=`<div class="gx-setup ${fuertes.length?'up':''}" style="margin-top:12px">
     <div class="gx-setup-h">Qué hacer con esto · ${sym}</div>
     ${fuertes.length
-      ? `<div class="gx-setup-b"><b>Franjas con patrón sólido:</b> ${fuertes.map(f=>`<b>${f.etiqueta}</b> (${num(f.retMedio)}%, ${f.pctAlcista.toFixed(0)}% alcista, t=${f.t.toFixed(1)})`).join(' · ')}.
+      ? `<div class="gx-setup-b"><b>Franjas con patrón sólido:</b> ${fuertes.map(f=>`<b>${f.etiquetaES}</b> <span class="mute">(${f.etiqueta} NY)</span> ${num(f.retMedio)}%, ${f.pctAlcista.toFixed(0)}% alcista, t=${f.t.toFixed(1)}`).join(' · ')}.
         Sobreviven a la corrección por contrastes múltiples, así que no son casualidad de haber mirado 26 franjas.</div>`
       : `<div class="gx-setup-b"><b>Ninguna franja tiene un patrón sólido.</b> Las que salen con t&gt;1,96 son
         compatibles con el azar cuando se tienen en cuenta los ${R.nTests} contrastes. Para este valor,
         la hora del día no predice la dirección — que es el resultado más habitual y también es información útil.</div>`}
     <div class="gx-setup-b"><b>Lo que sí es fiable aunque no prediga dirección:</b> el <b>rango medio</b> y el
       <b>volumen</b>. Son mucho más estables que el retorno y te dicen <b>cuándo</b> operar aunque no <b>hacia dónde</b>:
-      ${sym} se mueve más en <b>${R.masVolatil.etiqueta}</b> (${R.masVolatil.rangoMedio.toFixed(2)}% de rango) y menos en
-      <b>${R.masCalma.etiqueta}</b> (${R.masCalma.rangoMedio.toFixed(2)}%).
+      ${sym} se mueve más a las <b>${R.masVolatil.etiquetaES}</b> hora española (${R.masVolatil.rangoMedio.toFixed(2)}% de rango) y menos a las
+      <b>${R.masCalma.etiquetaES}</b> (${R.masCalma.rangoMedio.toFixed(2)}%).
       Para comprar opciones intradía interesa la franja movida; para venderlas, la tranquila.</div>
     <div class="gx-setup-b mute" style="font-size:11.5px">El <b>% alcista</b> es más robusto que el retorno medio
       (no lo distorsiona un día extremo). Si una franja tiene 60% de velas alcistas sostenido, dice más que
