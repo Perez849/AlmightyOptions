@@ -816,6 +816,45 @@ summary:hover{color:var(--ink)}
         arriba y descartes los que se giran a las dos velas.
       </div>
     </section>
+
+    <section class="blk">
+      <h2>🎯 RSI Shift Zone<span class="sub">valores del S&P 500 y Nasdaq con el RSI diario en zona</span></h2>
+      <div class="historia" style="font-size:13.5px;margin-bottom:12px">
+        <p>Réplica de la lógica del indicador de ChartPrime: <b>RSI de Wilder de 14</b> sobre cierres diarios,
+        con niveles 70/30. Busca en los 571 valores del universo (S&P 500 + Nasdaq 100 + midcaps líquidas)
+        los que tienen el RSI <b>en 31 o por debajo</b>.</p>
+        <p style="margin-top:6px">Además reproduce la <b>zona</b>: cuando el RSI cruza por debajo de 30, el
+        indicador guarda el máximo y el mínimo de esa vela como canal y lo mantiene un mínimo de 15 velas.
+        Aquí verás esa zona y si el precio sigue por debajo, ha vuelto dentro, o ya está por encima.</p>
+        <p style="margin-top:6px">Y debajo de los resultados, el <b>reparto por sector</b>: qué porcentaje
+        de los valores en sobreventa pertenece a cada sector, para ver si es debilidad general o un castigo
+        sectorial concreto.</p>
+      </div>
+      <div class="btns" style="margin-bottom:6px">
+        <button class="btn solid" id="rzBtn" onclick="scanRSIZona()">Buscar en zona</button>
+        <button class="btn quiet sm" onclick="pararRSIZona()">Detener</button>
+        <select id="rzUmbral" class="btn quiet" style="padding:8px">
+          <option value="31" selected>RSI ≤ 31</option>
+          <option value="30">RSI ≤ 30 (nivel del indicador)</option>
+          <option value="25">RSI ≤ 25 (sobreventa fuerte)</option>
+          <option value="20">RSI ≤ 20 (extremo)</option>
+          <option value="35">RSI ≤ 35 (más amplio)</option>
+        </select>
+      </div>
+      <div class="sr-progress" id="rzProg" style="display:none">
+        <div class="sr-bar"><div class="sr-fill" id="rzFill"></div></div>
+        <div class="sr-ptxt" id="rzPtxt"></div>
+      </div>
+      <div class="caveat" id="rzMsg" style="display:none"></div>
+      <div id="rzOut" style="display:none"><div id="rzTable"></div></div>
+      <div class="empty" id="rzEmpty">
+        <strong>Buscador de sobreventa</strong>
+        Recorre los 571 valores del universo calculando el RSI de 14 en gráfico diario, y te lista los que
+        están en 31 o por debajo — ordenados del más hundido al menos, con su zona del cruce y el reparto
+        sectorial al final.
+      </div>
+    </section>
+
     <section class="blk">
       <h2>🕐 Estacionalidad intradía<span class="sub">qué suele hacer un valor a cada hora de la sesión</span></h2>
       <div class="historia" style="font-size:13.5px;margin-bottom:12px">
@@ -7229,6 +7268,124 @@ function estacionalidadIntradia(velas, opts={}){
            masCalma:   filas.reduce((b,f)=>!b||f.rangoMedio<b.rangoMedio?f:b,null) };
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   BUSCADOR DE OSCILADORES EN ZONA · gráfico diario
+   Recorre el universo (S&P 500 + Nasdaq 100 + midcaps líquidas) y
+   devuelve los valores cuyo oscilador está en el nivel que pidas.
+   Varios indicadores porque el umbral 31 encaja con más de uno.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Williams %R: va de −100 (sobreventa) a 0 (sobrecompra) */
+function williamsR(highs, lows, closes, len=14){
+  if(closes.length<len) return NaN;
+  const h=Math.max(...highs.slice(-len)), l=Math.min(...lows.slice(-len));
+  const c=closes[closes.length-1];
+  return (h===l)? -50 : ((h-c)/(h-l))*-100;
+}
+/* CCI: típicamente ±100, extremos en ±200 */
+function cci(highs, lows, closes, len=20){
+  if(closes.length<len) return NaN;
+  const tp=[]; for(let i=0;i<closes.length;i++) tp.push((highs[i]+lows[i]+closes[i])/3);
+  const w=tp.slice(-len);
+  const m=w.reduce((a,b)=>a+b,0)/len;
+  const dm=w.reduce((a,b)=>a+Math.abs(b-m),0)/len;
+  return dm===0?0:(tp[tp.length-1]-m)/(0.015*dm);
+}
+/* MFI: RSI ponderado por volumen, 0-100 */
+function mfi(highs, lows, closes, vols, len=14){
+  if(closes.length<len+1) return NaN;
+  let pos=0, neg=0;
+  for(let i=closes.length-len;i<closes.length;i++){
+    const tp=(highs[i]+lows[i]+closes[i])/3, tpPrev=(highs[i-1]+lows[i-1]+closes[i-1])/3;
+    const flujo=tp*(isFinite(vols[i])&&vols[i]>0?vols[i]:1);
+    if(tp>tpPrev) pos+=flujo; else if(tp<tpPrev) neg+=flujo;
+  }
+  if(neg===0) return 100;
+  return 100 - 100/(1+pos/neg);
+}
+
+const OSC_DEF = {
+  rsi:      {nombre:'RSI (14)',        umbral:31,  dir:'bajo', min:0,  max:100, zona:'sobreventa por debajo de 30-31'},
+  stochk:   {nombre:'Stoch RSI %K',     umbral:31,  dir:'bajo', min:0,  max:100, zona:'sobreventa por debajo de 20'},
+  williams: {nombre:'Williams %R (14)', umbral:-80, dir:'bajo', min:-100, max:0, zona:'sobreventa por debajo de −80'},
+  cci:      {nombre:'CCI (20)',         umbral:-100,dir:'bajo', min:-300,max:300,zona:'sobreventa por debajo de −100'},
+  mfi:      {nombre:'MFI (14)',         umbral:31,  dir:'bajo', min:0,  max:100, zona:'sobreventa por debajo de 20-30'},
+};
+
+function calcOscilador(id, velas){
+  const c=velas.map(x=>x.close), h=velas.map(x=>x.high), l=velas.map(x=>x.low), v=velas.map(x=>x.volume);
+  switch(id){
+    case 'rsi':      { const s=rsiWilder(c,14); return s.length? s[s.length-1] : NaN; }
+    case 'stochk':   { const s=stochRSI(c,14,14,3,3); return s? s.k : NaN; }
+    case 'williams': return williamsR(h,l,c,14);
+    case 'cci':      return cci(h,l,c,20);
+    case 'mfi':      return mfi(h,l,c,v,14);
+  }
+  return NaN;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RSI SHIFT ZONE · buscador sobre el universo (diario)
+   Réplica de la lógica del indicador de ChartPrime:
+     · RSI de Wilder de 14 sobre cierres (ta.rsi(close,14))
+     · niveles 70 / 30
+     · cuando el RSI CRUZA por debajo de 30 se abre una ZONA: se
+       guardan el máximo y el mínimo de esa vela como canal, y la
+       zona permanece activa un mínimo de 15 velas.
+   Aquí se busca lo que pediste: valores con el RSI diario en 31 o
+   por debajo, distinguiendo los que ACABAN de cruzar (señal fresca)
+   de los que llevan tiempo hundidos.
+   ═══════════════════════════════════════════════════════════════ */
+function rsiShiftZone(velas, opts={}){
+  const len=opts.len??14, nivel=opts.nivel??30, minCanal=opts.minCanal??15;
+  const c=velas.map(v=>v.close).filter(x=>isFinite(x)&&x>0);
+  if(c.length<len+30) return null;
+  const serie=rsiWilder(c,len);
+  const n=serie.length;
+  const rsi=serie[n-1];
+  if(!isFinite(rsi)) return null;
+
+  /* Buscar el último cruce a la baja del nivel (crossunder) */
+  let idxCruce=-1;
+  for(let i=n-1;i>len+1;i--){
+    if(isFinite(serie[i])&&isFinite(serie[i-1]) && serie[i]<nivel && serie[i-1]>=nivel){ idxCruce=i; break; }
+  }
+  const velasDesdeCruce = idxCruce>=0 ? (n-1-idxCruce) : NaN;
+  // la zona del indicador: máximo y mínimo de la vela del cruce
+  let zonaAlta=NaN, zonaBaja=NaN, zonaActiva=false;
+  if(idxCruce>=0 && velas[idxCruce]){
+    zonaAlta=velas[idxCruce].high; zonaBaja=velas[idxCruce].low;
+    zonaActiva = velasDesdeCruce < minCanal;
+  }
+  const precio=c[c.length-1];
+  // ¿dónde está el precio respecto a la zona?
+  let posZona='—';
+  if(isFinite(zonaAlta)&&isFinite(zonaBaja)){
+    posZona = precio>zonaAlta ? 'por encima de la zona'
+            : precio<zonaBaja ? 'por debajo de la zona'
+            : 'dentro de la zona';
+  }
+  // pendiente del RSI: ¿sigue cayendo o ya gira?
+  const rsiPrev=serie[n-2], rsiPrev3=serie[Math.max(n-4,0)];
+  const girando = isFinite(rsiPrev)&&rsi>rsiPrev;
+  const rsiMin20 = Math.min(...serie.slice(-20).filter(isFinite));
+
+  return { rsi, rsiPrev, girando, rsiMin20,
+           idxCruce, velasDesdeCruce, zonaAlta, zonaBaja, zonaActiva, posZona,
+           precio, serie };
+}
+
+/* Reparto por sector de un conjunto de resultados */
+function repartoSectorial(filas){
+  const total=filas.length;
+  if(!total) return [];
+  const cuenta={};
+  for(const f of filas){ const s=f.sector||'—'; cuenta[s]=(cuenta[s]||0)+1; }
+  return Object.entries(cuenta)
+    .map(([sector,n])=>({sector, n, pct:n/total*100, tickers:filas.filter(f=>(f.sector||'—')===sector).map(f=>f.sym)}))
+    .sort((a,b)=>b.n-a.n);
+}
+
 function calcularGEX(rows, spot, opts={}){
   if(!rows || !rows.length || !isFinite(spot) || spot<=0) return null;
   const mult = opts.mult ?? 100;
@@ -9534,6 +9691,131 @@ function renderEstacionalidad(){
       un retorno medio alto que venga de dos sesiones sueltas.</div>
   </div>`;
   $('estTable').innerHTML=html;
+}
+
+/* Escáner RSI Shift Zone sobre el universo */
+let RZ={running:false, filas:[], done:0, total:0};
+
+async function scanRSIZona(){
+  if(RZ.running) return;
+  if(!CN.url||!CN.key){ const m=$('rzMsg'); m.style.display='block';
+    m.innerHTML='Necesito el acceso a datos configurado (Mi cuenta → Configurar acceso).'; return; }
+  const umbral=+(($('rzUmbral')&&$('rzUmbral').value)||31);
+  RZ={running:true, filas:[], done:0, total:STOCH_UNIVERSE.length, umbral};
+  $('rzEmpty').style.display='none'; $('rzOut').style.display='none';
+  $('rzProg').style.display='block'; $('rzBtn').disabled=true; $('rzBtn').textContent='Buscando…';
+  $('rzMsg').style.display='none';
+  try{
+    const dx=new DXLink(); RZ.dx=dx;
+    await dx.connect(CN.url, CN.key);
+    const LOTE=25;
+    for(let i=0;i<STOCH_UNIVERSE.length && RZ.running;i+=LOTE){
+      const lote=STOCH_UNIVERSE.slice(i,i+LOTE);
+      const buck={};
+      dx.onCandle=(s,c)=>{ const b=s.split('{')[0]; (buck[b]=buck[b]||[]).push(c); };
+      lote.forEach(s=>dx.subscribeCandles(s, 300, 'd'));   // 300 días: el RSI Wilder converge
+      await new Promise(r=>setTimeout(r, 2800));
+      for(const sym of lote){
+        const cs=(buck[sym]||[]).sort((a,b)=>a.time-b.time)
+          .filter(c=>isFinite(c.close)&&c.close>0);
+        RZ.done++;
+        if(cs.length<50) continue;
+        const z=rsiShiftZone(cs,{len:14,nivel:30,minCanal:15});
+        if(!z || !isFinite(z.rsi)) continue;
+        if(z.rsi>umbral) continue;                          // solo los que están en zona
+        const meta=STOCK_META[sym]||[sym,'—'];
+        RZ.filas.push({sym, nombre:meta[0], sector:meta[1], ...z});
+      }
+      lote.forEach(s=>{ try{ dx.unsubscribeCandles(s,'d'); }catch(e){} });
+      const pct=Math.round(RZ.done/RZ.total*100);
+      $('rzFill').style.width=pct+'%';
+      $('rzPtxt').textContent=`${RZ.done} / ${RZ.total} valores · ${RZ.filas.length} en zona`;
+      renderRSIZona();
+    }
+    try{ dx.disconnect(); }catch(e){}
+  }catch(e){ $('rzMsg').style.display='block'; $('rzMsg').innerHTML='Error: '+(e.message||e); }
+  RZ.running=false;
+  $('rzProg').style.display='none';
+  $('rzBtn').disabled=false; $('rzBtn').textContent='Buscar en zona';
+  renderRSIZona(true);
+}
+function pararRSIZona(){ RZ.running=false; try{RZ.dx&&RZ.dx.disconnect();}catch(e){} }
+
+function renderRSIZona(final){
+  if(!RZ.filas.length){ if(final){ $('rzOut').style.display='block';
+    $('rzTable').innerHTML='<div class="historia">Ningún valor del universo tiene el RSI diario en '+RZ.umbral+' o por debajo. Es lo normal cuando el mercado sube: la sobreventa escasea.</div>'; }
+    return; }
+  $('rzOut').style.display='block';
+  const F=[...RZ.filas].sort((a,b)=>a.rsi-b.rsi);   // el más hundido primero
+  const num=(x,d=1)=>isFinite(x)?x.toFixed(d):'—';
+
+  let html=`<div class="bt-grid" style="grid-template-columns:repeat(4,1fr)">
+    <div class="bt-cell"><div class="bt-num">${F.length}</div><div class="bt-lbl">valores con<br>RSI ≤ ${RZ.umbral}</div></div>
+    <div class="bt-cell"><div class="bt-num dn">${num(F[0].rsi)}</div><div class="bt-lbl">el más hundido<br>${F[0].sym}</div></div>
+    <div class="bt-cell"><div class="bt-num up">${F.filter(f=>f.girando).length}</div><div class="bt-lbl">ya girando<br>al alza</div></div>
+    <div class="bt-cell"><div class="bt-num">${F.filter(f=>f.zonaActiva).length}</div><div class="bt-lbl">con la zona<br>aún activa</div></div>
+  </div>`;
+
+  html+='<div class="scrollx" style="margin-top:12px"><table class="quotes"><thead><tr>'+
+    '<th>Ticker</th><th>Sector</th><th>RSI</th><th>Tendencia<br>del RSI</th><th>Precio</th>'+
+    '<th>Zona del cruce</th><th>Velas desde<br>el cruce</th></tr></thead><tbody>';
+  for(const f of F){
+    const rsiCls = f.rsi<=20?'dn':f.rsi<=25?'dn':'';
+    html+=`<tr onclick="srGoChain('${f.sym}')">
+      <td class="tk"><b>${f.sym}</b><br><span class="mute" style="font-size:10.5px">${f.nombre}</span></td>
+      <td class="mute" style="font-size:11.5px">${f.sector}</td>
+      <td class="num ${rsiCls}"><b>${num(f.rsi)}</b></td>
+      <td class="num ${f.girando?'up':'dn'}" style="font-size:11.5px">${f.girando?'▲ girando':'▼ cayendo'}
+        <br><span class="mute" style="font-size:10px">antes ${num(f.rsiPrev)}</span></td>
+      <td class="num">$${num(f.precio,2)}</td>
+      <td class="num" style="font-size:11.5px">${isFinite(f.zonaBaja)?('$'+num(f.zonaBaja,2)+' — $'+num(f.zonaAlta,2)):'—'}
+        <br><span class="mute" style="font-size:10px">${f.posZona}</span></td>
+      <td class="num ${f.zonaActiva?'up':'mute'}">${isFinite(f.velasDesdeCruce)?f.velasDesdeCruce:'—'}
+        ${f.zonaActiva?'<br><span style="font-size:10px">activa</span>':''}</td></tr>`;
+  }
+  html+='</tbody></table></div>';
+
+  /* REPARTO SECTORIAL — lo que pediste */
+  const rep=repartoSectorial(F);
+  const maxPct=Math.max(...rep.map(r=>r.pct),1);
+  html+=`<h2 style="margin-top:18px">Reparto por sector<span class="sub">dónde se concentra la sobreventa</span></h2>
+    <div class="scrollx"><table class="quotes"><thead><tr><th>Sector</th><th>Valores</th><th>% del total</th><th></th><th>Cuáles</th></tr></thead><tbody>`;
+  for(const r of rep){
+    const w=r.pct/maxPct*100;
+    html+=`<tr>
+      <td class="tk"><b>${r.sector}</b></td>
+      <td class="num">${r.n}</td>
+      <td class="num"><b>${r.pct.toFixed(1)}%</b></td>
+      <td style="width:130px"><span class="gx-track" style="display:inline-block;width:120px"><span class="gx-fill" style="width:${w.toFixed(0)}%;background:var(--brand)"></span></span></td>
+      <td class="mute" style="font-size:11px">${r.tickers.slice(0,10).join(', ')}${r.tickers.length>10?' …':''}</td></tr>`;
+  }
+  html+='</tbody></table></div>';
+
+  if(final){
+    const dom=rep[0], girando=F.filter(f=>f.girando).length;
+    const concentrado = dom && dom.pct>35;
+    html+=`<div class="gx-setup ${concentrado?'':'up'}" style="margin-top:14px">
+      <div class="gx-setup-h">Lectura</div>
+      <div class="gx-setup-b"><b>${F.length} valores</b> del universo (${RZ.total} analizados) tienen el RSI diario
+        en ${RZ.umbral} o por debajo. De ellos, <b>${girando}</b> ya están girando al alza — el RSI de hoy es
+        mayor que el de ayer, que es la primera señal de que el vendedor afloja.</div>
+      ${concentrado
+        ? `<div class="gx-setup-b" style="border-left:3px solid var(--warn,#d29922);padding-left:9px">
+           <b>⚠️ Sobreventa concentrada en ${dom.sector} (${dom.pct.toFixed(0)}% de los resultados).</b>
+           Cuando la sobreventa se agolpa en un solo sector no suele ser casualidad de cada empresa: es que
+           <b>el sector entero está siendo castigado</b>. Comprar ahí es apostar contra un movimiento sectorial,
+           no cazar una anomalía individual. Mira antes el ETF del sector en el análisis sectorial.</div>`
+        : `<div class="gx-setup-b">La sobreventa está <b>repartida entre sectores</b> (el mayor es ${dom.sector}
+           con el ${dom.pct.toFixed(0)}%), así que parece más debilidad de mercado general o casos individuales
+           que un castigo sectorial concreto.</div>`}
+      <div class="gx-setup-b mute" style="font-size:11.5px">La <b>zona del cruce</b> es el máximo y mínimo de la
+        vela en que el RSI perforó 30, igual que dibuja el indicador. Si el precio sigue por debajo de esa zona,
+        la caída ha continuado desde entonces; si ha vuelto dentro o por encima, está recuperando.
+        Y recuerda lo de siempre: RSI bajo en un valor con tendencia bajista de fondo puede seguir bajando
+        semanas — la sobreventa funciona mejor a favor de la tendencia mayor.</div>
+    </div>`;
+  }
+  $('rzTable').innerHTML=html;
 }
 
 async function scanStochRSI(){
